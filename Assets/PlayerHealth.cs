@@ -1,7 +1,6 @@
 using UnityEngine;
 using UnityEngine.UI;
-using UnityEngine.SceneManagement;
-using System.Collections; 
+using System.Collections;
 
 public class PlayerHealth : MonoBehaviour
 {
@@ -10,31 +9,34 @@ public class PlayerHealth : MonoBehaviour
     public int currentHealth;
 
     [Header("UI")]
-    public GameObject gameOverUI; 
-    public Image healthBarFill; 
+    public Image healthBarFill;
 
     [Header("Combat Settings")]
-    public float parryDuration = 0.5f; 
-    public ParticleSystem parryEffect; 
-    
-    // How wide is the block? (0.2 = Roughly 160 degrees in front)
-    public float blockAngleThreshold = 0.2f; 
+    public float parryDuration = 0.5f;
+    public ParticleSystem parryEffect;
+    public float blockAngleThreshold = 0.2f;
 
-    public bool isShieldBlocking = false; 
-    private bool isParrying = false;
+    public bool isShieldBlocking = false;
+
+    bool isParrying = false;
+    bool isDead = false; // 👈 IMPORTANT
 
     void Start()
     {
+        ResetHealth();
+    }
+
+    public void ResetHealth()
+    {
+        isDead = false;
         currentHealth = maxHealth;
-        UpdateHealthBar(); 
-        
-        // We must tell Unity to start time again, or the game stays frozen.
-        Time.timeScale = 1; 
+        UpdateHealthBar();
     }
 
     public void ActivateParry()
     {
-        if (!isParrying) StartCoroutine(PerformParry());
+        if (!isParrying && !isDead)
+            StartCoroutine(PerformParry());
     }
 
     IEnumerator PerformParry()
@@ -46,56 +48,49 @@ public class PlayerHealth : MonoBehaviour
 
     public void TakeDamage(int amount, Transform attacker)
     {
-        // CHECK PARRY 
+        if (isDead) return; // 👈 PREVENT MULTIPLE DEATHS
+
         if (isParrying)
         {
-            Debug.Log("PERFECT PARRY!");
-            if (parryEffect != null) parryEffect.Play();
-            
+            if (parryEffect != null)
+                parryEffect.Play();
+
             if (attacker != null)
             {
-                EnemyController enemyScript = attacker.GetComponent<EnemyController>();
-                if (enemyScript != null) enemyScript.TakeDamage(3); 
+                EnemyController enemy = attacker.GetComponent<EnemyController>();
+                if (enemy != null)
+                    enemy.TakeDamage(3);
             }
-            return; 
+            return;
         }
 
-        // CHECK SHIELD BLOCK 
         if (isShieldBlocking && attacker != null)
         {
-            Vector3 directionToEnemy = (attacker.position - transform.position).normalized;
-            float angle = Vector3.Dot(transform.forward, directionToEnemy);
+            Vector3 dir = (attacker.position - transform.position).normalized;
+            float angle = Vector3.Dot(transform.forward, dir);
 
             if (angle > blockAngleThreshold)
-            {
-                Debug.Log("Blocked Damage from Front!");
-                return; 
-            }
-            else
-            {
-                Debug.Log("OUCH! Backstabbed through shield!");
-            }
+                return;
         }
 
-        // NORMAL DAMAGE
         currentHealth -= amount;
         UpdateHealthBar();
 
-        if (currentHealth <= 0) Die();
+        if (currentHealth <= 0)
+            Die();
     }
 
-    void UpdateHealthBar() { if (healthBarFill != null) healthBarFill.fillAmount = (float)currentHealth / maxHealth; }
-    
-    void Die() 
-    { 
-        if (gameOverUI != null) gameOverUI.SetActive(true); 
-        Time.timeScale = 0; // This pauses the game
-        Cursor.visible = true; 
-        Cursor.lockState = CursorLockMode.None; 
+    void UpdateHealthBar()
+    {
+        if (healthBarFill != null)
+            healthBarFill.fillAmount = (float)currentHealth / maxHealth;
     }
-    
-    public void RestartGame() 
-    { 
-        SceneManager.LoadScene(SceneManager.GetActiveScene().name); 
+
+    void Die()
+    {
+        isDead = true; // 👈 LOCK STATE
+
+        if (GameManager.instance != null)
+            GameManager.instance.GameOver();
     }
 }

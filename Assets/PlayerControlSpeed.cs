@@ -1,4 +1,5 @@
 using UnityEngine;
+using System.Collections.Generic;
 
 public class PlayerControlSpeed : MonoBehaviour
 {
@@ -113,20 +114,25 @@ public class PlayerControlSpeed : MonoBehaviour
     {
         Vector3 hitPosition = transform.position + transform.forward;
         Collider[] hitColliders = Physics.OverlapSphere(hitPosition, attackRange);
-        foreach (Collider hitThing in hitColliders)
+
+        HashSet<EnemyController> hitEnemies = new HashSet<EnemyController>();
+
+        foreach (Collider hit in hitColliders)
         {
-            if (hitThing.CompareTag("Enemy"))
+            if (hit.CompareTag("Enemy"))
             {
-                EnemyController enemyScript = hitThing.GetComponent<EnemyController>();
-                if (enemyScript != null)
+                EnemyController enemy = hit.GetComponentInParent<EnemyController>();
+                if (enemy != null && !hitEnemies.Contains(enemy))
                 {
-                    Vector3 directionToEnemy = (hitThing.transform.position - transform.position).normalized;
-                    if (Vector3.Dot(transform.forward, directionToEnemy) > 0.3f)
+                    Vector3 dir = (enemy.transform.position - transform.position).normalized;
+                    if (Vector3.Dot(transform.forward, dir) > 0.3f)
                     {
-                        enemyScript.TakeDamage(1); 
+                        enemy.TakeDamage(1);
+                        hitEnemies.Add(enemy); // 🔒 one hit per enemy
                     }
                 }
             }
         }
     }
+
 }

@@ -4,37 +4,47 @@ using TMPro;
 
 public class GameManager : MonoBehaviour
 {
-    // Singleton: Lets zombies find this script easily
-    public static GameManager instance; 
+    public static GameManager instance;
 
     [Header("Level Goals")]
-    public int targetKills = 10; // WIN CONDITION
+    public int targetKills = 10;
     public int currentKills = 0;
 
-    [Header("UI Panels")]
-    public GameObject victoryUI; 
-    public GameObject pauseMenuUI; 
-    public TextMeshProUGUI scoreText; // Optional: To show "Kills: 0/10"
-    
-    private bool isPaused = false;
-    private bool gameEnded = false;
+    [Header("UI")]
+    public GameObject gameplayUI;   // Health bar + score
+    public GameObject victoryUI;
+    public GameObject gameOverUI;
+    public GameObject pauseMenuUI;
+    public TextMeshProUGUI scoreText;
+
+    bool isPaused;
+    bool gameEnded;
+
+    // =======================
+    // UNITY
+    // =======================
 
     void Awake()
     {
-        // Set up the Singleton
-        if (instance == null) instance = this;
+        if (instance != null && instance != this)
+        {
+            Destroy(gameObject);
+            return;
+        }
+
+        instance = this;
+        Time.timeScale = 1f;
     }
 
     void Start()
     {
-        UpdateScoreUI();
+        StartGameplay();
     }
 
     void Update()
     {
         if (gameEnded) return;
 
-        // PAUSE INPUT (ESC Key)
         if (Input.GetKeyDown(KeyCode.Escape))
         {
             if (isPaused) Resume();
@@ -42,7 +52,37 @@ public class GameManager : MonoBehaviour
         }
     }
 
-    // CALLED BY ZOMBIE WHEN IT DIES
+    // =======================
+    // GAME FLOW
+    // =======================
+
+    void StartGameplay()
+    {
+        currentKills = 0;
+        isPaused = false;
+        gameEnded = false;
+
+        if (gameplayUI) gameplayUI.SetActive(true);
+        if (victoryUI) victoryUI.SetActive(false);
+        if (gameOverUI) gameOverUI.SetActive(false);
+        if (pauseMenuUI) pauseMenuUI.SetActive(false);
+
+        UpdateScoreUI();
+
+        // Reset player health safely
+        PlayerHealth player = Object.FindFirstObjectByType<PlayerHealth>();
+        if (player != null)
+            player.ResetHealth();
+
+        Cursor.visible = false;
+        Cursor.lockState = CursorLockMode.Locked;
+        Time.timeScale = 1f;
+    }
+
+    // =======================
+    // GAMEPLAY
+    // =======================
+
     public void AddKill()
     {
         if (gameEnded) return;
@@ -50,56 +90,83 @@ public class GameManager : MonoBehaviour
         currentKills++;
         UpdateScoreUI();
 
-        // CHECK VICTORY: Only win if we hit the target number
         if (currentKills >= targetKills)
-        {
             WinGame();
-        }
     }
 
     void UpdateScoreUI()
     {
-        if (scoreText != null)
-        {
-            scoreText.text = "Zombies Defeated: " + currentKills + " / " + targetKills;
-        }
+        if (scoreText)
+            scoreText.text = $"Zombies Defeated: {currentKills} / {targetKills}";
     }
 
     void WinGame()
     {
         gameEnded = true;
-        victoryUI.SetActive(true);
-        Time.timeScale = 0; 
+        Time.timeScale = 0f;
+
+        if (victoryUI) victoryUI.SetActive(true);
+
         Cursor.visible = true;
         Cursor.lockState = CursorLockMode.None;
     }
 
+    public void GameOver()
+    {
+        if (gameEnded) return;
+
+        gameEnded = true;
+        Time.timeScale = 0f;
+
+        if (gameOverUI) gameOverUI.SetActive(true);
+
+        Cursor.visible = true;
+        Cursor.lockState = CursorLockMode.None;
+    }
+
+    // =======================
+    // PAUSE
+    // =======================
+
     public void Pause()
     {
-        pauseMenuUI.SetActive(true);
-        Time.timeScale = 0;
+        if (gameEnded) return;
+
+        if (pauseMenuUI) pauseMenuUI.SetActive(true);
+
+        Time.timeScale = 0f;
         isPaused = true;
+
         Cursor.visible = true;
         Cursor.lockState = CursorLockMode.None;
     }
 
     public void Resume()
     {
-        pauseMenuUI.SetActive(false);
-        Time.timeScale = 1;
+        if (pauseMenuUI) pauseMenuUI.SetActive(false);
+
+        Time.timeScale = 1f;
         isPaused = false;
+
         Cursor.visible = false;
         Cursor.lockState = CursorLockMode.Locked;
     }
-    
+
+    // =======================
+    // BUTTON ACTIONS
+    // =======================
+
     public void RestartGame()
     {
-        Time.timeScale = 1; 
-        SceneManager.LoadScene(SceneManager.GetActiveScene().name);
+        Time.timeScale = 1f;
+
+        SceneManager.LoadScene("Semi-Final", LoadSceneMode.Single);
+        SceneManager.LoadScene("Background", LoadSceneMode.Additive);
     }
-    
+
     public void QuitGame()
     {
-        Application.Quit();
+        Time.timeScale = 1f;
+        SceneManager.LoadScene("MainMenu", LoadSceneMode.Single);
     }
 }

@@ -29,3 +29,10 @@
 # OS generated files (Junk)
 .DS_Store
 Thumbs.db
+# Local player builds
+/Medieval Warrior Game/
+*.exe
+*_BurstDebugInformation_DoNotShip/
+
+# Embedded locally (slow CDN); the manifest still pins 3.5.4 from the registry
+/Packages/com.unity.postprocessing/

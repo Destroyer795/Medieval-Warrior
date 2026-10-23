@@ -65,7 +65,10 @@ public class PlayerControlSpeed : MonoBehaviour
     bool exhausted;
     float blockWeight, aimWeight, stepTimer, leanWeight;
     int stepIndex;
-    Transform leftHand, spine, bowVisual, nockedArrow;
+    Transform leftHand, spine;
+    ArcherRig rig;
+    KnightGear gear;
+    public KnightGear Gear => gear;
     readonly List<(float time, int step)> pendingHits = new List<(float, int)>();
 
     void Start()
@@ -89,7 +92,9 @@ public class PlayerControlSpeed : MonoBehaviour
         leftHand = FindBone(transform, "Bip001 L Hand");
         spine = FindBone(transform, "Bip001 Spine1") ?? FindBone(transform, "Bip001 Spine");
         if (!TryGetComponent(out KnightAppearance _)) gameObject.AddComponent<KnightAppearance>();
-        BuildBow();
+        rig = gameObject.AddComponent<ArcherRig>();
+        rig.Init(this);
+        gear = gameObject.AddComponent<KnightGear>();
     }
 
     static Transform FindBone(Transform root, string name)
@@ -101,22 +106,6 @@ public class PlayerControlSpeed : MonoBehaviour
             if (f != null) return f;
         }
         return null;
-    }
-
-    void BuildBow()
-    {
-        var t = Resources.Load<GameObject>("Prefabs/Bow");
-        var go = t != null ? Instantiate(t) : ProceduralModels.Spawn("Bow", ProceduralModels.BowMesh(), ProceduralModels.BowMaterials(0));
-        go.name = "Bow (equipment)";
-        var mr = go.GetComponent<MeshRenderer>();
-        if (mr != null) mr.sharedMaterials = ProceduralModels.BowMaterials(GameSettings.BowFinish);
-        bowVisual = go.transform;
-        bowVisual.SetParent(transform, true);
-
-        nockedArrow = Arrow.Model().transform;
-        nockedArrow.name = "Nocked Arrow";
-        nockedArrow.SetParent(transform, true);
-        nockedArrow.gameObject.SetActive(false);
     }
 
     bool Paused => Time.timeScale < 0.01f;
@@ -383,6 +372,7 @@ public class PlayerControlSpeed : MonoBehaviour
 
     void UpdateBow()
     {
+        if (debugHold) return;   // a test is holding the draw
         if (GameInput.AttackDown)
         {
             if (Arrows <= 0)
@@ -413,7 +403,7 @@ public class PlayerControlSpeed : MonoBehaviour
         DrawAmount = 0f;
         Arrows--;
 
-        Vector3 origin = bowVisual != null ? bowVisual.position : transform.position + Vector3.up * 1.4f;
+        Vector3 origin = rig != null ? rig.ArrowOrigin : transform.position + Vector3.up * 1.4f;
         Vector3 target;
         if (cameraTransform != null)
         {
@@ -434,6 +424,7 @@ public class PlayerControlSpeed : MonoBehaviour
                    Boons.Pierce, Boons.FireArrows && draw > 0.95f);
         AudioManager.PlayAt("bow_release", transform.position, 1f, 0.08f);
         if (GameManager.instance != null) GameManager.instance.RegisterArrowFired();
+        if (rig != null) rig.Release();
         FX.Shake(0.06f);
     }
 
@@ -446,6 +437,7 @@ public class PlayerControlSpeed : MonoBehaviour
 
     void CancelDraw()
     {
+        debugHold = false;
         IsDrawing = false;
         DrawAmount = 0f;
     }
@@ -465,16 +457,27 @@ public class PlayerControlSpeed : MonoBehaviour
     {
         if (Arrows <= 0) return;
         Arrows--;
-        Vector3 origin = bowVisual != null ? bowVisual.position : transform.position + Vector3.up * 1.4f;
+        Vector3 origin = rig != null ? rig.ArrowOrigin : transform.position + Vector3.up * 1.4f;
         Vector3 dir = (target - origin).normalized;
         Arrow.Fire(origin + dir * 0.2f, dir, Mathf.Lerp(24f, 58f, draw), Mathf.Lerp(1f, 3.4f, draw), Mathf.Lerp(2f, 9f, draw), transform);
         if (GameManager.instance != null) GameManager.instance.RegisterArrowFired();
+        if (rig != null) rig.Release();
     }
+
+    /// <summary>Holds the bow at a given draw (0..1) without firing - for tests and screenshots.</summary>
+    public void DebugHoldDraw(float amount)
+    {
+        IsDrawing = amount > 0f;
+        DrawAmount = Mathf.Clamp01(amount);
+        debugHold = IsDrawing;
+    }
+    bool debugHold;
 
     public void Equip(Weapon w)
     {
         if (w == CurrentWeapon) return;
         CurrentWeapon = w;
+        if (gear != null) gear.SetStowed(w == Weapon.Bow);   // two hands for the bow: sword to the hip, shield to the back
         CancelDraw();
         AudioManager.PlayAt("ui_click", transform.position, 0.7f);
     }
@@ -495,40 +498,9 @@ public class PlayerControlSpeed : MonoBehaviour
             spine.rotation = Quaternion.AngleAxis(32f * leanWeight, axis) * spine.rotation;
         }
 
-        // smoothly raise the shield arm (same pose holds the bow out when aiming)
-        float raise = Mathf.Max(blockWeight, aimWeight);
-        if (shieldArmBone != null && raise > 0.001f)
-            shieldArmBone.localRotation *= Quaternion.Slerp(Quaternion.identity, Quaternion.Euler(blockRotation), raise);
-
-        PlaceBow();
-    }
-
-    void PlaceBow()
-    {
-        if (bowVisual == null) return;
-        bool inHand = CurrentWeapon == Weapon.Bow && leftHand != null;
-        Vector3 aim = transform.forward;
-        if (cameraTransform != null && (IsAiming || IsDrawing)) aim = cameraTransform.forward;
-
-        if (inHand)
-        {
-            Vector3 up = Vector3.Slerp(transform.up, Vector3.Cross(aim, transform.right).normalized, 0.5f);
-            bowVisual.SetPositionAndRotation(leftHand.position + aim * 0.05f, Quaternion.LookRotation(aim, up) * Quaternion.Euler(0, 0, -12f));
-        }
-        else
-        {
-            // slung diagonally across the back
-            Vector3 back = (spine != null ? spine.position : transform.position + Vector3.up * 1.3f) - transform.forward * 0.3f + Vector3.up * 0.1f;
-            bowVisual.SetPositionAndRotation(back, Quaternion.LookRotation(-transform.forward, Vector3.up) * Quaternion.Euler(0, 0, 38f));
-        }
-
-        bool showArrow = inHand && Arrows > 0 && (IsDrawing || IsAiming);
-        if (nockedArrow.gameObject.activeSelf != showArrow) nockedArrow.gameObject.SetActive(showArrow);
-        if (showArrow)
-        {
-            Vector3 stringPos = bowVisual.position - bowVisual.forward * (0.02f + DrawAmount * 0.42f);
-            nockedArrow.SetPositionAndRotation(stringPos, Quaternion.LookRotation(aim, bowVisual.up));
-        }
+        // smoothly raise the shield arm (the archer stance is posed by ArcherRig)
+        if (shieldArmBone != null && blockWeight > 0.001f)
+            shieldArmBone.localRotation *= Quaternion.Slerp(Quaternion.identity, Quaternion.Euler(blockRotation), blockWeight);
     }
 
     void OnDisable()

@@ -22,6 +22,11 @@ zombie, three game modes, and a fully customisable knight.
 - **Bow & arrow** – press `Q` / `2` to swap; hold left mouse to draw (a fuller draw flies
   further, hits harder and knocks zombies back), right mouse aims over the shoulder.
   Headshots do double damage. The bow is slung on your back while you use the sword.
+- **Archer stance** – the knight turns side-on, extends the bow arm down the line of the shot and
+  draws the string back to his cheek (procedural IK on the skeleton). With the bow out, his sword is
+  sheathed on his hip and his shield slung on his back.
+- **Arrows can be recovered** – missed arrows stick in the ground, arrows in a zombie drop when it
+  dies; walk over them to pick them back up.
 - **Arrows** wait on **supply crates** beside the houses (they restock over time) and drop from
   fallen zombies, along with healing draughts.
 - **Stamina** for sprinting, dodge rolls (brief invulnerability) and shield bashes.
@@ -43,6 +48,10 @@ The zombie AI takes turns: only a few may attack at once while the others **circ
 for an opening**. They **rise out of the ground** at random reachable spots all over the map,
 sidestep when they get stuck, path around buildings (NavMesh) and relocate if they are ever
 cut off.
+
+**World** – the castle crowns a mound; the town's ground rolls and dips, every house, wall and
+tower seated on its own levelled, cobbled pad. 2K terrain textures, three kinds of hand-painted
+grass, flowers, forests, a mountain ring and roads that run to the real gates.
 
 **Game modes**
 - **Defend the Castle** – slay a set number of undead (by difficulty); the Warlord leads the
@@ -90,6 +99,9 @@ Menus work with the mouse or a controller (d-pad/stick to move, A to choose).
 ---
 
 ## Getting started (for collaborators)
+
+**Full step-by-step guide: [Docs/SETUP.md](Docs/SETUP.md)** (install, first open, package
+workaround, building, testing, regenerating assets, troubleshooting). Quick version:
 
 1. Install **Unity 6000.3.2f1** (Unity Hub → Installs → Install Editor → Archive, or any
    `6000.3.x`). No extra modules are needed for Windows.

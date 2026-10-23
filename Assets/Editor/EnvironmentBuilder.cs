@@ -37,9 +37,9 @@ public static class EnvironmentBuilder
     const float TerrainBase = 16f;     // world y = 0 is this far above the terrain floor
     static float FlatRadius;           // perfectly level play area
     static float PlainRadius;          // gentle undulation up to here, hills beyond
-    const int HeightRes = 1025;
+    const int HeightRes = 2049;
     const int AlphaRes = 2048;
-    const int DetailRes = 1024;
+    const int DetailRes = 2048;
     static Vector2[][] Roads;
 
     enum L { GrassLush, GrassMeadow, Dirt, Cobble, Rock }
@@ -128,6 +128,7 @@ public static class EnvironmentBuilder
 
         CollectBuildings(world);
         DeriveLayout();
+        ComputePads();
         GroundBuildings();
 
         Terrain terrain = CreateTerrain(env.transform, prefabs);
@@ -514,6 +515,8 @@ public static class EnvironmentBuilder
                 p = Center + dir * r;
                 if (!InsideWalls(p, 0f)) break;
             }
+            // vertical capsule: catches the wall whatever height it has been seated at
+            // probe at walking height; the walls are ~16 m tall, so this still hits them after they are seated lower
             bool blocked = Physics.CheckSphere(new Vector3(p.x, 1.6f, p.y), 1.4f, ~0, QueryTriggerInteraction.Ignore)
                         || Physics.CheckSphere(new Vector3(p.x - dir.x * 2f, 1.6f, p.y - dir.y * 2f), 1.4f, ~0, QueryTriggerInteraction.Ignore);
             open.Add((deg, !blocked));
@@ -564,12 +567,18 @@ public static class EnvironmentBuilder
     static void GroundBuildings()
     {
         const float sink = 0.12f;
-        foreach (var b in buildings)
+        var deltas = new float[buildings.Count];
+        for (int i = 0; i < buildings.Count; i++)
         {
-            if (b.bottom > 1.0f || b.bottom < -0.6f) continue; // mounted on another piece / already buried
-            float delta = -sink - b.bottom;
-            if (Mathf.Abs(delta) < 0.01f) continue;
-            if (delta > 0f && b.bottom > -sink - 0.05f) continue; // never raise
+            if (float.IsNaN(pads[i])) continue;
+            var b = buildings[i];
+            deltas[i] = pads[i] - sink - b.bottom;
+        }
+        for (int i = 0; i < buildings.Count; i++)
+        {
+            float delta = float.IsNaN(pads[i]) ? (supports[i] >= 0 ? deltas[supports[i]] : 0f) : deltas[i];
+            if (Mathf.Abs(delta) < 0.005f) continue;
+            var b = buildings[i];
             Undo.RecordObject(b.go.transform, "Ground building");
             b.go.transform.position += Vector3.up * delta;
             b.bottom += delta;
@@ -638,7 +647,79 @@ public static class EnvironmentBuilder
         return best + (Mathf.PerlinNoise(p.x * 0.06f, p.y * 0.06f) - 0.5f) * 3f;
     }
 
+    const float MoundDrop = 8.5f;        // how far the ground falls from the keep to the walls
+    static Building keep;
+    static float[] pads;               // levelled ground height under each grounded building (NaN = mounted on another piece)
+    static int[] supports;             // for mounted pieces: the building they stand on
+
+    // The ground before buildings are considered: a mound crowned by the keep, rolling undulation
+    // through the town, then the outer meadow, hills and mountains.
+    static float NaturalHeight(float x, float z)
+    {
+        Vector2 p = new Vector2(x, z);
+        float dKeep = keep != null ? keep.SignedDistance(p) : (p - Center).magnitude - 15f;
+        float slopeAway = Mathf.SmoothStep(0, 1, Mathf.InverseLerp(6f, CastleRadius + 20f, dKeep));
+        float rolling = ((Fbm(x * 0.017f + 3f, z * 0.017f + 7f, 3) - 0.5f) * 2f * 3.2f
+                       + (Fbm(x * 0.06f + 11f, z * 0.06f - 4f, 2) - 0.5f) * 0.6f)
+                      * Mathf.SmoothStep(0, 1, Mathf.InverseLerp(4f, 24f, dKeep));
+        return -MoundDrop * slopeAway + rolling + OuterHeight(x, z);
+    }
+
+    // Ground under everything: natural height, flattened into a pad under (and just around) each building.
     static float WorldHeight(float x, float z)
+    {
+        float natural = NaturalHeight(x, z);
+        if (pads == null) return natural;
+        Vector2 p = new Vector2(x, z);
+        float wsum = 0f, acc = 0f;
+        for (int i = 0; i < buildings.Count; i++)
+        {
+            if (float.IsNaN(pads[i])) continue;
+            var b = buildings[i];
+            float reach = b.half.magnitude + 8f;
+            if ((p - b.center).sqrMagnitude > reach * reach) continue;
+            float w = 1f - Mathf.SmoothStep(0, 1, Mathf.InverseLerp(1.2f, 7f, b.SignedDistance(p)));
+            if (w <= 0f) continue;
+            wsum += w;
+            acc += w * pads[i];
+        }
+        if (wsum <= 0f) return natural;
+        return Mathf.Lerp(natural, acc / wsum, Mathf.Min(1f, wsum));
+    }
+
+    static void ComputePads()
+    {
+        keep = buildings.Where(b => b.kind == "Castle").OrderByDescending(b => b.half.magnitude).FirstOrDefault();
+        pads = new float[buildings.Count];
+        supports = new int[buildings.Count];
+        for (int i = 0; i < buildings.Count; i++)
+        {
+            var b = buildings[i];
+            supports[i] = -1;
+            // standing on a lower, larger piece (towers on the keep, the keep bridge)? then it rides along with it
+            for (int j = 0; j < buildings.Count; j++)
+            {
+                var o = buildings[j];
+                if (j == i || o.kind == "Column" || o.half.magnitude <= b.half.magnitude * 0.6f) continue;
+                if (o.SignedDistance(b.center) < 0f && o.bottom < b.bottom - 1f) { supports[i] = j; break; }
+            }
+            if (supports[i] >= 0) { pads[i] = float.NaN; continue; }
+            // raised pieces with nothing under them (the keep's bridge) stay exactly where the designer put them
+            if (b.bottom > NaturalHeight(b.center.x, b.center.y) + 1f && b.bottom > 0.9f) { pads[i] = float.NaN; supports[i] = -2; continue; }
+            // average the natural ground over the footprint
+            float sum = 0f; int n = 0;
+            for (int sx = -2; sx <= 2; sx++)
+                for (int sz = -2; sz <= 2; sz++)
+                {
+                    Vector2 q = b.center + b.axisX * (b.half.x * sx / 2f) + b.axisZ * (b.half.y * sz / 2f);
+                    sum += NaturalHeight(q.x, q.y); n++;
+                }
+            pads[i] = sum / n;
+        }
+        Debug.Log($"[EnvironmentBuilder] pads: {pads.Count(p => !float.IsNaN(p))} grounded, {pads.Count(float.IsNaN)} mounted, range {pads.Where(p => !float.IsNaN(p)).DefaultIfEmpty(0).Min():F1}..{pads.Where(p => !float.IsNaN(p)).DefaultIfEmpty(0).Max():F1} m");
+    }
+
+    static float OuterHeight(float x, float z)
     {
         Vector2 p = new Vector2(x, z);
         float d = (p - Center).magnitude;
@@ -714,7 +795,7 @@ public static class EnvironmentBuilder
         terrain.drawInstanced = true;
         terrain.treeDistance = 450f;
         terrain.treeBillboardDistance = 450f;
-        terrain.detailObjectDistance = 85f;
+        terrain.detailObjectDistance = 120f;
         terrain.detailObjectDensity = 1f;
         terrain.shadowCastingMode = ShadowCastingMode.TwoSided;
 
@@ -802,20 +883,24 @@ public static class EnvironmentBuilder
         };
         td.detailPrototypes = new[]
         {
-            Proto("GrassBlades", 0.45f, 0.8f, 0.22f, 0.48f, new Color(0.42f, 0.66f, 0.24f), new Color(0.6f, 0.66f, 0.3f), DetailRenderMode.Grass),
+            Proto("GrassDense", 0.55f, 0.95f, 0.32f, 0.62f, new Color(0.96f, 1f, 0.92f), new Color(1f, 0.95f, 0.76f), DetailRenderMode.Grass),
+            Proto("GrassWild", 0.6f, 1.05f, 0.55f, 1.0f, new Color(0.95f, 1f, 0.9f), new Color(1f, 0.92f, 0.7f), DetailRenderMode.Grass),
+            Proto("GrassShort", 0.38f, 0.62f, 0.22f, 0.38f, new Color(0.96f, 1f, 0.92f), new Color(1f, 0.96f, 0.8f), DetailRenderMode.Grass),
             Proto("FlowersYellow", 0.35f, 0.5f, 0.3f, 0.45f, Color.white, Color.white, DetailRenderMode.GrassBillboard),
             Proto("FlowersRed", 0.35f, 0.5f, 0.3f, 0.45f, Color.white, Color.white, DetailRenderMode.GrassBillboard),
             Proto("FlowersWhite", 0.35f, 0.5f, 0.3f, 0.45f, Color.white, Color.white, DetailRenderMode.GrassBillboard),
             Proto("FlowersPurple", 0.35f, 0.5f, 0.3f, 0.45f, Color.white, Color.white, DetailRenderMode.GrassBillboard),
         };
-        td.wavingGrassTint = new Color(0.92f, 1f, 0.9f);
+        td.wavingGrassTint = Color.white;
         td.wavingGrassStrength = 0.35f;
         td.wavingGrassAmount = 0.3f;
         td.wavingGrassSpeed = 0.4f;
         td.SetDetailScatterMode(DetailScatterMode.InstanceCountMode);
-        td.SetDetailResolution(DetailRes, 16);
+        td.SetDetailResolution(DetailRes, 32);
 
-        var grass = new int[DetailRes, DetailRes];
+        var dense = new int[DetailRes, DetailRes];
+        var wild = new int[DetailRes, DetailRes];
+        var shortGrass = new int[DetailRes, DetailRes];
         var flowers = Enumerable.Range(0, 4).Select(_ => new int[DetailRes, DetailRes]).ToArray();
         for (int iz = 0; iz < DetailRes; iz++)
             for (int ix = 0; ix < DetailRes; ix++)
@@ -826,19 +911,34 @@ public static class EnvironmentBuilder
                 float sd = NearestBuilding(p, out _);
                 if (sd < 0.35f || grassy < 0.35f) continue;
                 float clump = Mathf.PerlinNoise(p.x * 0.15f + 7f, p.y * 0.15f + 3f);
-                // thicker grass hugging building bases and wall feet, hides the seam
-                float hug = sd < 5f ? 1.5f : 0f;
-                grass[iz, ix] = Mathf.RoundToInt(Mathf.Clamp(grassy * (clump * 3f + hug) + (float)rng.NextDouble() * 0.6f, 0f, 4f));
+                float wildness = Mathf.PerlinNoise(p.x * 0.04f - 9f, p.y * 0.04f + 2f);
+                bool inside = InsideWalls(p, 2f);
+                float hug = sd < 5f ? 1f : 0f;   // thicker grass hugging building bases and wall feet hides the seam
+                float amount = grassy * (clump * 1.6f + hug) + (float)rng.NextDouble() * 0.5f;
+                if (inside)
+                {
+                    // the town: mostly short, trodden grass with fuller clumps against the walls
+                    shortGrass[iz, ix] = Mathf.RoundToInt(Mathf.Clamp(amount * 1.2f, 0f, 3f));
+                    if (hug > 0f || clump > 0.62f) dense[iz, ix] = Mathf.RoundToInt(Mathf.Clamp(amount * 0.8f, 0f, 2f));
+                }
+                else
+                {
+                    dense[iz, ix] = Mathf.RoundToInt(Mathf.Clamp(amount, 0f, 3f));
+                    if (wildness > 0.52f || hug > 0f) wild[iz, ix] = Mathf.RoundToInt(Mathf.Clamp(amount * (wildness - 0.4f) * 2f, 0f, 2f));
+                    else shortGrass[iz, ix] = Mathf.RoundToInt(Mathf.Clamp(amount * 0.6f, 0f, 2f));
+                }
 
-                float flowerChance = 0.03f + (sd < 4.5f ? 0.25f : 0f) + (SplatAt(p, origin, L.GrassMeadow) > 0.5f ? 0.05f : 0f);
+                float flowerChance = 0.008f + (sd < 4.5f ? 0.07f : 0f) + (SplatAt(p, origin, L.GrassMeadow) > 0.5f ? 0.05f : 0f);
                 if (rng.NextDouble() < flowerChance * grassy)
                 {
                     int kind = (int)(Mathf.PerlinNoise(p.x * 0.05f, p.y * 0.05f) * 4f * 0.999f + rng.Next(2)) % 4;
                     flowers[kind][iz, ix] = 1 + rng.Next(2);
                 }
             }
-        td.SetDetailLayer(0, 0, 0, grass);
-        for (int i = 0; i < 4; i++) td.SetDetailLayer(0, 0, i + 1, flowers[i]);
+        td.SetDetailLayer(0, 0, 0, dense);
+        td.SetDetailLayer(0, 0, 1, wild);
+        td.SetDetailLayer(0, 0, 2, shortGrass);
+        for (int i = 0; i < 4; i++) td.SetDetailLayer(0, 0, i + 3, flowers[i]);
     }
 
     static void PlaceTrees(TerrainData td, Vector3 origin, Prefabs prefabs)
@@ -955,7 +1055,7 @@ public static class EnvironmentBuilder
                 bool rock = rng.NextDouble() < (b.kind == "House" ? 0.25 : 0.45);
                 var prefab = rock ? prefabs.rocks[rng.Next(prefabs.rocks.Length)] : prefabs.bushes[rng.Next(prefabs.bushes.Length)];
                 var go = (GameObject)PrefabUtility.InstantiatePrefab(prefab, root);
-                go.transform.position = new Vector3(p.x, -0.05f, p.y);
+                go.transform.position = new Vector3(p.x, WorldHeight(p.x, p.y) - 0.05f, p.y);
                 go.transform.rotation = Quaternion.Euler(0, R(0, 360), 0);
                 go.transform.localScale = Vector3.one * s * (rock ? R(0.35f, 0.7f) : R(0.6f, 1.05f));
                 count++;
@@ -986,10 +1086,11 @@ public static class EnvironmentBuilder
                 Vector2 outward = side switch { 0 => b.axisZ, 1 => -b.axisZ, 2 => b.axisX, _ => -b.axisX };
                 Vector2 p = b.center + b.axisX * local.x + b.axisZ * local.y + outward * 1.5f;
                 if (NearestBuilding(p, out _) < 1.1f) continue;
-                if (Mathf.Abs(WorldHeight(p.x, p.y)) > 0.2f) continue;
+                float gh = WorldHeight(p.x, p.y);
+                if (Mathf.Abs(WorldHeight(p.x + 1f, p.y) - gh) > 0.25f || Mathf.Abs(WorldHeight(p.x, p.y + 1f) - gh) > 0.25f) continue;   // too steep for a crate
                 var crate = (GameObject)PrefabUtility.InstantiatePrefab(prefab, root);
                 crate.name = "Supply Crate " + placed;
-                crate.transform.position = new Vector3(p.x, -0.02f, p.y);
+                crate.transform.position = new Vector3(p.x, gh - 0.02f, p.y);
                 crate.transform.rotation = Quaternion.LookRotation(new Vector3(outward.x, 0, outward.y)) * Quaternion.Euler(0, R(-12f, 12f), 0);
                 var pickupGo = new GameObject(placed % 4 == 3 ? "Healing Draught" : "Arrow Bundle");
                 pickupGo.transform.SetParent(crate.transform, false);
@@ -1045,11 +1146,11 @@ public static class EnvironmentBuilder
                 float clear = NearestBuilding(p, out _);
                 if (clear < 5f) continue;
                 // in sunlight? (cast towards the sun over the buildings)
-                bool lit = !Physics.Raycast(new Vector3(p.x, 1.2f, p.y), toSun, 200f);
+                bool lit = !Physics.Raycast(new Vector3(p.x, WorldHeight(p.x, p.y) + 1.2f, p.y), toSun, 200f);
                 float score = Mathf.Min(clear, 12f) + (lit ? 10f : 0f) - (p - Center).magnitude * 0.08f;
                 if (score > bestScore) { bestScore = score; best = p; }
             }
-        Vector3 pos = new Vector3(best.x, 0.05f, best.y);
+        Vector3 pos = new Vector3(best.x, WorldHeight(best.x, best.y) + 0.05f, best.y);
         Vector3 look = new Vector3(Center.x, 0, Center.y) - pos; look.y = 0;
         if (look.sqrMagnitude < 1f) look = Vector3.forward;
         player.transform.SetPositionAndRotation(pos, Quaternion.LookRotation(look));

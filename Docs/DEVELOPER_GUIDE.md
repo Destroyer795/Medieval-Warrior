@@ -44,6 +44,8 @@ the same lighting settings; the builder writes them into all three scenes.
 | `Feats` | Persistent achievements: `Feats.Add(stat)` for counters, `Feats.Unlock(id)` for events. Disabled while tests run. |
 | `GamepadUISelector` | On every UIKit canvas: keeps a control focused on the frontmost screen while a gamepad is used. |
 | `BannerFlag`, `ChimneySmoke`, `SkyDrift` | World ambience placed by the builder. |
+| `ArcherRig` | Procedural archer stance (no archery clips exist for the knight): torso twist, two-bone IK for both arms, live bowstring, nocked arrow, release follow-through. Runs after animation (`DefaultExecutionOrder(100)`). |
+| `KnightGear` | Finds the sword and shield islands inside the knight's single skinned mesh; with the bow out, swaps to a mesh copy without them and shows them as props (sword on the hip, shield on the back). |
 | `TintVariation` | Per-house colour wash via MaterialPropertyBlock (set by the builder). |
 | `UIKit` | Builds styled UI in code (panels, buttons, sliders, toggles, selectors, input fields). |
 | `GameHUD`, `MainMenuUI`, `SharedPanels` | The screens themselves. |
@@ -78,6 +80,14 @@ Drop a `.wav` in `Assets/Resources/Audio` and call `AudioManager.PlayAt("name", 
 ### Add a UI screen
 Use `SharedPanels.Page(parent, name, size, title)` to get a framed, fading page, then fill it
 with `UIKit.Button / Slider / Toggle / Selector / InputField`. Look at `SharedPanels.Settings`.
+
+### Terrain and building seating
+`EnvironmentBuilder.NaturalHeight` is the ground before buildings: a mound crowned by the keep
+(`MoundDrop`), two layers of rolling noise inside the town, then the outer meadow/hills/mountains
+(`OuterHeight`). `ComputePads` gives every grounded building a pad (average natural height under its
+footprint); `WorldHeight` blends each pad smoothly into the surrounding ground, and `GroundBuildings`
+moves each building onto its pad. Pieces standing on another piece ride along with their support;
+raised pieces with nothing under them (the keep's bridge) are left exactly where they are.
 
 ### Regenerate the world
 `Medieval Warrior → Rebuild Environment`. Inputs live in `Assets/Environment/Textures` and the

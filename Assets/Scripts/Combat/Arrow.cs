@@ -6,7 +6,9 @@ public class Arrow : MonoBehaviour
     Vector3 velocity;
     float damage, knockback;
     Transform owner;
-    bool stuck, fire;
+    bool stuck, fire, falling, stuckInEnemy;
+    EnemyController stuckIn;
+    Vector3 fallVelocity, spin;
     int pierce;
     float age;
     readonly System.Collections.Generic.HashSet<EnemyController> pierced = new System.Collections.Generic.HashSet<EnemyController>();
@@ -47,8 +49,14 @@ public class Arrow : MonoBehaviour
     void Update()
     {
         age += Time.deltaTime;
+        if (falling) { UpdateFall(); return; }
+        if (stuck)
+        {
+            // the zombie it was stuck in has died (or been cleaned up): drop to the ground
+            if (stuckInEnemy && (stuckIn == null || stuckIn.IsDead)) BeginFall();
+            return;
+        }
         if (age > 14f) { Destroy(gameObject); return; }
-        if (stuck) return;
 
         velocity += Physics.gravity * 0.45f * Time.deltaTime;
         Vector3 tip = transform.position + transform.forward * Length;
@@ -87,16 +95,75 @@ public class Arrow : MonoBehaviour
         if (enemy != null && !enemy.IsDead)
         {
             HitEnemy(enemy, hit.point);
-            transform.SetParent(hit.collider.transform, true);
-            Destroy(gameObject, 4f);
+            // stick to the nearest bone so the arrow moves with the body, not the upright root collider
+            transform.SetParent(NearestBone(enemy, hit.point), true);
+            stuckIn = enemy;
+            stuckInEnemy = true;
+            if (enemy.IsDead) BeginFall();
         }
         else
         {
             if (fire) FX.Embers(hit.point, 8);
             AudioManager.PlayAt("arrow_hit", hit.point, 0.8f);
             FX.Dust(hit.point, 0.25f, 5);
-            Destroy(gameObject, 10f);
+            BecomePickup();   // walk over it to get it back
         }
+    }
+
+    static Transform NearestBone(EnemyController enemy, Vector3 point)
+    {
+        Transform best = enemy.transform;
+        float bestD = float.MaxValue;
+        foreach (var smr in enemy.GetComponentsInChildren<SkinnedMeshRenderer>())
+            foreach (var b in smr.bones)
+            {
+                if (b == null) continue;
+                float d = (b.position - point).sqrMagnitude;
+                if (d < bestD) { bestD = d; best = b; }
+            }
+        return best;
+    }
+
+    void BeginFall()
+    {
+        stuck = false;
+        falling = true;
+        stuckInEnemy = false;
+        transform.SetParent(null, true);
+        fallVelocity = new Vector3(Random.Range(-1f, 1f), Random.Range(0.5f, 2f), Random.Range(-1f, 1f));
+        spin = new Vector3(Random.Range(-360f, 360f), Random.Range(-180f, 180f), 0f);
+    }
+
+    void UpdateFall()
+    {
+        fallVelocity += Physics.gravity * Time.deltaTime;
+        Vector3 step = fallVelocity * Time.deltaTime;
+        foreach (var hit in Physics.RaycastAll(transform.position + Vector3.up * 0.3f, Vector3.down, 0.3f + Mathf.Max(0.05f, -step.y), ~0, QueryTriggerInteraction.Ignore))
+        {
+            if (hit.collider.GetComponentInParent<EnemyController>() != null || hit.collider.GetComponentInParent<PlayerHealth>() != null) continue;
+            // land flat on the ground
+            Vector3 along = Vector3.ProjectOnPlane(transform.forward, hit.normal);
+            if (along.sqrMagnitude < 0.01f) along = Vector3.ProjectOnPlane(Vector3.forward, hit.normal);
+            transform.SetPositionAndRotation(hit.point + hit.normal * 0.02f - along.normalized * 0.45f, Quaternion.LookRotation(along, hit.normal));
+            falling = false;
+            BecomePickup();
+            return;
+        }
+        transform.position += step;
+        transform.Rotate(spin * Time.deltaTime, Space.Self);
+        if (transform.position.y < -60f) Destroy(gameObject);
+    }
+
+    void BecomePickup()
+    {
+        var trail = GetComponent<TrailRenderer>();
+        if (trail != null) Destroy(trail);
+        var p = gameObject.AddComponent<Pickup>();
+        p.kind = PickupKind.Arrows;
+        p.amount = 1;
+        p.lifetime = 40f;
+        p.staticVisual = true;
+        Destroy(this);
     }
 
     void HitEnemy(EnemyController enemy, Vector3 point)

@@ -139,6 +139,9 @@ public static class GameplayBuilder
         acid.renderQueue = 3000;
         SaveMat(Res + "/FX/Acid.mat", acid);
 
+        var bowString = new Material(Shader.Find("Unlit/Color")) { name = "BowString", color = new Color(0.9f, 0.87f, 0.78f) };
+        SaveMat(Res + "/FX/BowString.mat", bowString);
+
         var banner = new Material(Shader.Find("MedievalWarrior/VertexColorLit")) { name = "Banner", enableInstancing = true };
         SaveMat(Res + "/FX/Banner.mat", banner);
     }

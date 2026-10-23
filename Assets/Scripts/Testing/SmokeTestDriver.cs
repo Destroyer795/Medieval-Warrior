@@ -164,7 +164,54 @@ public class SmokeTestDriver : MonoBehaviour
         Check(gm.ArrowsFired - firedBefore == 3, "three shots fired and counted");
         Check(player.Arrows < arrowsBefore || player.Arrows == player.maxArrows, "arrows consumed (unless topped up from a crate)");
         Check(gm.ArrowsHit >= 1, $"arrows hit zombies ({gm.ArrowsHit}/{gm.ArrowsFired})");
+        // archer stance: the draw hand travels to the cheek, the bow arm points down the shot
+        var lUpper = Bone(player.transform, "Bip001 L UpperArm");
+        var lHand = Bone(player.transform, "Bip001 L Hand");
+        var rHand = Bone(player.transform, "Bip001 R Hand");
+        player.DebugHoldDraw(0.01f);
+        yield return Wait(0.8f);
+        float braceGap = Vector3.Distance(lHand.position, rHand.position);
+        CaptureFrom("14b_archer_brace_side", player.transform.position + player.transform.right * 2.6f + player.transform.forward * 0.6f + Vector3.up * 1.5f, player.transform.position + Vector3.up * 1.3f);
+        player.DebugHoldDraw(1f);
+        yield return Wait(0.8f);
+        float fullGap = Vector3.Distance(lHand.position, rHand.position);
+        float armAngle = Vector3.Angle(lHand.position - lUpper.position, Camera.main.transform.forward);
+        CaptureFrom("14c_archer_full_side", player.transform.position + player.transform.right * 2.6f + player.transform.forward * 0.6f + Vector3.up * 1.5f, player.transform.position + Vector3.up * 1.3f);
+        CaptureFrom("14d_archer_full_front", player.transform.position + player.transform.forward * 2.8f - player.transform.right * 0.8f + Vector3.up * 1.6f, player.transform.position + Vector3.up * 1.3f);
+        Capture("14e_archer_full_aim");
+        Check(fullGap > braceGap + 0.06f, $"draw hand pulls the string back ({braceGap:F2} m -> {fullGap:F2} m between hands)");
+        Check(player.Gear != null && player.Gear.Ready, "sword and shield stowed for the bow (" + (player.Gear != null ? player.Gear.Report : "no gear") + ")");
+        Check(armAngle < 30f, $"bow arm points along the aim ({armAngle:F0} deg off)");
+        player.DebugHoldDraw(0f);
         player.DebugAim(false);
+
+        // rolling terrain inside the walls, and every house seated on it
+        var terrain = Terrain.activeTerrain;
+        if (terrain != null)
+        {
+            float lo = float.MaxValue, hi = float.MinValue;
+            Vector3 c = player.transform.position;
+            for (int a = 0; a < 360; a += 15)
+                for (float r = 10f; r <= 50f; r += 10f)
+                {
+                    Vector3 q = c + Quaternion.Euler(0, a, 0) * Vector3.forward * r;
+                    float h = terrain.SampleHeight(q) + terrain.transform.position.y;
+                    lo = Mathf.Min(lo, h); hi = Mathf.Max(hi, h);
+                }
+            Check(hi - lo > 2f, $"ground rolls through the castle ({hi - lo:F1} m of relief)");
+            int floating = 0, houses = 0;
+            foreach (var house in Object.FindObjectsByType<TintVariation>(FindObjectsSortMode.None))
+            {
+                var rends = house.GetComponentsInChildren<Renderer>();
+                if (rends.Length == 0) continue;
+                var b = rends[0].bounds;
+                foreach (var r in rends) b.Encapsulate(r.bounds);
+                float ground = terrain.SampleHeight(b.center) + terrain.transform.position.y;
+                houses++;
+                if (Mathf.Abs(b.min.y - ground) > 0.5f) floating++;
+            }
+            Check(houses > 10 && floating == 0, $"houses sit on the terrain ({houses - floating}/{houses} seated)");
+        }
 
         // sword
         player.Equip(Weapon.Sword);
@@ -203,6 +250,13 @@ public class SmokeTestDriver : MonoBehaviour
         foreach (var e in line.Where(x => x != null && !x.IsDead).ToArray()) e.TakeDamage(999f, fwd, 5f);
         yield return Wait(1.5f);
         Check(gm.currentKills > killsBefore, $"kills counted ({gm.currentKills - killsBefore})");
+        int airborne = 0, grounded = 0;
+        foreach (var p in Object.FindObjectsByType<Pickup>(FindObjectsSortMode.None))
+        {
+            if (!p.staticVisual) continue;
+            if (Physics.Raycast(p.transform.position + Vector3.up * 0.5f, Vector3.down, 2.5f)) grounded++; else airborne++;
+        }
+        Check(airborne == 0, $"spent arrows lie on the ground as pickups ({grounded} grounded, {airborne} floating)");
         Check(gm.Score > scoreBefore, "score increases with kills");
         Capture("16_after_kills");
 
@@ -324,6 +378,38 @@ public class SmokeTestDriver : MonoBehaviour
         File.WriteAllText(Path.Combine(shotDir, "report.txt"), report.ToString());
         Debug.Log("[SMOKE] REPORT\n" + report);
         File.WriteAllText(Path.Combine(Application.dataPath, "..", "Temp", "mw_smoke_done.txt"), result);
+    }
+
+    static Transform Bone(Transform root, string name)
+    {
+        if (root.name == name) return root;
+        foreach (Transform c in root) { var f = Bone(c, name); if (f != null) return f; }
+        return null;
+    }
+
+    // A separate camera, so the gameplay camera (and therefore the aim) is left alone.
+    void CaptureFrom(string name, Vector3 position, Vector3 lookAt)
+    {
+        var go = new GameObject("Capture Camera");
+        var cam = go.AddComponent<Camera>();
+        cam.fieldOfView = 40f;
+        cam.nearClipPlane = 0.05f;
+        go.transform.position = position;
+        go.transform.LookAt(lookAt);
+        var rt = new RenderTexture(1280, 720, 24, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB);
+        cam.targetTexture = rt;
+        cam.Render();
+        RenderTexture.active = rt;
+        var tex = new Texture2D(1280, 720, TextureFormat.RGB24, false);
+        tex.ReadPixels(new Rect(0, 0, 1280, 720), 0, 0);
+        tex.Apply();
+        RenderTexture.active = null;
+        cam.targetTexture = null;
+        rt.Release();
+        Destroy(go);
+        Directory.CreateDirectory(shotDir);
+        File.WriteAllBytes(Path.Combine(shotDir, name + ".png"), tex.EncodeToPNG());
+        Destroy(tex);
     }
 
     // Screen-space overlay UI isn't drawn into camera renders, so temporarily move canvases onto the camera.

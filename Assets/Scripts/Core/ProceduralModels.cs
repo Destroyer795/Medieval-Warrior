@@ -119,7 +119,7 @@ public static class ProceduralModels
     // ------------------------------------------------------------ bow (limbs bend towards +Z, string at -Z)
     public static Mesh BowMesh() => Cached("bow", () =>
     {
-        var k = new MeshKit(3); // 0 wood, 1 trim/grip, 2 string
+        var k = new MeshKit(2); // 0 wood, 1 trim/grip (the string is a live LineRenderer, see ArcherRig)
         const int segs = 10;
         const float half = 0.62f, depth = 0.2f;
         Vector3 Limb(float t) { float y = Mathf.Lerp(-half, half, t); float yy = y / half; return new Vector3(0, y, depth * (1f - yy * yy) - depth * 0.15f * yy * yy * yy * yy); }
@@ -132,7 +132,6 @@ public static class ProceduralModels
         k.Tube(1, Limb(0.42f), Limb(0.58f), 0.042f, 0.042f, 6);           // leather grip
         k.Ball(1, Limb(0f), Vector3.one * 0.03f, 3, 5);                  // nocks
         k.Ball(1, Limb(1f), Vector3.one * 0.03f, 3, 5);
-        k.Tube(2, Limb(0f), Limb(1f), 0.005f, 0.005f, 3);                // string
         return k.Build("Bow");
     });
 
@@ -143,7 +142,6 @@ public static class ProceduralModels
         {
             Mat("bow_wood_" + finish, f.wood, 0.35f),
             Mat("bow_trim_" + finish, f.trim, 0.5f, 0.3f),
-            Mat("bow_string", new Color(0.92f, 0.9f, 0.82f), 0.1f),
         };
     }
 

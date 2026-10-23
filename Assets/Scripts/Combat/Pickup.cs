@@ -11,6 +11,7 @@ public class Pickup : MonoBehaviour
     public bool respawns;
     public float respawnTime = 45f;
     public float lifetime = 30f;
+    public bool staticVisual;   // this object *is* the pickup (a spent arrow on the ground): no bobbing, no glow
 
     Transform visual;
     float age, hiddenUntil = -1f;
@@ -31,6 +32,7 @@ public class Pickup : MonoBehaviour
     void Start()
     {
         basePos = transform.position;
+        if (staticVisual) { visual = transform; return; }
         string prefab = kind == PickupKind.Arrows ? "ArrowBundle" : "Potion";
         var t = Resources.Load<GameObject>("Prefabs/" + prefab);
         GameObject v = t != null ? Instantiate(t, transform) :
@@ -65,8 +67,11 @@ public class Pickup : MonoBehaviour
         age += Time.deltaTime;
         if (!respawns && age > lifetime) { Destroy(gameObject); return; }
 
-        visual.localPosition = Vector3.up * (0.45f + Mathf.Sin(Time.time * 2.2f) * 0.08f);
-        visual.Rotate(Vector3.up, 70f * Time.deltaTime, Space.World);
+        if (!staticVisual)
+        {
+            visual.localPosition = Vector3.up * (0.45f + Mathf.Sin(Time.time * 2.2f) * 0.08f);
+            visual.Rotate(Vector3.up, 70f * Time.deltaTime, Space.World);
+        }
 
         var player = GameObject.FindWithTag("Player");
         if (player == null) return;
@@ -77,7 +82,7 @@ public class Pickup : MonoBehaviour
         bool wanted = kind == PickupKind.Arrows ? weapons != null && weapons.Arrows < weapons.maxArrows
                                                 : health != null && health.currentHealth < health.maxHealth;
         if (!wanted) { magnet = false; return; }
-        if (d < 3.2f) magnet = true;
+        if (d < (staticVisual ? 2.2f : 3.2f)) magnet = true;
         if (magnet && !respawns) transform.position = Vector3.MoveTowards(transform.position, player.transform.position + Vector3.up * 0.5f, 9f * Time.deltaTime);
         if (d < 1.3f) Collect(weapons, health);
     }
@@ -87,7 +92,7 @@ public class Pickup : MonoBehaviour
         if (kind == PickupKind.Arrows)
         {
             int got = weapons.AddArrows(amount);
-            GameHUD.Toast($"+{got} arrows", UIKit.Gold, "arrow");
+            if (got > 0) GameHUD.Toast(got == 1 ? "+1 arrow" : $"+{got} arrows", UIKit.Gold, "arrow", staticVisual ? 0.9f : 1.8f, staticVisual ? 24 : 30);
             AudioManager.Play2D("pickup", 0.8f);
         }
         else

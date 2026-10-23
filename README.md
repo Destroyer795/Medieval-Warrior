@@ -8,6 +8,7 @@ zombie, three game modes, and a fully customisable knight.
 |---|---|
 | ![Main menu](Docs/screenshots/menu.jpg) | ![Castle](Docs/screenshots/overview.jpg) |
 | ![Combat](Docs/screenshots/combat.jpg) | ![The horde](Docs/screenshots/bestiary.jpg) |
+| ![Boons](Docs/screenshots/boons.jpg) | ![Feats](Docs/screenshots/feats.jpg) |
 | ![Customise your knight](Docs/screenshots/customise.jpg) | ![Village](Docs/screenshots/village.jpg) |
 
 ---

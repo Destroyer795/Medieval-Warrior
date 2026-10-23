@@ -7,8 +7,8 @@ public class AudioManager : MonoBehaviour
     static AudioManager instance;
     readonly Dictionary<string, AudioClip> clips = new Dictionary<string, AudioClip>();
     readonly List<AudioSource> voices = new List<AudioSource>();
-    AudioSource music;
-    float musicScale = 1f;
+    AudioSource music, battle;
+    float musicScale = 1f, battleTarget, battleLevel;
 
     static AudioManager Instance
     {
@@ -99,6 +99,34 @@ public class AudioManager : MonoBehaviour
     public static void StopMusic()
     {
         if (instance != null && instance.music != null) instance.music.Stop();
+        SetBattleIntensity(0f, true);
+    }
+
+    /// <summary>War drums that swell as the fighting gets close (0 = calm, 1 = full battle).</summary>
+    public static void SetBattleIntensity(float level, bool immediate = false)
+    {
+        var m = Instance;
+        if (m.battle == null)
+        {
+            if (level <= 0f) return;
+            m.battle = m.gameObject.AddComponent<AudioSource>();
+            m.battle.loop = true;
+            m.battle.spatialBlend = 0f;
+            m.battle.playOnAwake = false;
+            m.battle.clip = m.Clip("music_battle");
+            m.battle.volume = 0f;
+            if (m.battle.clip != null) m.battle.Play();
+        }
+        m.battleTarget = Mathf.Clamp01(level);
+        if (immediate) m.battleLevel = m.battleTarget;
+    }
+
+    void Update()
+    {
+        if (battle == null) return;
+        battleLevel = Mathf.MoveTowards(battleLevel, battleTarget, Time.unscaledDeltaTime * (battleTarget > battleLevel ? 0.5f : 0.2f));
+        battle.volume = battleLevel * 0.85f * GameSettings.MusicVolume;
+        if (music != null) music.volume = musicScale * GameSettings.MusicVolume * (1f - battleLevel * 0.6f);
     }
 
     public static void RefreshMusicVolume()

@@ -4,7 +4,11 @@ Fight the undead to save your castle. A third-person medieval action game made i
 (built-in render pipeline): sword and shield, a bow you can sling on your back, six kinds of
 zombie, three game modes, and a fully customisable knight.
 
-![Castle overview](Docs/screenshots/overview.png)
+| | |
+|---|---|
+| ![Main menu](Docs/screenshots/menu.jpg) | ![Castle](Docs/screenshots/overview.jpg) |
+| ![Combat](Docs/screenshots/combat.jpg) | ![The horde](Docs/screenshots/bestiary.jpg) |
+| ![Customise your knight](Docs/screenshots/customise.jpg) | ![Village](Docs/screenshots/village.jpg) |
 
 ---
 
@@ -21,6 +25,7 @@ zombie, three game modes, and a fully customisable knight.
   fallen zombies, along with healing draughts.
 - **Stamina** for sprinting, dodge rolls (brief invulnerability) and shield bashes.
 - Hit-stop, screen shake, blood/sparks, damage numbers, kill streak score multiplier.
+- War drums swell in as the horde closes in and fade when the field is clear.
 
 **Enemies** – all built from the same zombie art so they look like one horde:
 
@@ -88,8 +93,10 @@ Everything the game needs is committed: terrain data, generated meshes, prefabs,
 fonts, UI art and audio. You do **not** need to run any generator to play.
 
 ### Build a standalone game
-`File → Build Profiles → Windows → Build`. The scene list is already set:
-`MainMenu`, `Semi-Final`, `Background`.
+`Medieval Warrior → Build Windows Player` writes `Builds/Windows/MedievalWarrior.exe`
+(or use `File → Build Profiles`; the scene list is already set: `MainMenu`, `Semi-Final`, `Background`).
+A built game can test itself: `MedievalWarrior.exe -batchmode -autotest -logFile autotest.log`
+plays a short match of two modes and exits with code 0 if everything worked.
 
 ---
 
@@ -127,6 +134,7 @@ how to add a zombie type / weapon / UI screen, and how to regenerate the world o
   and the generated assets, so commit your work first.
 - **Medieval Warrior → Run Smoke Test** – plays through every menu and mode automatically and
   writes a PASS/FAIL report plus screenshots to `Temp/SmokeShots`.
+- **Medieval Warrior → Build Windows Player** – builds `Builds/Windows/MedievalWarrior.exe`.
 
 ## Credits & licences
 

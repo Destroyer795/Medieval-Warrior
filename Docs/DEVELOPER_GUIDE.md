@@ -38,7 +38,8 @@ the same lighting settings; the builder writes them into all three scenes.
 | `CameraFollow` | Orbit camera with mouse look, collision, bow aim (shoulder offset + FOV) and screen shake. |
 | `Arrow`, `BileGlob`, `AcidPool`, `Combat.Explode`, `Pickup` | Projectiles, area damage and loot. |
 | `FX` | Particle bursts built in code, hit-stop, screen shake. |
-| `AudioManager` | `Play2D`, `PlayAt` (3D) and `PlayMusic`; clips come from `Resources/Audio` by name. |
+| `AudioManager` | `Play2D`, `PlayAt` (3D), `PlayMusic` and `SetBattleIntensity` (war-drum layer driven by how many zombies are near); clips come from `Resources/Audio` by name. |
+| `TintVariation` | Per-house colour wash via MaterialPropertyBlock (set by the builder). |
 | `UIKit` | Builds styled UI in code (panels, buttons, sliders, toggles, selectors, input fields). |
 | `GameHUD`, `MainMenuUI`, `SharedPanels` | The screens themselves. |
 
@@ -90,6 +91,15 @@ It walks every menu page, plays all three modes, spawns each zombie type, fires 
 the sword, takes bile damage, collects a pickup, pauses, wins and loses, and fails if any check
 fails or any error/exception is logged. Results: `<folder>/report.txt` + screenshots.
 Exit code 0 = pass. It never writes high scores.
+
+### Build and self-test the shipped game
+`Medieval Warrior → Build Windows Player` (or `-executeMethod BuildTool.BuildWindowsBatch`) builds
+`Builds/Windows/MedievalWarrior.exe` (git-ignored). `AutoPlayTest` is compiled into the player but
+only runs with `-autotest`:
+```
+Builds/Windows/MedievalWarrior.exe -batchmode -autotest -logFile autotest.log
+```
+Look for `[AUTOTEST] RESULT PASS` in the log; the exit code is 0 on success.
 
 ## Asset pipeline notes
 

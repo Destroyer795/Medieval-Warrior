@@ -218,7 +218,7 @@ public class EnemyController : MonoBehaviour
         if (!hasToken && d < 7f) { SetState(State.Circle); return; }
 
         float speed = baseSpeed;
-        if (type == ZombieType.Runner && hasToken && d < 7f && d > 2.5f) speed *= 1.6f;   // lunge
+        if (type == ZombieType.Runner && hasToken && d < 7f && d > 2.5f) speed *= 1.35f;  // lunge
         Chase(player.position, speed);
 
         if (hasToken && d <= attackRange && Time.time >= attackTimer) BeginAttack();

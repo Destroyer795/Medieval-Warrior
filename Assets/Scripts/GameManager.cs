@@ -104,6 +104,7 @@ public class GameManager : MonoBehaviour
 
         MatchTime += Time.deltaTime;
         if (Combo > 0 && Time.time > comboExpires) Combo = 0;
+        UpdateBattleMusic();
 
         switch (State)
         {
@@ -113,6 +114,7 @@ public class GameManager : MonoBehaviour
                 break;
             case MatchState.Playing:
                 UpdateMode();
+                UpdateTips();
                 break;
             case MatchState.Intermission:
                 IntermissionLeft -= Time.deltaTime;
@@ -166,7 +168,11 @@ public class GameManager : MonoBehaviour
     void BeginPlay()
     {
         if (Mode == GameMode.EndlessHorde) StartWave(1);
-        else State = MatchState.Playing;
+        else
+        {
+            State = MatchState.Playing;
+            for (int i = 0; i < 3; i++) Spawn(ZombieType.Walker);   // the first few are already shambling in
+        }
         spawnTimer = 1f;
         nextBruteTime = MatchTime + 70f;
     }
@@ -238,11 +244,44 @@ public class GameManager : MonoBehaviour
         return ZombieType.Brute;
     }
 
+    readonly HashSet<ZombieType> introduced = new HashSet<ZombieType>();
+
     EnemyController Spawn(ZombieType type)
     {
         var spawner = ZombieSpawner.Instance;
-        return spawner != null ? spawner.Spawn(type, false) : null;
+        var e = spawner != null ? spawner.Spawn(type, false) : null;
+        if (e != null && type != ZombieType.Walker && introduced.Add(type))
+            GameHUD.Announce($"{ZombieTypes.Get(type).name}: {ZombieTypes.Get(type).description}", new Color(1f, 0.75f, 0.45f));
+        return e;
     }
+
+    void UpdateBattleMusic()
+    {
+        if (playerHealth == null) return;
+        int near = 0;
+        Vector3 p = playerHealth.transform.position;
+        foreach (var e in EnemyController.All)
+            if (e != null && (e.transform.position - p).sqrMagnitude < 22f * 22f) near++;
+        float level = Mathf.Clamp01(near / 4f);
+        if (Boss != null && !Boss.IsDead) level = 1f;
+        AudioManager.SetBattleIntensity(level);
+    }
+
+    void UpdateTips()
+    {
+        if (tipIndex >= Tips.Length || MatchTime < Tips[tipIndex].time) return;
+        GameHUD.Toast(Tips[tipIndex].text, UIKit.Parchment, Tips[tipIndex].icon, 4.5f, 28);
+        tipIndex++;
+    }
+
+    int tipIndex;
+    static readonly (float time, string text, string icon)[] Tips =
+    {
+        (6f, "Press Q to swap between sword and bow", "bow"),
+        (22f, "Hold right mouse to raise your shield - block as a blow lands for a Perfect Block", "shield"),
+        (40f, "Arrows wait on supply crates beside the houses", "arrow"),
+        (60f, "Space to dodge roll - you can't be hurt mid-roll", "stamina"),
+    };
 
     void SpawnBoss(ZombieType type)
     {
@@ -347,6 +386,7 @@ public class GameManager : MonoBehaviour
         if (victory) Score += Mathf.RoundToInt(playerHealth != null ? playerHealth.currentHealth * 10f : 0f);
         NewRecord = GameSettings.SubmitScore(Mode, Score, Wave);
         AudioManager.Play2D(victory ? "victory" : "defeat", 1f);
+        AudioManager.SetBattleIntensity(0f);
         MatchEnded?.Invoke(victory);
         StartCoroutine(SlowToStop());
         LockCursor(false);

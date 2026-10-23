@@ -363,8 +363,7 @@ public static class EnvironmentBuilder
     static GameObject SavePrefab(string name, Mesh mesh, Material[] materials, bool collider, float colliderRadius = 0.2f, float colliderHeight = 2f)
     {
         string meshPath = $"{GenDir}/{name}_Mesh.asset";
-        AssetDatabase.DeleteAsset(meshPath);
-        AssetDatabase.CreateAsset(mesh, meshPath);
+        mesh = SaveMesh(mesh, meshPath);
 
         var go = new GameObject(name);
         go.AddComponent<MeshFilter>().sharedMesh = mesh;
@@ -501,6 +500,38 @@ public static class EnvironmentBuilder
             Debug.Log($"[EnvironmentBuilder]   {b.go.name} ({b.kind}) bottom={b.bottom:F2} h={b.height:F2} half={b.half}");
     }
 
+    // Walk round the wall ring looking for openings wide enough to walk through; roads lead to them.
+    static List<float> FindGateAngles()
+    {
+        var open = new List<(float angle, bool open)>();
+        for (int deg = 0; deg < 360; deg += 2)
+        {
+            Vector2 dir = new Vector2(Mathf.Cos(deg * Mathf.Deg2Rad), Mathf.Sin(deg * Mathf.Deg2Rad));
+            Vector2 p = Center;
+            for (float r = 0; r < CastleRadius * 1.5f; r += 0.5f)
+            {
+                p = Center + dir * r;
+                if (!InsideWalls(p, 0f)) break;
+            }
+            bool blocked = Physics.CheckSphere(new Vector3(p.x, 1.6f, p.y), 1.4f, ~0, QueryTriggerInteraction.Ignore)
+                        || Physics.CheckSphere(new Vector3(p.x - dir.x * 2f, 1.6f, p.y - dir.y * 2f), 1.4f, ~0, QueryTriggerInteraction.Ignore);
+            open.Add((deg, !blocked));
+        }
+        // group consecutive open samples into gaps, widest first
+        var gaps = new List<(float center, int width)>();
+        int n = open.Count;
+        int startIdx = open.FindIndex(o => !o.open);
+        if (startIdx < 0) return new List<float>();
+        int run = 0; float runStart = 0;
+        for (int k = 1; k <= n; k++)
+        {
+            var o = open[(startIdx + k) % n];
+            if (o.open) { if (run == 0) runStart = o.angle; run++; }
+            else if (run > 0) { gaps.Add((runStart + (run - 1) * 1f, run)); run = 0; }
+        }
+        return gaps.Where(g => g.width >= 2).OrderByDescending(g => g.width).Select(g => g.center).Take(2).ToList();
+    }
+
     static void DeriveLayout()
     {
         var ring = wallHull.Count >= 3 ? wallHull : buildings.Select(b => b.center).ToList();
@@ -520,7 +551,11 @@ public static class EnvironmentBuilder
             }
             return pts.ToArray();
         }
-        Roads = new[] { Road(-62f, 9f), Road(168f, 7f) };
+        var gates = FindGateAngles();
+        float a0 = gates.Count > 0 ? gates[0] : -62f;
+        float a1 = gates.Count > 1 ? gates[1] : a0 + 180f;
+        Roads = new[] { Road(a0, 9f), Road(a1, 7f) };
+        Debug.Log($"[EnvironmentBuilder] gates at {string.Join(", ", gates.Select(g => g.ToString("F0")))} deg");
         Debug.Log($"[EnvironmentBuilder] centre {Center} castle radius {CastleRadius:F1} terrain {TerrainSize}");
     }
 
@@ -625,8 +660,10 @@ public static class EnvironmentBuilder
     static Terrain CreateTerrain(Transform parent, Prefabs prefabs)
     {
         string dataPath = GenDir + "/CastleTerrain.asset";
-        AssetDatabase.DeleteAsset(dataPath);
-        var td = new TerrainData { heightmapResolution = HeightRes };
+        // reuse the existing asset so its GUID (and the scene reference) stays stable between rebuilds
+        var td = AssetDatabase.LoadAssetAtPath<TerrainData>(dataPath);
+        if (td == null) { td = new TerrainData(); AssetDatabase.CreateAsset(td, dataPath); }
+        td.heightmapResolution = HeightRes;
         td.size = new Vector3(TerrainSize, TerrainHeight, TerrainSize);
         Vector3 origin = new Vector3(Center.x - TerrainSize / 2f, -TerrainBase, Center.y - TerrainSize / 2f);
 
@@ -639,24 +676,21 @@ public static class EnvironmentBuilder
                 heights[iz, ix] = (WorldHeight(x, z) + TerrainBase) / TerrainHeight;
             }
         td.SetHeights(0, 0, heights);
-        AssetDatabase.CreateAsset(td, dataPath);
 
         // layers
         TerrainLayer Layer(string name, string tex, float tile, Color tint)
         {
             string path = $"{GenDir}/{name}.terrainlayer";
-            AssetDatabase.DeleteAsset(path);
-            var l = new TerrainLayer
-            {
-                diffuseTexture = Tex<Texture2D>(tex + "_D"),
-                normalMapTexture = Tex<Texture2D>(tex + "_N"),
-                tileSize = new Vector2(tile, tile),
-                normalScale = 1f,
-                smoothness = 0f,
-                metallic = 0f,
-                diffuseRemapMax = tint,
-            };
-            AssetDatabase.CreateAsset(l, path);
+            var l = AssetDatabase.LoadAssetAtPath<TerrainLayer>(path);
+            if (l == null) { l = new TerrainLayer(); AssetDatabase.CreateAsset(l, path); }
+            l.diffuseTexture = Tex<Texture2D>(tex + "_D");
+            l.normalMapTexture = Tex<Texture2D>(tex + "_N");
+            l.tileSize = new Vector2(tile, tile);
+            l.normalScale = 1f;
+            l.smoothness = 0f;
+            l.metallic = 0f;
+            l.diffuseRemapMax = tint;
+            EditorUtility.SetDirty(l);
             return l;
         }
         td.terrainLayers = new[]
@@ -864,6 +898,12 @@ public static class EnvironmentBuilder
         root.SetParent(parent, false);
         foreach (var b in buildings.Where(b => b.kind == "House"))
         {
+            // each house gets its own warm wash so the village doesn't look copy-pasted
+            Color[] washes = { new Color(1f, 0.97f, 0.9f), new Color(1.06f, 0.95f, 0.82f), new Color(0.98f, 0.9f, 0.84f), new Color(1.04f, 1f, 0.92f), new Color(0.95f, 0.92f, 0.88f) };
+            if (!b.go.TryGetComponent(out TintVariation tv)) tv = b.go.AddComponent<TintVariation>();
+            tv.tint = washes[rng.Next(washes.Length)];
+            tv.Apply();
+
             // a stone plinth slightly wider than the walls, half buried
             var mb = new MeshBuilder(1);
             Vector3 h = new Vector3(b.half.x + 0.25f, 0, b.half.y + 0.25f);
@@ -871,8 +911,7 @@ public static class EnvironmentBuilder
             var mesh = mb.ToMesh(b.go.name + "_Plinth");
             string path = $"{GenDir}/Plinths/{b.go.name.Replace(" ", "_").Replace("(", "").Replace(")", "")}.asset";
             EnsureFolder(GenDir + "/Plinths");
-            AssetDatabase.DeleteAsset(path);
-            AssetDatabase.CreateAsset(mesh, path);
+            mesh = SaveMesh(mesh, path);
 
             var go = new GameObject(b.go.name + " Foundation");
             go.transform.SetParent(root, false);
@@ -1278,6 +1317,16 @@ public static class EnvironmentBuilder
     }
 
     // ------------------------------------------------------------------ util
+
+    // overwrite in place when the asset exists, so GUIDs and references stay stable
+    public static Mesh SaveMesh(Mesh mesh, string path)
+    {
+        var existing = AssetDatabase.LoadAssetAtPath<Mesh>(path);
+        if (existing == null) { AssetDatabase.CreateAsset(mesh, path); return mesh; }
+        EditorUtility.CopySerialized(mesh, existing);
+        EditorUtility.SetDirty(existing);
+        return existing;
+    }
 
     static string GetArg(string name)
     {

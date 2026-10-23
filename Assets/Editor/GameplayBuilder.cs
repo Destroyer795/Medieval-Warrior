@@ -143,9 +143,7 @@ public static class GameplayBuilder
     static GameObject SaveProp(string name, Mesh mesh, Material[] runtimeMats, bool collider = false)
     {
         string meshPath = $"{PropsDir}/{name}_Mesh.asset";
-        AssetDatabase.DeleteAsset(meshPath);
-        AssetDatabase.CreateAsset(Object.Instantiate(mesh), meshPath);
-        var savedMesh = AssetDatabase.LoadAssetAtPath<Mesh>(meshPath);
+        var savedMesh = EnvironmentBuilder.SaveMesh(Object.Instantiate(mesh), meshPath);
         var mats = runtimeMats.Select(m => SaveMat($"{PropsDir}/{m.name}.mat", new Material(m) { name = m.name })).ToArray();
 
         var go = new GameObject(name);
@@ -269,8 +267,23 @@ public static class GameplayBuilder
 
     // ------------------------------------------------------------ gameplay scene
 
+    // Some objects carried components whose scripts were never committed (they log "missing script").
+    public static int RemoveMissingScripts(Scene scene)
+    {
+        int removed = 0;
+        void Clean(GameObject go)
+        {
+            removed += GameObjectUtility.RemoveMonoBehavioursWithMissingScript(go);
+            foreach (Transform c in go.transform) Clean(c.gameObject);
+        }
+        foreach (var root in scene.GetRootGameObjects()) Clean(root);
+        if (removed > 0) { Debug.Log($"[GameplayBuilder] removed {removed} missing-script components from {scene.name}"); EditorSceneManager.MarkSceneDirty(scene); }
+        return removed;
+    }
+
     public static void SetupGameScene(Scene game)
     {
+        RemoveMissingScripts(game);
         foreach (var root in game.GetRootGameObjects())
         {
             // the old hand-made HUD is replaced by GameHUD
@@ -291,7 +304,12 @@ public static class GameplayBuilder
         if (cam != null)
         {
             var follow = cam.GetComponent<CameraFollow>();
-            if (follow != null) { follow.smoothSpeed = 0.08f; follow.minPitch = -20f; follow.maxPitch = 65f; follow.maxZoom = 12f; EditorUtility.SetDirty(follow); }
+            if (follow != null)
+            {
+                follow.smoothSpeed = 0.08f; follow.minPitch = -20f; follow.maxPitch = 65f; follow.maxZoom = 12f;
+                follow.aimDistance = 2.9f; follow.aimShoulder = new Vector3(0.8f, 0.25f, 0f);
+                EditorUtility.SetDirty(follow);
+            }
         }
         EditorSceneManager.MarkSceneDirty(game);
     }
@@ -301,6 +319,7 @@ public static class GameplayBuilder
     public static void SetupMenuScene(Vector2 castleCenter, float castleRadius, Material sky, Action<Scene, Material> applyLighting)
     {
         var menu = EditorSceneManager.OpenScene(MenuScene, OpenSceneMode.Single);
+        RemoveMissingScripts(menu);
         foreach (var r in menu.GetRootGameObjects().Where(g => g.name == "Menu Camera" || g.name == "Knight Preview" || g.name == "Sun" || g.name == "PostFX Volume"))
             Object.DestroyImmediate(r);
         // stale cameras/listeners from the old menu would fight the new ones

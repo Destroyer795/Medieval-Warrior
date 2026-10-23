@@ -24,8 +24,8 @@ public class CameraFollow : MonoBehaviour
     public float collisionRadius = 0.25f;
 
     [Header("Aiming")]
-    public float aimDistance = 2.3f;
-    public Vector3 aimShoulder = new Vector3(0.65f, 0.15f, 0f);
+    public float aimDistance = 2.9f;
+    public Vector3 aimShoulder = new Vector3(0.8f, 0.25f, 0f);
     public float aimFovDrop = 14f;
 
     // Internal variables

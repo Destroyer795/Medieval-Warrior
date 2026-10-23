@@ -154,15 +154,15 @@ public class SmokeTestDriver : MonoBehaviour
         player.DebugAim(true);
         yield return Wait(0.6f);
         Capture("14_bow_aim");
-        int arrowsBefore = player.Arrows;
+        int arrowsBefore = player.Arrows, firedBefore = gm.ArrowsFired;
         foreach (var e in line.Where(x => x != null && !x.IsDead).Take(3))
         {
             player.DebugFireAt(e.transform.position + Vector3.up * 1.2f, 1f);
             yield return Wait(0.35f);
         }
         yield return Wait(0.8f);
-        Check(player.Arrows == arrowsBefore - 3, "arrows consumed");
-        Check(gm.ArrowsFired >= 3, "shots counted");
+        Check(gm.ArrowsFired - firedBefore == 3, "three shots fired and counted");
+        Check(player.Arrows < arrowsBefore || player.Arrows == player.maxArrows, "arrows consumed (unless topped up from a crate)");
         Check(gm.ArrowsHit >= 1, $"arrows hit zombies ({gm.ArrowsHit}/{gm.ArrowsFired})");
         player.DebugAim(false);
 
@@ -203,6 +203,7 @@ public class SmokeTestDriver : MonoBehaviour
         Capture("17_acid");
 
         // pickups
+        player.AddArrows(-10);   // make room in the quiver
         int arrows = player.Arrows;
         Pickup.Spawn(PickupKind.Arrows, player.transform.position + fwd * 0.5f, 6);
         yield return Wait(1.2f);

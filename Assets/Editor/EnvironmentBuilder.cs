@@ -134,6 +134,7 @@ public static class EnvironmentBuilder
         CreateFoundations(env.transform, mats);
         ScatterBaseProps(env.transform, prefabs);
         PlaceSupplyCrates(env.transform);
+        PlaceBannersAndChimneys(env.transform);
         TameTorchLights(world);
 
         SceneManager.SetActiveScene(game);
@@ -1066,6 +1067,42 @@ public static class EnvironmentBuilder
             cam.transform.LookAt(pos + Vector3.up * 1.5f);
         }
         Debug.Log($"[EnvironmentBuilder] player start {pos} (clear {NearestBuilding(best, out _):F1} m)");
+    }
+
+    // Heraldic banners on the towers and smoke from some of the village chimneys.
+    static void PlaceBannersAndChimneys(Transform parent)
+    {
+        var root = new GameObject("Banners & Smoke").transform;
+        root.SetParent(parent, false);
+        Color[] fields = { new Color(0.62f, 0.07f, 0.08f), new Color(0.1f, 0.2f, 0.55f) };
+        int banners = 0, chimneys = 0;
+        foreach (var b in buildings)
+        {
+            if (b.kind == "Tower" || b.kind == "Castle")
+            {
+                float top = b.bottom + b.height;
+                var go = new GameObject("Banner");
+                go.transform.SetParent(root, false);
+                go.transform.position = new Vector3(b.center.x, top - 0.6f, b.center.y);
+                go.transform.rotation = Quaternion.Euler(0, R(0, 360), 0);
+                var flag = go.AddComponent<BannerFlag>();
+                flag.field = fields[banners % fields.Length];
+                flag.width = b.kind == "Castle" ? 4.2f : 3f;
+                flag.height = b.kind == "Castle" ? 2.6f : 1.9f;
+                flag.poleHeight = b.kind == "Castle" ? 7f : 5f;
+                banners++;
+            }
+            else if (b.kind == "House" && rng.NextDouble() < 0.45)
+            {
+                var go = new GameObject("Chimney Smoke");
+                go.transform.SetParent(root, false);
+                Vector2 off = b.axisX * b.half.x * 0.45f;
+                go.transform.position = new Vector3(b.center.x + off.x, b.bottom + b.height - 0.3f, b.center.y + off.y);
+                go.AddComponent<ChimneySmoke>();
+                chimneys++;
+            }
+        }
+        Debug.Log($"[EnvironmentBuilder] {banners} banners, {chimneys} chimneys");
     }
 
     static void TameTorchLights(Scene world)

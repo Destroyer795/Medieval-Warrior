@@ -63,7 +63,8 @@ public class PlayerControlSpeed : MonoBehaviour
     float lastAttack = -9f, lastStaminaUse = -9f, stunnedUntil, dodgeUntil, bashReady;
     Vector3 dodgeDir;
     bool exhausted;
-    float blockWeight, aimWeight;
+    float blockWeight, aimWeight, stepTimer, leanWeight;
+    int stepIndex;
     Transform leftHand, spine, bowVisual, nockedArrow;
     readonly List<(float time, int step)> pendingHits = new List<(float, int)>();
 
@@ -188,6 +189,17 @@ public class PlayerControlSpeed : MonoBehaviour
         {
             Vector3 f = cameraTransform.forward; f.y = 0;
             if (f.sqrMagnitude > 0.01f) transform.rotation = Quaternion.RotateTowards(transform.rotation, Quaternion.LookRotation(f), rotationSpeed * 1.5f * Time.deltaTime);
+        }
+
+        // footsteps, quicker when running
+        if (rb != null && desiredVelocity.sqrMagnitude > 0.5f)
+        {
+            stepTimer -= Time.deltaTime * desiredVelocity.magnitude;
+            if (stepTimer <= 0f)
+            {
+                stepTimer = 1.55f;
+                AudioManager.PlayAt("step" + (stepIndex++ % 4), transform.position, Dodging ? 0.5f : 0.32f, 0.1f);
+            }
         }
 
         // --- 4. STAMINA
@@ -473,6 +485,14 @@ public class PlayerControlSpeed : MonoBehaviour
         float k = 1f - Mathf.Exp(-14f * Time.deltaTime);
         blockWeight = Mathf.Lerp(blockWeight, isBlocking ? 1f : 0f, k);
         aimWeight = Mathf.Lerp(aimWeight, CurrentWeapon == Weapon.Bow && (IsAiming || IsDrawing) ? 1f : 0f, k);
+
+        // lean into dodge rolls
+        leanWeight = Mathf.Lerp(leanWeight, Dodging ? 1f : 0f, 1f - Mathf.Exp(-20f * Time.deltaTime));
+        if (spine != null && leanWeight > 0.01f)
+        {
+            Vector3 axis = Vector3.Cross(Vector3.up, dodgeDir.sqrMagnitude > 0.01f ? dodgeDir : transform.forward);
+            spine.rotation = Quaternion.AngleAxis(32f * leanWeight, axis) * spine.rotation;
+        }
 
         // smoothly raise the shield arm (same pose holds the bow out when aiming)
         float raise = Mathf.Max(blockWeight, aimWeight);

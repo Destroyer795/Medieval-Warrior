@@ -138,6 +138,9 @@ public static class GameplayBuilder
         acid.SetFloat("_Glossiness", 0.85f);
         acid.renderQueue = 3000;
         SaveMat(Res + "/FX/Acid.mat", acid);
+
+        var banner = new Material(Shader.Find("MedievalWarrior/VertexColorLit")) { name = "Banner", enableInstancing = true };
+        SaveMat(Res + "/FX/Banner.mat", banner);
     }
 
     static GameObject SaveProp(string name, Mesh mesh, Material[] runtimeMats, bool collider = false)
@@ -284,6 +287,12 @@ public static class GameplayBuilder
     public static void SetupGameScene(Scene game)
     {
         RemoveMissingScripts(game);
+        if (!game.GetRootGameObjects().Any(g => g.GetComponent<SkyDrift>() != null))
+        {
+            var drift = new GameObject("Sky Drift");
+            SceneManager.MoveGameObjectToScene(drift, game);
+            drift.AddComponent<SkyDrift>();
+        }
         foreach (var root in game.GetRootGameObjects())
         {
             // the old hand-made HUD is replaced by GameHUD
@@ -320,7 +329,7 @@ public static class GameplayBuilder
     {
         var menu = EditorSceneManager.OpenScene(MenuScene, OpenSceneMode.Single);
         RemoveMissingScripts(menu);
-        foreach (var r in menu.GetRootGameObjects().Where(g => g.name == "Menu Camera" || g.name == "Knight Preview" || g.name == "Sun" || g.name == "PostFX Volume"))
+        foreach (var r in menu.GetRootGameObjects().Where(g => g.name == "Menu Camera" || g.name == "Knight Preview" || g.name == "Sun" || g.name == "PostFX Volume" || g.name == "Sky Drift"))
             Object.DestroyImmediate(r);
         // stale cameras/listeners from the old menu would fight the new ones
         foreach (var c in menu.GetRootGameObjects().SelectMany(g => g.GetComponentsInChildren<Camera>(true))) c.enabled = false;
@@ -331,6 +340,10 @@ public static class GameplayBuilder
         var sun = sunGo.AddComponent<Light>();
         sun.type = LightType.Directional;
         applyLighting(menu, sky);
+
+        var menuDrift = new GameObject("Sky Drift");
+        SceneManager.MoveGameObjectToScene(menuDrift, menu);
+        menuDrift.AddComponent<SkyDrift>().degreesPerSecond = 1.2f;
 
         // cinematic camera
         var camGo = new GameObject("Menu Camera") { tag = "MainCamera" };

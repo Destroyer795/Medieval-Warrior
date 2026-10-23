@@ -209,6 +209,8 @@ public class SmokeTestDriver : MonoBehaviour
         yield return Wait(1.2f);
         Check(player.Arrows > arrows, $"arrow pickup collected ({arrows} -> {player.Arrows})");
         Check(Object.FindObjectsByType<Pickup>(FindObjectsSortMode.None).Count(p => p.respawns) >= 5, "supply crates with pickups exist in the world");
+        Check(Object.FindObjectsByType<BannerFlag>(FindObjectsSortMode.None).Length >= 6, "banners fly from the towers");
+        Check(Object.FindObjectsByType<ChimneySmoke>(FindObjectsSortMode.None).Length >= 3, "village chimneys smoke");
 
         // pause menu
         gm.Pause();

@@ -37,7 +37,7 @@ public class EnemyController : MonoBehaviour
     public float HealthFraction => MaxHealth > 0 ? Mathf.Clamp01(Health / MaxHealth) : 0f;
     public Vector3 HeadPosition => transform.position + Vector3.up * 1.9f * transform.localScale.y;
 
-    enum State { Emerging, Hunt, Circle, Attack, Stagger, Kite, Fuse, Dead }
+    enum State { Emerging, Hunt, Circle, Attack, Stagger, Kite, Fuse, Charge, Dead }
     State state = State.Hunt;
 
     Animator animator;
@@ -138,7 +138,9 @@ public class EnemyController : MonoBehaviour
         {
             player = playerObj.transform;
             playerHealth = playerObj.GetComponent<PlayerHealth>();
+            playerControl = playerObj.GetComponent<PlayerControlSpeed>();
         }
+        nextCharge = Time.time + UnityEngine.Random.Range(4f, 9f);
 
         circleAngle = UnityEngine.Random.Range(0f, 360f);
         circleRadius = UnityEngine.Random.Range(3.6f, 5.2f);
@@ -175,6 +177,7 @@ public class EnemyController : MonoBehaviour
         }
 
         if (type == ZombieType.Warlord && !enraged && HealthFraction < 0.5f) Enrage();
+        if (enraged && Time.time > nextSummon) { Summon(2); nextSummon = Time.time + 18f; }
 
         switch (state)
         {
@@ -184,6 +187,7 @@ public class EnemyController : MonoBehaviour
             case State.Stagger: UpdateStagger(); break;
             case State.Kite: UpdateKite(); break;
             case State.Fuse: UpdateFuse(); break;
+            case State.Charge: UpdateCharge(); break;
         }
     }
 
@@ -195,7 +199,7 @@ public class EnemyController : MonoBehaviour
         state = s;
         stateTimer = 0f;
         hitDealt = false;
-        if (navAgent != null && navAgent.enabled && navAgent.isOnNavMesh) navAgent.isStopped = s == State.Attack || s == State.Stagger || s == State.Fuse;
+        if (navAgent != null && navAgent.enabled && navAgent.isOnNavMesh) navAgent.isStopped = s == State.Attack || s == State.Stagger || s == State.Fuse || s == State.Charge;
     }
 
     void Idle()
@@ -219,8 +223,25 @@ public class EnemyController : MonoBehaviour
         if (!hasToken && d < 9f) hasToken = ZombieDirector.RequestToken(this);
         if (!hasToken && d < 7f) { SetState(State.Circle); return; }
 
+        // Brutes and the Warlord charge from mid range
+        if ((type == ZombieType.Brute || type == ZombieType.Warlord) && d > 7f && d < 16f && Time.time > nextCharge && HasLineOfSight())
+        {
+            StartCharge();
+            return;
+        }
+
         float speed = baseSpeed;
         if (type == ZombieType.Runner && hasToken && d < 7f && d > 2.5f) speed *= 1.35f;  // lunge
+
+        // Runners notice the bow aimed at them and zig-zag out of the line of fire
+        if (type == ZombieType.Runner && d > 4f && IsBeingAimedAt())
+        {
+            if (Time.time > zigTime) { zigSide = -zigSide; zigTime = Time.time + UnityEngine.Random.Range(0.45f, 0.75f); }
+            Vector3 toPlayer = Flat(player.position - transform.position).normalized;
+            Vector3 side = Vector3.Cross(Vector3.up, toPlayer) * zigSide;
+            Chase(transform.position + (toPlayer * 2f + side * 3f), speed * 1.15f);
+            return;
+        }
         Chase(player.position, speed);
 
         if (hasToken && d <= attackRange && Time.time >= attackTimer) BeginAttack();
@@ -418,7 +439,7 @@ public class EnemyController : MonoBehaviour
     {
         if (animator == null) return;
         float v = navAgent != null && navAgent.enabled ? navAgent.velocity.magnitude : 0f;
-        if (state == State.Stagger || state == State.Attack || state == State.Fuse) v = 0f;
+        if (state == State.Stagger || state == State.Attack || state == State.Fuse || state == State.Charge) v = 0f;
         if (pSpeed) animator.SetFloat(hSpeed, v / Mathf.Max(0.5f, transform.localScale.y), 0.1f, Time.deltaTime);
         if (pIsMoving) animator.SetBool(hIsMoving, v > 0.2f);
     }
@@ -592,7 +613,86 @@ public class EnemyController : MonoBehaviour
         timeBetweenAttacks *= 0.65f;
         AudioManager.PlayAt("brute_roar", transform.position, 1f, 0f);
         FX.Shake(0.6f);
-        GameHUD.Announce("The Warlord is enraged!", UIKit.Blood);
+        GameHUD.Announce("The Warlord is enraged - the dead answer its call!", UIKit.Blood);
+        Summon(3);
+        nextSummon = Time.time + 18f;
+    }
+
+    // ------------------------------------------------------------ smarter behaviours
+
+    PlayerControlSpeed playerControl;
+    float zigTime, zigSide = 1f, nextCharge, nextSummon;
+    Vector3 chargeDir;
+    bool chargeHit;
+    readonly System.Collections.Generic.List<EnemyController> summoned = new System.Collections.Generic.List<EnemyController>();
+
+    bool IsBeingAimedAt()
+    {
+        if (playerControl == null || playerControl.CurrentWeapon != Weapon.Bow || !(playerControl.IsAiming || playerControl.IsDrawing)) return false;
+        var cam = Camera.main;
+        if (cam == null) return false;
+        Vector3 to = (transform.position + Vector3.up) - cam.transform.position;
+        return Vector3.Angle(cam.transform.forward, to) < 7f;
+    }
+
+    void StartCharge()
+    {
+        SetState(State.Charge);
+        chargeHit = false;
+        chargeDir = Flat(player.position - transform.position).normalized;
+        AudioManager.PlayAt("brute_roar", transform.position, 0.9f, 0.05f);
+        GameHUD.Toast(Stats.name + " charges!", new Color(1f, 0.5f, 0.35f), "skull", 1.4f, 28);
+    }
+
+    void UpdateCharge()
+    {
+        const float windup = 0.65f, run = 1.5f;
+        if (stateTimer < windup)
+        {
+            // paw the ground and line up
+            chargeDir = Vector3.Slerp(chargeDir, Flat(player.position - transform.position).normalized, Time.deltaTime * 4f);
+            FaceTowards(transform.position + chargeDir, 10f);
+            if (Mathf.Repeat(stateTimer, 0.2f) < Time.deltaTime) FX.Dust(transform.position, 0.6f, 4);
+            return;
+        }
+        Vector3 before = transform.position;
+        if (navAgent.isOnNavMesh) navAgent.Move(chargeDir * baseSpeed * 2.6f * Time.deltaTime);
+        if (pSpeed) animator.SetFloat(hSpeed, 4f);
+        if (Mathf.Repeat(stateTimer, 0.12f) < Time.deltaTime) FX.Dust(transform.position, 0.5f, 3);
+
+        Vector3 toPlayer = player.position - transform.position;
+        if (!chargeHit && toPlayer.magnitude < 2.2f && Vector3.Angle(chargeDir, Flat(toPlayer)) < 60f)
+        {
+            chargeHit = true;
+            if (playerHealth != null) playerHealth.TakeDamage(damage * 0.8f, transform, 13f);
+            FX.Shake(0.7f);
+            AudioManager.PlayAt("shield_block", transform.position, 0.8f);
+        }
+        bool blocked = (transform.position - before).magnitude < baseSpeed * Time.deltaTime * 0.5f;   // ran into a wall
+        if (stateTimer > windup + run || chargeHit || blocked && stateTimer > windup + 0.2f)
+        {
+            if (blocked && !chargeHit) { FX.Dust(transform.position + chargeDir, 1.2f, 12); FX.Shake(0.3f); }
+            nextCharge = Time.time + UnityEngine.Random.Range(9f, 14f);
+            SetState(State.Hunt);
+        }
+    }
+
+    void Summon(int count)
+    {
+        summoned.RemoveAll(z => z == null || z.IsDead);
+        var spawner = ZombieSpawner.Instance;
+        if (spawner == null || spawner.zombiePrefab == null) return;
+        for (int i = 0; i < count && summoned.Count < 6; i++)
+        {
+            Vector3 p = transform.position + Quaternion.Euler(0, i * 360f / count + UnityEngine.Random.Range(-20f, 20f), 0) * Vector3.forward * UnityEngine.Random.Range(3f, 5f);
+            if (!NavMesh.SamplePosition(p, out var hit, 3f, NavMesh.AllAreas)) continue;
+            var go = Instantiate(spawner.zombiePrefab, hit.position, Quaternion.LookRotation(Flat(player.position - hit.position) + Vector3.forward * 0.001f));
+            var e = go.GetComponent<EnemyController>();
+            if (e == null) continue;
+            e.Init(ZombieType.Walker, false, true);
+            summoned.Add(e);
+        }
+        FX.Dust(transform.position, 2f, 20, new Color(0.35f, 0.15f, 0.12f, 0.8f));
     }
 
     // ------------------------------------------------------------ visuals

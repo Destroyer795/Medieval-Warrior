@@ -185,6 +185,19 @@ public class SmokeTestDriver : MonoBehaviour
         }
         Capture("15_melee");
 
+        // wound the Warlord past half: it enrages and raises walkers around itself
+        var warlord = line.FirstOrDefault(x => x != null && !x.IsDead && x.type == ZombieType.Warlord);
+        if (warlord != null)
+        {
+            int aliveBefore = EnemyController.All.Count;
+            warlord.TakeDamage(warlord.Health * 0.6f, fwd, 0f);
+            yield return Wait(0.5f);
+            Check(EnemyController.All.Count >= aliveBefore + 2, $"enraged Warlord summons the dead ({aliveBefore} -> {EnemyController.All.Count})");
+            yield return Wait(1.2f);
+            Capture("15b_warlord_summons");
+            line.AddRange(EnemyController.All.Where(z => !line.Contains(z)));
+        }
+
         // kill everything; bloater explosion must not throw
         int killsBefore = gm.currentKills, scoreBefore = gm.Score;
         foreach (var e in line.Where(x => x != null && !x.IsDead).ToArray()) e.TakeDamage(999f, fwd, 5f);
@@ -193,7 +206,12 @@ public class SmokeTestDriver : MonoBehaviour
         Check(gm.Score > scoreBefore, "score increases with kills");
         Capture("16_after_kills");
 
-        // spitter bile hits the knight and leaves acid
+        // spitter bile hits the knight and leaves acid (stand still first: blasts may have knocked him back)
+        yield return ResolveBoons();
+        var rbody = player.GetComponent<Rigidbody>();
+        if (rbody != null) rbody.linearVelocity = Vector3.zero;
+        yield return Wait(1f);
+        if (rbody != null) rbody.linearVelocity = Vector3.zero;
         health.InvulnerableUntil = 0f;
         float hp = health.currentHealth;
         BileGlob.Throw(player.transform.position + Vector3.up * 6f + fwd * 4f, player.transform.position, 10f, null);
@@ -213,6 +231,7 @@ public class SmokeTestDriver : MonoBehaviour
         Check(Object.FindObjectsByType<ChimneySmoke>(FindObjectsSortMode.None).Length >= 3, "village chimneys smoke");
 
         // pause menu
+        yield return ResolveBoons();
         gm.Pause();
         yield return Wait(0.5f);
         Check(Time.timeScale == 0f, "pause freezes time");
@@ -281,6 +300,15 @@ public class SmokeTestDriver : MonoBehaviour
         Capture("40_last_stand");
 
         Finish(savedMode, savedDiff);
+    }
+
+    IEnumerator ResolveBoons()
+    {
+        for (int i = 0; i < 4 && GameHUD.BoonsOpen; i++)
+        {
+            GameHUD.DebugPickBoon(0);
+            yield return Wait(0.2f);
+        }
     }
 
     void Finish(GameMode mode, Difficulty diff)

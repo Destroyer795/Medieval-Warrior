@@ -122,3 +122,20 @@ Look for `[AUTOTEST] RESULT PASS` in the log; the exit code is 0 on success.
   (the builder sets this). The mask channels are R = tabard cloth, G = metal, B = leather.
 - Props (bow, arrows, crates, potions) are generated from `ProceduralModels` and saved as prefabs
   in `Resources/Prefabs` so their materials ship in builds.
+
+## Working together
+
+- **Unity version**: everyone on 6000.3.2f1 (any 6000.3.x opens it). Opening with a different
+  major version rewrites lots of files – don't commit that.
+- **Scenes are YAML and merge badly.** Agree who is editing `Semi-Final`, `MainMenu` or
+  `Background` before you start. Most gameplay lives in scripts and in code-built UI, so the
+  scenes rarely need hand edits.
+- **The world is generated.** Change `EnvironmentBuilder` / `GameplayBuilder`, run
+  *Rebuild Environment*, and commit the scripts *and* the regenerated scenes/assets together.
+  The builder is deterministic, so an unchanged builder produces identical terrain bytes
+  (the 48 MB terrain asset only changes when the terrain recipe changes).
+- **Before pushing**: run *Medieval Warrior → Run Smoke Test* (about 2 minutes) and check
+  `Temp/SmokeShots/report.txt` says `PASS`.
+- **Never commit** `Library/`, `Temp/`, `Logs/`, `UserSettings/`, `Builds/` (already in `.gitignore`).
+- If Unity rewrites `Packages/packages-lock.json` to an `"embedded"` post-processing entry
+  (because you dropped the package into `Packages/` locally), don't commit that change.

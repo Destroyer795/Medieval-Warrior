@@ -41,13 +41,27 @@ public static class SmokeTest
         EditorSceneManager.OpenScene("Assets/Scenes/MainMenu.unity", OpenSceneMode.Single);
         EditorApplication.update -= Poll;
         EditorApplication.update += Poll;
-        Debug.Log("[SMOKE] entering play mode");
-        EditorApplication.EnterPlaymode();
+        // Let the editor finish its own start-up work first: on a fresh clone (no UserSettings/Search.index)
+        // Unity's search indexer throws during start-up, and entering play mode in the same moment stalls batch mode.
+        SessionState.SetBool(EnteredKey, false);
+        SessionState.SetFloat(EnterAtKey, (float)EditorApplication.timeSinceStartup + 8f);
+        Debug.Log("[SMOKE] waiting for the editor to settle before entering play mode");
     }
+
+    const string EnteredKey = "mw.smoke.entered", EnterAtKey = "mw.smoke.enterAt";
 
     static void Poll()
     {
         if (!File.Exists(FlagFile)) { EditorApplication.update -= Poll; return; }
+
+        if (!SessionState.GetBool(EnteredKey, true) && EditorApplication.timeSinceStartup > SessionState.GetFloat(EnterAtKey, 0f)
+            && !EditorApplication.isCompiling && !EditorApplication.isUpdating && !EditorApplication.isPlayingOrWillChangePlaymode)
+        {
+            SessionState.SetBool(EnteredKey, true);
+            Debug.Log("[SMOKE] entering play mode");
+            EditorApplication.EnterPlaymode();
+            return;
+        }
 
         if (File.Exists(DoneFile))
         {

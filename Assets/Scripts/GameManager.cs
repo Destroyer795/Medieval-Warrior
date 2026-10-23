@@ -472,6 +472,13 @@ public class GameManager : MonoBehaviour
     // PAUSE
     // =======================
 
+    // alt-tabbing away mid-fight shouldn't get you killed
+    void OnApplicationFocus(bool focused)
+    {
+        if (!focused && !Application.isBatchMode && !GameSettings.TestMode && !gameEnded && !isPaused && !ChoosingBoon && State != MatchState.Intro)
+            Pause();
+    }
+
     public void Pause()
     {
         if (gameEnded) return;

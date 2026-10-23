@@ -92,7 +92,9 @@ Menus work with the mouse or a controller (d-pad/stick to move, A to choose).
 
 1. Install **Unity 6000.3.2f1** (Unity Hub → Installs → Install Editor → Archive, or any
    `6000.3.x`). No extra modules are needed for Windows.
-2. Clone the repo and open the folder in Unity Hub. The first import takes a few minutes;
+2. Clone the repo (on Windows keep the path short or run
+   `git config --global core.longpaths true` first – some asset-pack paths are long) and open the
+   folder in Unity Hub. The first import takes a few minutes;
    Unity downloads the packages listed in `Packages/manifest.json` (including
    `com.unity.postprocessing`).
 3. Open `Assets/Scenes/MainMenu.unity` and press **Play**.

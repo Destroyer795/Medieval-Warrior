@@ -1052,6 +1052,13 @@ public static class EnvironmentBuilder
         Vector3 look = new Vector3(Center.x, 0, Center.y) - pos; look.y = 0;
         if (look.sqrMagnitude < 1f) look = Vector3.forward;
         player.transform.SetPositionAndRotation(pos, Quaternion.LookRotation(look));
+        var pc = player.GetComponent<PlayerControlSpeed>();
+        if (pc != null)
+        {
+            pc.boundsCenter = new Vector3(Center.x, 0, Center.y);
+            pc.boundsRadius = PlainRadius + 30f;   // stays on the NavMesh-covered plain
+            EditorUtility.SetDirty(pc);
+        }
         var cam = game.GetRootGameObjects().SelectMany(g => g.GetComponentsInChildren<Camera>()).FirstOrDefault(c => c.CompareTag("MainCamera"));
         if (cam != null)
         {

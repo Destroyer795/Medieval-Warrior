@@ -111,7 +111,7 @@ public class PlayerHealth : MonoBehaviour
             Vector3 dir = (attacker.position - transform.position).normalized;
             if (Vector3.Dot(transform.forward, dir) > blockAngleThreshold)
             {
-                bool perfect = Time.time - blockStartTime < perfectBlockWindow;
+                bool perfect = Time.time - blockStartTime < perfectBlockWindow + Boons.PerfectBlockBonus;
                 FX.Sparks(transform.position + Vector3.up * 1.2f + transform.forward * 0.5f, transform.forward);
                 AudioManager.PlayAt("shield_block", transform.position, 1f);
                 if (perfect)
@@ -122,7 +122,7 @@ public class PlayerHealth : MonoBehaviour
                 }
                 amount *= 0.15f;
                 knockback *= 0.3f;
-                if (controller != null) controller.DrainStamina(12f);
+                if (controller != null && !Boons.FreeBlocking) controller.DrainStamina(12f);
             }
         }
 

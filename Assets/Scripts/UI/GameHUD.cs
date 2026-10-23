@@ -79,6 +79,105 @@ public class GameHUD : MonoBehaviour
         instance.transients.Add(((RectTransform)row.transform, Time.unscaledTime, life));
     }
 
+    // ---- boon choice: three parchment cards, time frozen until one is picked
+    RectTransform boonRoot;
+    public static bool BoonsOpen => instance != null && instance.boonRoot != null;
+    System.Action<BoonId> boonCallback;
+    Boons.Def[] boonChoices;
+
+    public static void ShowBoons(Boons.Def[] choices, System.Action<BoonId> onPick)
+    {
+        if (instance == null) { onPick?.Invoke(choices[0].id); return; }
+        instance.BuildBoonCards(choices, onPick);
+    }
+
+    /// <summary>Picks a card as if clicked (used by the automated tests).</summary>
+    public static void DebugPickBoon(int index)
+    {
+        if (instance == null || instance.boonChoices == null) return;
+        instance.PickBoon(instance.boonChoices[Mathf.Clamp(index, 0, instance.boonChoices.Length - 1)].id);
+    }
+
+    void BuildBoonCards(Boons.Def[] choices, System.Action<BoonId> onPick)
+    {
+        if (boonRoot != null) Destroy(boonRoot.gameObject);
+        bannerRoot.gameObject.SetActive(false);   // the cards take centre stage
+        boonCallback = onPick;
+        boonChoices = choices;
+        boonRoot = UIKit.Rect("Boons", root).Fill();
+        var dim = UIKit.Img(boonRoot, null, new Color(0.02f, 0.01f, 0.01f, 0.65f), "Dim");
+        dim.rectTransform.Fill(); dim.raycastTarget = true;
+        var title = UIKit.Text(boonRoot, "Choose a Boon", 64, UIKit.Gold, TextAlignmentOptions.Center, true);
+        title.rectTransform.Place(new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0, 330), new Vector2(1200, 90));
+        var row = UIKit.HList(boonRoot, 40);
+        ((RectTransform)row.transform).Place(new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0, -20), new Vector2(1300, 460));
+        row.childForceExpandWidth = false; row.childControlWidth = false;
+        foreach (var def in choices)
+        {
+            var card = UIKit.Img(row.transform, "panel_parchment", Color.white, "Boon " + def.name);
+            card.raycastTarget = true;
+            card.rectTransform.sizeDelta = new Vector2(380, 460);
+            card.Layout(460, 380);
+            var icon = UIKit.Icon(card.transform, def.icon, 120);
+            icon.rectTransform.Place(new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0, -40), new Vector2(120, 120));
+            var name = UIKit.Text(card.transform, def.name, 38, UIKit.Ink, TextAlignmentOptions.Center, true);
+            name.fontSharedMaterial = name.font.material;
+            name.rectTransform.Place(new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0, -180), new Vector2(340, 56));
+            var desc = UIKit.Text(card.transform, def.description, 28, UIKit.Ink, TextAlignmentOptions.Top);
+            desc.fontSharedMaterial = desc.font.material;
+            desc.rectTransform.Place(new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0, -250), new Vector2(320, 140));
+            int owned = Boons.Stacks(def.id);
+            if (owned > 0)
+            {
+                var have = UIKit.Text(card.transform, $"Owned: {owned}", 24, new Color(0.45f, 0.1f, 0.08f), TextAlignmentOptions.Bottom);
+                have.fontSharedMaterial = have.font.material;
+                have.rectTransform.Place(new Vector2(0.5f, 0), new Vector2(0.5f, 0), new Vector2(0, 30), new Vector2(320, 34));
+            }
+            var b = card.gameObject.AddComponent<Button>();
+            b.transition = Selectable.Transition.None;
+            var id = def.id;
+            b.onClick.AddListener(() => PickBoon(id));
+            card.gameObject.AddComponent<UIHoverFx>().hoverScale = 1.06f;
+        }
+    }
+
+    void PickBoon(BoonId id)
+    {
+        if (boonRoot != null) Destroy(boonRoot.gameObject);
+        boonRoot = null;
+        boonChoices = null;
+        var cb = boonCallback;
+        boonCallback = null;
+        cb?.Invoke(id);
+        RefreshBoonStrip();
+    }
+
+    RectTransform boonStrip;
+
+    void RefreshBoonStrip()
+    {
+        if (boonStrip == null)
+        {
+            var h = UIKit.HList(root, 6, TextAnchor.UpperLeft);
+            boonStrip = (RectTransform)h.transform;
+            boonStrip.Place(new Vector2(0, 1), new Vector2(0, 1), new Vector2(170, -150), new Vector2(600, 40));
+            h.childForceExpandWidth = false; h.childControlWidth = false;
+        }
+        foreach (Transform c in boonStrip) Destroy(c.gameObject);
+        foreach (var (def, n) in Boons.Owned)
+        {
+            var slot = UIKit.Img(boonStrip, "slot", Color.white, def.name);
+            slot.rectTransform.sizeDelta = new Vector2(40, 40);
+            var i = UIKit.Icon(slot.transform, def.icon, 30);
+            i.rectTransform.Place(new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(30, 30));
+            if (n > 1)
+            {
+                var t = UIKit.Text(slot.transform, n.ToString(), 18, UIKit.Gold, TextAlignmentOptions.BottomRight);
+                t.rectTransform.Fill(1);
+            }
+        }
+    }
+
     public static void HitMarker(bool headshot)
     {
         if (instance == null) return;
@@ -430,7 +529,7 @@ public class GameHUD : MonoBehaviour
             scoreText.text = gm.Score.ToString("N0");
             scoreText.transform.localScale = Vector3.Lerp(scoreText.transform.localScale, Vector3.one, 1f - Mathf.Exp(-8f * dt));
             comboText.text = gm.Combo >= 2 ? $"{gm.Combo} kill streak  x{gm.ComboMultiplier}" : "";
-            comboBar.fillAmount = gm.Combo >= 2 ? gm.ComboTimeLeft / 4f : 0f;
+            comboBar.fillAmount = gm.Combo >= 2 ? gm.ComboTimeLeft / Boons.ComboWindow : 0f;
             var boss = gm.Boss;
             bool showBoss = boss != null && !boss.IsDead;
             bossRoot.gameObject.SetActive(showBoss);

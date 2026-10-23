@@ -33,6 +33,11 @@ public class PlayerControlSpeed : MonoBehaviour
     public int maxArrows = 45;
     public float drawTime = 0.7f;
 
+    [Header("World bounds (set by the environment builder)")]
+    public Vector3 boundsCenter;
+    public float boundsRadius;            // 0 = unlimited
+    public float maxSlope = 40f;
+
     [Header("Shield Logic")]
     public Transform shieldArmBone; // <--- DRAG 'Bip001 L UpperArm' HERE
     public Vector3 blockRotation = new Vector3(-30, 60, -20); // The angle to hold the shield
@@ -160,6 +165,7 @@ public class PlayerControlSpeed : MonoBehaviour
             else if (IsAiming || IsDrawing) currentSpeed = aimSpeed;
             else if (isRunning) currentSpeed = runSpeed;
 
+            currentSpeed *= Boons.MoveSpeed;
             if (rb != null) desiredVelocity = movement * currentSpeed;
             else transform.Translate(movement * currentSpeed * Time.deltaTime, Space.World);
 
@@ -186,7 +192,7 @@ public class PlayerControlSpeed : MonoBehaviour
 
         // --- 4. STAMINA
         if (isRunning) UseStamina(sprintCost * Time.deltaTime);
-        else if (Time.time - lastStaminaUse > 0.7f) Stamina = Mathf.Min(maxStamina, Stamina + staminaRegen * Time.deltaTime);
+        else if (Time.time - lastStaminaUse > 0.7f) Stamina = Mathf.Min(maxStamina, Stamina + staminaRegen * Boons.StaminaRegen * Time.deltaTime);
         if (Stamina <= 0.5f) exhausted = true;
         if (exhausted && Stamina > maxStamina * 0.3f) exhausted = false;
 
@@ -218,8 +224,31 @@ public class PlayerControlSpeed : MonoBehaviour
         if (rb == null || rb.isKinematic) return;
         if (Stunned && !Dodging) return;   // let knockback forces play out
 
+        Vector3 v = desiredVelocity;
+
+        // too steep to walk up (mountains frame the valley, they aren't a ladder)
+        if (v.sqrMagnitude > 0.01f && Physics.Raycast(rb.position + Vector3.up * 0.6f, Vector3.down, out var ground, 1.6f, ~0, QueryTriggerInteraction.Ignore))
+        {
+            float slope = Vector3.Angle(ground.normal, Vector3.up);
+            Vector3 downhill = Vector3.ProjectOnPlane(ground.normal, Vector3.up);
+            if (slope > maxSlope && Vector3.Dot(v, downhill) < 0f)
+                v -= Vector3.Project(v, downhill.normalized);
+        }
+
+        // soft world edge
+        if (boundsRadius > 0f)
+        {
+            Vector3 off = rb.position - boundsCenter; off.y = 0f;
+            if (off.magnitude > boundsRadius)
+            {
+                Vector3 outward = off.normalized;
+                if (Vector3.Dot(v, outward) > 0f) v -= Vector3.Project(v, outward);
+                v -= outward * (off.magnitude - boundsRadius) * 2f;
+            }
+        }
+
         // Keep gravity on Y, drive X/Z from input
-        rb.linearVelocity = new Vector3(desiredVelocity.x, rb.linearVelocity.y, desiredVelocity.z);
+        rb.linearVelocity = new Vector3(v.x, rb.linearVelocity.y, v.z);
     }
 
     // ------------------------------------------------------------ stamina / dodge
@@ -267,6 +296,7 @@ public class PlayerControlSpeed : MonoBehaviour
         animator.SetTrigger("isAttacking");
         if (myHealthScript != null) myHealthScript.ActivateParry();
         AudioManager.PlayAt("sword_swing", transform.position, 0.8f, 0.12f);
+        FX.Swipe(transform, ComboStep);
         pendingHits.Add((Time.time + 0.2f, ComboStep));
         if (rb != null) rb.AddForce(transform.forward * 2.5f, ForceMode.VelocityChange); // small lunge
     }
@@ -288,7 +318,7 @@ public class PlayerControlSpeed : MonoBehaviour
 
         HashSet<EnemyController> hitEnemies = new HashSet<EnemyController>();
         bool finisher = step == 2;
-        float damage = finisher ? 2f : 1f;
+        float damage = (finisher ? 2f : 1f) * Boons.SwordDamage;
         float knock = finisher ? 7f : 2.5f;
 
         foreach (Collider hit in hitColliders)
@@ -300,6 +330,7 @@ public class PlayerControlSpeed : MonoBehaviour
             {
                 enemy.TakeDamage(damage, dir, knock);
                 hitEnemies.Add(enemy); // one hit per enemy
+                if (enemy.IsDead && Boons.LifeSteal > 0f && myHealthScript != null) myHealthScript.Heal(Boons.LifeSteal);
                 if (GameManager.instance != null) GameManager.instance.RegisterMeleeHit(enemy);
             }
         }
@@ -353,7 +384,7 @@ public class PlayerControlSpeed : MonoBehaviour
         }
         if (IsDrawing)
         {
-            DrawAmount = Mathf.Min(1f, DrawAmount + Time.deltaTime / drawTime);
+            DrawAmount = Mathf.Min(1f, DrawAmount + Time.deltaTime * Boons.DrawSpeed / drawTime);
             if (Input.GetMouseButtonUp(0) || !Input.GetMouseButton(0))
             {
                 if (DrawAmount > 0.15f) Fire();
@@ -386,7 +417,8 @@ public class PlayerControlSpeed : MonoBehaviour
         else target = origin + transform.forward * 50f;
 
         Vector3 dir = (target - origin).normalized;
-        Arrow.Fire(origin + dir * 0.2f, dir, Mathf.Lerp(24f, 58f, draw), Mathf.Lerp(1f, 3.4f, draw), Mathf.Lerp(2f, 9f, draw), transform);
+        Arrow.Fire(origin + dir * 0.2f, dir, Mathf.Lerp(24f, 58f, draw), Mathf.Lerp(1f, 3.4f, draw), Mathf.Lerp(2f, 9f, draw), transform,
+                   Boons.Pierce, Boons.FireArrows && draw > 0.95f);
         AudioManager.PlayAt("bow_release", transform.position, 1f, 0.08f);
         if (GameManager.instance != null) GameManager.instance.RegisterArrowFired();
         FX.Shake(0.06f);

@@ -148,6 +148,88 @@ public static class FX
         Burst(ps, count);
     }
 
+    public static void Embers(Vector3 pos, int count = 6)
+    {
+        var ps = Make("Embers", pos, 0.1f, 1f);
+        var main = ps.main;
+        main.startLifetime = new ParticleSystem.MinMaxCurve(0.3f, 0.8f);
+        main.startSpeed = new ParticleSystem.MinMaxCurve(0.4f, 1.6f);
+        main.startSize = new ParticleSystem.MinMaxCurve(0.12f, 0.3f);
+        main.gravityModifier = -0.6f;
+        main.startColor = new Color(1f, 0.55f, 0.12f, 0.95f);
+        var shape = ps.shape; shape.shapeType = ParticleSystemShapeType.Sphere; shape.radius = 0.25f;
+        Gradient(ps, new Color(1f, 0.75f, 0.25f, 1f), new Color(0.6f, 0.1f, 0.02f, 0f));
+        Burst(ps, count);
+    }
+
+    // A pale crescent that traces each sword swing; the combo step decides the angle.
+    static Mesh swipeMesh;
+    static readonly MaterialPropertyBlock swipeBlock = new MaterialPropertyBlock();
+
+    public static void Swipe(Transform owner, int step)
+    {
+        if (swipeMesh == null) swipeMesh = BuildSwipeMesh();
+        var go = new GameObject("FX Swipe");
+        go.transform.SetParent(owner, false);
+        go.transform.localPosition = new Vector3(0, 1.15f, 0.35f);
+        float roll = step == 0 ? 20f : step == 1 ? 160f : 90f;   // right-to-left, back-hand, overhead
+        go.transform.localRotation = Quaternion.Euler(0, 0, roll);
+        go.AddComponent<MeshFilter>().sharedMesh = swipeMesh;
+        var mr = go.AddComponent<MeshRenderer>();
+        mr.sharedMaterial = ParticleMat;
+        mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        EnsureRunner();
+        runner.StartCoroutine(FadeSwipe(go, mr, step == 2));
+    }
+
+    static IEnumerator FadeSwipe(GameObject go, MeshRenderer mr, bool heavy)
+    {
+        float life = heavy ? 0.22f : 0.16f;
+        for (float t = 0; t < life && go != null; t += Time.deltaTime)
+        {
+            float k = t / life;
+            swipeBlock.SetColor("_TintColor", new Color(1f, 0.95f, 0.85f, (1f - k) * (heavy ? 0.75f : 0.55f)));
+            swipeBlock.SetColor("_Color", new Color(1f, 0.95f, 0.85f, (1f - k) * 0.6f));
+            mr.SetPropertyBlock(swipeBlock);
+            go.transform.localScale = Vector3.one * Mathf.Lerp(0.85f, 1.1f, k);
+            yield return null;
+        }
+        if (go != null) Object.Destroy(go);
+    }
+
+    static Mesh BuildSwipeMesh()
+    {
+        // ring sector in the local XY plane, bright in the middle of its width, fading at both ends
+        const int segs = 18;
+        var v = new System.Collections.Generic.List<Vector3>();
+        var uv = new System.Collections.Generic.List<Vector2>();
+        var col = new System.Collections.Generic.List<Color>();
+        var tri = new System.Collections.Generic.List<int>();
+        for (int i = 0; i <= segs; i++)
+        {
+            float t = i / (float)segs;
+            float a = Mathf.Lerp(-75f, 75f, t) * Mathf.Deg2Rad;
+            Vector3 dir = new Vector3(Mathf.Sin(a), Mathf.Cos(a) * 0.35f, Mathf.Cos(a));
+            float fade = Mathf.Sin(t * Mathf.PI);
+            foreach (var (r, vcoord) in new[] { (0.55f, 0f), (1.15f, 0.5f), (1.55f, 1f) })
+            {
+                v.Add(dir.normalized * r);
+                uv.Add(new Vector2(0.5f, vcoord));
+                col.Add(new Color(1, 1, 1, fade));
+            }
+        }
+        for (int i = 0; i < segs; i++)
+            for (int j = 0; j < 2; j++)
+            {
+                int a = i * 3 + j, b = a + 1, c = a + 3, d = a + 4;
+                tri.AddRange(new[] { a, c, b, b, c, d, a, b, c, b, d, c });   // double sided
+            }
+        var m = new Mesh { name = "Swipe" };
+        m.SetVertices(v); m.SetUVs(0, uv); m.SetColors(col); m.SetTriangles(tri, 0);
+        m.RecalculateBounds();
+        return m;
+    }
+
     // ------------------------------------------------------------ game feel
 
     static Coroutine hitStop;

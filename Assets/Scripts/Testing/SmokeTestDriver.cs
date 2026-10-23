@@ -222,6 +222,13 @@ public class SmokeTestDriver : MonoBehaviour
         // victory
         health.InvulnerableUntil = Time.time + 30f;
         while (gm.currentKills < gm.targetKills) gm.AddKill(null);
+        // the kill milestones offer boons (time freezes until one is picked)
+        for (int i = 0; i < 6; i++)
+        {
+            yield return Wait(0.3f);
+            if (GameHUD.BoonsOpen) { if (i == 0) Capture("18b_defend_boon"); GameHUD.DebugPickBoon(i % 3); }
+        }
+        Check(Boons.Total >= 2, $"Defend the Castle offered boons at 1/3 and 2/3 ({Boons.Total})");
         yield return Wait(2.2f);   // the Warlord appears at 75% and needs a moment to rise
         Check(gm.Boss != null, "the Warlord leads the final assault");
         if (gm.Boss != null && !gm.Boss.IsDead) gm.Boss.TakeDamage(9999f, fwd, 0f);
@@ -242,6 +249,21 @@ public class SmokeTestDriver : MonoBehaviour
         gm = GameManager.instance;
         Check(gm != null && gm.Wave >= 1, $"endless horde wave started (wave {gm?.Wave})");
         Capture("30_endless");
+        // clear wave 1 by force: a boon choice must appear and freeze time
+        for (int i = 0; i < 40 && gm.Wave == 1 && !GameHUD.BoonsOpen; i++)
+        {
+            foreach (var z in EnemyController.All.ToArray()) if (z != null && !z.IsDead) z.TakeDamage(999f, Vector3.forward, 0f);
+            yield return Wait(0.5f);
+        }
+        Check(GameHUD.BoonsOpen, "clearing a wave offers a boon");
+        Check(Time.timeScale == 0f, "time frozen while choosing");
+        Capture("32_boons");
+        int boonsBefore = Boons.Total;
+        GameHUD.DebugPickBoon(0);
+        yield return Wait(0.3f);
+        Check(Boons.Total == boonsBefore + 1 && !GameHUD.BoonsOpen, "boon applied");
+        Check(Time.timeScale > 0.5f, "time resumes after the pick");
+        Capture("33_boon_owned");
         health = GameObject.FindWithTag("Player").GetComponent<PlayerHealth>();
         health.TakeDamage(999f, null, 0f, true);
         yield return Wait(4.5f);

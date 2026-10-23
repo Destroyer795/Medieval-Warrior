@@ -39,6 +39,7 @@ the same lighting settings; the builder writes them into all three scenes.
 | `Arrow`, `BileGlob`, `AcidPool`, `Combat.Explode`, `Pickup` | Projectiles, area damage and loot. |
 | `FX` | Particle bursts built in code, hit-stop, screen shake. |
 | `AudioManager` | `Play2D`, `PlayAt` (3D), `PlayMusic` and `SetBattleIntensity` (war-drum layer driven by how many zombies are near); clips come from `Resources/Audio` by name. |
+| `Boons` | Per-match upgrades: definitions, stacks, `Roll` (offer three), `Apply` (one-off effects) and the multipliers gameplay code reads (`SwordDamage`, `DrawSpeed`, `Pierce`, `FireArrows`, ...). `GameManager.OfferBoon` freezes time and `GameHUD.ShowBoons` shows the cards. |
 | `TintVariation` | Per-house colour wash via MaterialPropertyBlock (set by the builder). |
 | `UIKit` | Builds styled UI in code (panels, buttons, sliders, toggles, selectors, input fields). |
 | `GameHUD`, `MainMenuUI`, `SharedPanels` | The screens themselves. |
@@ -58,6 +59,10 @@ with root motion on, so the agent and the animation fought each other.)
    and `Bloater` uses `State.Fuse`).
 3. Let it spawn: add a weight in `GameManager.PickType`.
 It automatically shows up in the How-to-Play bestiary.
+
+### Add a boon
+Add a value to `BoonId` and a `Def` to the table in `Boons.cs`; give it a multiplier property or a
+case in `Boons.Apply`, and read it where it matters (e.g. `PlayerControlSpeed`, `Arrow`).
 
 ### Tune difficulty or modes
 `GameSettings.Profiles` (health/damage/speed multipliers, spawn rate, Defend target, max alive,

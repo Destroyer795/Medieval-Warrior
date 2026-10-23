@@ -36,6 +36,7 @@ public class MainMenuUI : MonoBehaviour
         helpPage = SharedPanels.HowToPlay(root, () => Show(titlePage));
         BuildLoading();
         Show(titlePage);
+        AudioManager.SetBattleIntensity(0f, true);
         AudioManager.PlayMusic("music_menu", 0.8f);
     }
 

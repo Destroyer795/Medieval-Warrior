@@ -66,8 +66,20 @@ public class AutoPlayTest : MonoBehaviour
             pc.DebugSwing();
             foreach (var z in EnemyController.All.ToArray()) z.TakeDamage(999f, Vector3.forward, 4f);
             yield return new WaitForSecondsRealtime(3f);
+            if (GameHUD.BoonsOpen) GameHUD.DebugPickBoon(0);
             Expect(gm.currentKills > 0, $"kills registered ({gm.currentKills})");
-            yield return new WaitForSecondsRealtime(10f);
+
+            // performance sample while the horde regroups (real numbers only when not -batchmode)
+            int frames = 0; float worst = 0f, start = Time.realtimeSinceStartup;
+            while (Time.realtimeSinceStartup - start < 10f)
+            {
+                yield return null;
+                if (GameHUD.BoonsOpen) GameHUD.DebugPickBoon(0);
+                frames++;
+                worst = Mathf.Max(worst, Time.unscaledDeltaTime);
+            }
+            float avg = frames / (Time.realtimeSinceStartup - start);
+            Debug.Log($"[AUTOTEST] perf: {avg:F0} fps average, worst frame {worst * 1000f:F0} ms, {EnemyController.All.Count} zombies, {Screen.width}x{Screen.height}, quality {QualitySettings.names[QualitySettings.GetQualityLevel()]}");
             Expect(EnemyController.All.Count > 0, "horde keeps coming");
         }
 

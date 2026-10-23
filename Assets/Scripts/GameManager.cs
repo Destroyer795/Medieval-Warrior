@@ -96,7 +96,7 @@ public class GameManager : MonoBehaviour
     {
         if (Input.GetKeyDown(KeyCode.Escape) || Input.GetKeyDown(KeyCode.P))
         {
-            if (gameEnded) return;
+            if (gameEnded || ChoosingBoon) return;
             if (isPaused) Resume();
             else Pause();
         }
@@ -115,6 +115,7 @@ public class GameManager : MonoBehaviour
             case MatchState.Playing:
                 UpdateMode();
                 UpdateTips();
+                CheckBoonMilestones();
                 break;
             case MatchState.Intermission:
                 IntermissionLeft -= Time.deltaTime;
@@ -131,6 +132,7 @@ public class GameManager : MonoBehaviour
     {
         Mode = GameSettings.Mode;
         currentKills = 0;
+        Boons.Reset();
         isPaused = false;
         gameEnded = false;
         foreach (ZombieType t in Enum.GetValues(typeof(ZombieType))) killsByType[t] = 0;
@@ -255,6 +257,49 @@ public class GameManager : MonoBehaviour
         return e;
     }
 
+    // ---------------- boons: pick one of three at milestones
+    public bool ChoosingBoon { get; private set; }
+    public int BoonsOffered { get; private set; }
+    float nextBoonTime = 60f;
+    int defendBoonsGiven;
+
+    void CheckBoonMilestones()
+    {
+        if (ChoosingBoon || gameEnded) return;
+        if (Mode == GameMode.DefendTheCastle)
+        {
+            int due = currentKills >= targetKills * 2 / 3 ? 2 : currentKills >= targetKills / 3 ? 1 : 0;
+            if (defendBoonsGiven < due) { defendBoonsGiven++; OfferBoon(); }
+        }
+        else if (Mode == GameMode.LastStand && MatchTime >= nextBoonTime)
+        {
+            nextBoonTime += 60f;
+            OfferBoon();
+        }
+    }
+
+    public void OfferBoon()
+    {
+        var choices = Boons.Roll(3);
+        if (choices.Length == 0) return;
+        ChoosingBoon = true;
+        BoonsOffered++;
+        Time.timeScale = 0f;
+        LockCursor(false);
+        AudioManager.Play2D("heal", 0.8f);
+        GameHUD.ShowBoons(choices, PickBoon);
+    }
+
+    public void PickBoon(BoonId id)
+    {
+        if (!ChoosingBoon) return;
+        Boons.Apply(id, playerHealth != null ? playerHealth.gameObject : GameObject.FindWithTag("Player"));
+        ChoosingBoon = false;
+        if (!isPaused && !gameEnded) { Time.timeScale = 1f; LockCursor(true); }
+        GameHUD.Toast(Boons.Get(id).name + " gained", UIKit.Gold, Boons.Get(id).icon, 2.5f, 32);
+        AudioManager.Play2D("pickup", 1f);
+    }
+
     void UpdateBattleMusic()
     {
         if (playerHealth == null) return;
@@ -318,6 +363,7 @@ public class GameManager : MonoBehaviour
         if (playerHealth != null) playerHealth.Heal(playerHealth.maxHealth * 0.25f);
         GameHUD.Banner($"Wave {Wave} Cleared", $"+{bonus} bonus  -  wounds tended", 3f);
         AudioManager.Play2D("victory", 0.6f);
+        OfferBoon();
     }
 
     // =======================
@@ -336,7 +382,7 @@ public class GameManager : MonoBehaviour
 
         Combo++;
         BestCombo = Mathf.Max(BestCombo, Combo);
-        comboExpires = Time.time + 4f;
+        comboExpires = Time.time + Boons.ComboWindow;
         int points = (enemy != null && enemy.Stats != null ? enemy.Stats.points : 100) * ComboMultiplier;
         if (enemy != null && enemy.isBoss) points *= 2;
         Score += points;
@@ -414,7 +460,7 @@ public class GameManager : MonoBehaviour
 
     public void Resume()
     {
-        Time.timeScale = 1f;
+        Time.timeScale = ChoosingBoon ? 0f : 1f;
         isPaused = IsPaused = false;
         LockCursor(true);
         PauseChanged?.Invoke(false);

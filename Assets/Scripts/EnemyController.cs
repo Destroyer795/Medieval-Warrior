@@ -157,6 +157,8 @@ public class EnemyController : MonoBehaviour
     void Update()
     {
         if (!initialised || IsDead) return;
+        UpdateBurning();
+        if (IsDead) return;
         UpdateFlash();
         UpdateAnimator();
 
@@ -531,6 +533,35 @@ public class EnemyController : MonoBehaviour
         gameObject.tag = "Untagged";
         if (exploded) { foreach (var r in renderers) if (r != null) r.enabled = false; Destroy(gameObject, 0.1f); }
         else { Invoke(nameof(BeginSink), 3.5f); Destroy(gameObject, 6f); }
+    }
+
+    // ---- fire (from Fire Arrows): damage over time, embers, can't be put out
+    float burnUntil, burnDps, emberTimer, burnAccum;
+
+    public void Ignite(float seconds, float dps)
+    {
+        if (IsDead) return;
+        if (Time.time > burnUntil) AudioManager.PlayAt("explosion", transform.position, 0.15f, 0.3f);
+        burnUntil = Mathf.Max(burnUntil, Time.time + seconds);
+        burnDps = Mathf.Max(burnDps, dps);
+    }
+
+    public bool IsBurning => Time.time < burnUntil && !IsDead;
+
+    void UpdateBurning()
+    {
+        if (!IsBurning) return;
+        Health -= burnDps * Time.deltaTime;
+        burnAccum += burnDps * Time.deltaTime;
+        emberTimer -= Time.deltaTime;
+        if (emberTimer <= 0f)
+        {
+            emberTimer = 0.18f;
+            FX.Embers(transform.position + Vector3.up * UnityEngine.Random.Range(0.4f, 1.7f) * transform.localScale.y, 4);
+            if (burnAccum > 0.05f) { Damaged?.Invoke(this, burnAccum, HeadPosition); burnAccum = 0f; LastHitTime = Time.time; }
+        }
+        flashTimer = Mathf.Max(flashTimer, 0.25f);
+        if (Health <= 0f) Kill(transform.forward, false);
     }
 
     void BeginSink() => sinking = true;

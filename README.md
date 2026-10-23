@@ -52,6 +52,11 @@ cut off.
 
 Three difficulties (Squire / Knight / Warlord). High scores and best wave are saved.
 
+**Boons** – pick one of three upgrades after every Endless wave, at a third and two thirds of the
+way through Defend the Castle, and every minute of Last Stand: Vigour, Swift Draw, Keen Edge,
+Second Wind, Piercing Arrows, Fire Arrows (fully drawn shots set zombies ablaze), Great Quiver,
+Bulwark, Vampiric Blade, Fleet Foot and Bloodlust. They stack and last until the match ends.
+
 **UI** – medieval gold-and-iron interface: ornate health bar with damage trail, stamina bar,
 heraldic shield in your colours, objective plaque, combo meter, boss bar, weapon slots and arrow
 count, crosshair, hit markers, enemy health bars, off-screen threat arrows, kill feed, banners,

@@ -94,7 +94,7 @@ public class GameManager : MonoBehaviour
 
     void Update()
     {
-        if (Input.GetKeyDown(KeyCode.Escape) || Input.GetKeyDown(KeyCode.P))
+        if (GameInput.PauseDown)
         {
             if (gameEnded || ChoosingBoon) return;
             if (isPaused) Resume();
@@ -337,9 +337,13 @@ public class GameManager : MonoBehaviour
         GameHUD.Banner(type == ZombieType.Warlord ? "The Warlord Approaches" : "A Brute Leads the Wave", "Bring it down!", 3f);
     }
 
+    float damageAtWaveStart;
+
     void StartWave(int n)
     {
         Wave = n;
+        damageAtWaveStart = DamageTaken;
+        if (n >= 10) Feats.Unlock("unbroken");
         var p = GameSettings.Profile;
         waveToSpawn = Mathf.RoundToInt((5 + n * 3) * Mathf.Lerp(0.8f, 1.2f, p.spawnRate - 0.75f));
         waveSpawned = 0;
@@ -356,6 +360,7 @@ public class GameManager : MonoBehaviour
 
     void WaveCleared()
     {
+        if (DamageTaken <= damageAtWaveStart) Feats.Unlock("untouchable");
         State = MatchState.Intermission;
         IntermissionLeft = 9f;
         int bonus = 300 * Wave;
@@ -382,13 +387,28 @@ public class GameManager : MonoBehaviour
 
         Combo++;
         BestCombo = Mathf.Max(BestCombo, Combo);
+        Feats.Add("kills");
+        if (type == ZombieType.Brute) Feats.Add("brutes");
+        if (type == ZombieType.Warlord) Feats.Unlock("kingslayer");
+        if (Combo >= 15) Feats.Unlock("butcher");
         comboExpires = Time.time + Boons.ComboWindow;
         int points = (enemy != null && enemy.Stats != null ? enemy.Stats.points : 100) * ComboMultiplier;
         if (enemy != null && enemy.isBoss) points *= 2;
         Score += points;
         UpdateScoreUI();
         Killed?.Invoke(enemy, points);
-        if (enemy != null && enemy == Boss) GameHUD.Banner(enemy.Stats.name + " Slain!", "", 2.5f);
+        if (enemy != null && enemy == Boss)
+        {
+            GameHUD.Banner(enemy.Stats.name + " Slain!", "", 2.5f);
+            StartCoroutine(BossSlowMotion());
+        }
+    }
+
+    IEnumerator BossSlowMotion()
+    {
+        Time.timeScale = 0.25f;
+        yield return new WaitForSecondsRealtime(1.3f);
+        if (!gameEnded && !isPaused && !ChoosingBoon) Time.timeScale = 1f;
     }
 
     public void RegisterArrowFired() => ArrowsFired++;
@@ -396,7 +416,7 @@ public class GameManager : MonoBehaviour
     public void RegisterArrowHit(EnemyController enemy, bool headshot)
     {
         ArrowsHit++;
-        if (headshot) { Headshots++; Score += 25; }
+        if (headshot) { Headshots++; Score += 25; Feats.Add("headshots"); }
     }
 
     public void RegisterMeleeHit(EnemyController enemy) { }
@@ -431,6 +451,9 @@ public class GameManager : MonoBehaviour
         State = victory ? MatchState.Won : MatchState.Lost;
         if (victory) Score += Mathf.RoundToInt(playerHealth != null ? playerHealth.currentHealth * 10f : 0f);
         NewRecord = GameSettings.SubmitScore(Mode, Score, Wave);
+        if (victory && Mode == GameMode.DefendTheCastle) Feats.Unlock("defender");
+        if (victory && Mode == GameMode.LastStand) Feats.Unlock("dawn");
+        if (victory && GameSettings.Difficulty == Difficulty.Warlord) Feats.Unlock("legend");
         AudioManager.Play2D(victory ? "victory" : "defeat", 1f);
         AudioManager.SetBattleIntensity(0f);
         MatchEnded?.Invoke(victory);

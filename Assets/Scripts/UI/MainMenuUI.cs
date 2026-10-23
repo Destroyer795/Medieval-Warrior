@@ -9,7 +9,7 @@ using UnityEngine.UI;
 public class MainMenuUI : MonoBehaviour
 {
     RectTransform root;
-    UIPage titlePage, playPage, customisePage, settingsPage, helpPage;
+    UIPage titlePage, playPage, customisePage, settingsPage, helpPage, featsPage, creditsPage;
     CanvasGroup loading;
     MenuPreview preview;
     readonly Image[] modeCards = new Image[3];
@@ -34,6 +34,8 @@ public class MainMenuUI : MonoBehaviour
         BuildCustomise();
         settingsPage = SharedPanels.Settings(root, () => Show(titlePage));
         helpPage = SharedPanels.HowToPlay(root, () => Show(titlePage));
+        BuildFeats();
+        BuildCredits();
         BuildLoading();
         Show(titlePage);
         AudioManager.SetBattleIntensity(0f, true);
@@ -42,7 +44,7 @@ public class MainMenuUI : MonoBehaviour
 
     void Show(UIPage page)
     {
-        foreach (var p in new[] { titlePage, playPage, customisePage, settingsPage, helpPage })
+        foreach (var p in new[] { titlePage, playPage, customisePage, settingsPage, helpPage, featsPage, creditsPage })
             if (p != null && p != page) p.Hide();
         page.Show();
         if (preview != null) preview.SetActive(page == customisePage);
@@ -62,14 +64,16 @@ public class MainMenuUI : MonoBehaviour
         var div = UIKit.Img(rt, "divider", Color.white, "Divider");
         div.rectTransform.Place(new Vector2(0, 1), new Vector2(0, 1), new Vector2(110, -300), new Vector2(560, 28));
 
-        var list = UIKit.VList(rt, 18, null, TextAnchor.UpperLeft);
-        ((RectTransform)list.transform).Place(new Vector2(0, 1), new Vector2(0, 1), new Vector2(130, -350), new Vector2(420, 560));
+        var list = UIKit.VList(rt, 12, null, TextAnchor.UpperLeft);
+        ((RectTransform)list.transform).Place(new Vector2(0, 1), new Vector2(0, 1), new Vector2(130, -340), new Vector2(420, 700));
         list.childForceExpandWidth = false; list.childControlWidth = false;
-        UIKit.Button(list.transform, "Play", () => Show(playPage), 400, 80, 40);
-        UIKit.Button(list.transform, "Customise Knight", () => Show(customisePage), 400, 80, 36);
-        UIKit.Button(list.transform, "Settings", () => Show(settingsPage), 400, 80, 36);
-        UIKit.Button(list.transform, "How to Play", () => Show(helpPage), 400, 80, 36);
-        UIKit.Button(list.transform, "Quit", Quit, 400, 80, 36, "button_dark");
+        UIKit.Button(list.transform, "Play", () => Show(playPage), 400, 70, 40);
+        UIKit.Button(list.transform, "Customise Knight", () => Show(customisePage), 400, 70, 34);
+        UIKit.Button(list.transform, "Settings", () => Show(settingsPage), 400, 70, 34);
+        UIKit.Button(list.transform, "How to Play", () => Show(helpPage), 400, 70, 34);
+        UIKit.Button(list.transform, $"Feats  {Feats.UnlockedCount}/{Feats.All.Length}", () => Show(featsPage), 400, 70, 34);
+        UIKit.Button(list.transform, "Credits", () => Show(creditsPage), 400, 70, 34, "button_dark");
+        UIKit.Button(list.transform, "Quit", Quit, 400, 70, 34, "button_dark");
 
         var records = UIKit.Text(rt, RecordsLine(), 24, new Color(1, 1, 1, 0.75f), TextAlignmentOptions.BottomLeft);
         records.rectTransform.Place(new Vector2(0, 0), new Vector2(0, 0), new Vector2(130, 40), new Vector2(1400, 40));
@@ -242,10 +246,58 @@ public class MainMenuUI : MonoBehaviour
 #endif
     }
 
+    // ------------------------------------------------------------ feats & credits
+
+    void BuildFeats()
+    {
+        featsPage = SharedPanels.Page(root, "Feats Page", new Vector2(1500, 920), "Feats of Arms");
+        var grid = UIKit.Rect("Grid", featsPage.transform).Place(new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0, -140), new Vector2(1380, 660));
+        var g = grid.gameObject.AddComponent<GridLayoutGroup>();
+        g.cellSize = new Vector2(450, 120); g.spacing = new Vector2(15, 12);
+        foreach (var f in Feats.All)
+        {
+            bool done = Feats.IsUnlocked(f.id);
+            var cell = UIKit.Img(grid, "panel_iron", done ? Color.white : new Color(0.55f, 0.55f, 0.55f), f.name);
+            var icon = UIKit.Icon(cell.transform, f.icon, 64, done ? Color.white : new Color(0.35f, 0.35f, 0.35f));
+            icon.rectTransform.Place(new Vector2(0, 0.5f), new Vector2(0, 0.5f), new Vector2(22, 0), new Vector2(64, 64));
+            var n = UIKit.Text(cell.transform, f.name, 26, done ? UIKit.Gold : new Color(0.7f, 0.66f, 0.6f), TextAlignmentOptions.TopLeft, true);
+            n.rectTransform.Place(new Vector2(0, 1), new Vector2(0, 1), new Vector2(100, -14), new Vector2(330, 34));
+            n.textWrappingMode = TextWrappingModes.NoWrap;
+            n.enableAutoSizing = true; n.fontSizeMax = 26; n.fontSizeMin = 14;
+            var d = UIKit.Text(cell.transform, f.description, 19, UIKit.Parchment, TextAlignmentOptions.TopLeft);
+            d.rectTransform.Place(new Vector2(0, 1), new Vector2(0, 1), new Vector2(100, -48), new Vector2(330, 44));
+            var p = UIKit.Text(cell.transform, Feats.Progress(f), 18, done ? new Color(0.6f, 0.9f, 0.5f) : UIKit.GoldDim, TextAlignmentOptions.BottomRight);
+            p.rectTransform.Place(new Vector2(1, 0), new Vector2(1, 0), new Vector2(-16, 10), new Vector2(200, 24));
+        }
+        SharedPanels.BackButton(featsPage.transform, () => Show(titlePage));
+    }
+
+    void BuildCredits()
+    {
+        creditsPage = SharedPanels.Page(root, "Credits Page", new Vector2(1100, 860), "Credits");
+        var t = UIKit.Text(creditsPage.transform,
+            "<color=#F5CB73>MEDIEVAL WARRIOR</color>\n" +
+            "A game by the Medieval Warrior team\n\n" +
+            "<color=#F5CB73>Art</color>\n" +
+            "Medieval Castle - Advance Studios\n" +
+            "Toon RTS knight - Polygon Blacksmith\n" +
+            "Free Zombie pack\n" +
+            "Terrain textures & sky - Poly Haven (CC0)\n\n" +
+            "<color=#F5CB73>Fonts</color>\n" +
+            "Cinzel Decorative - Natanael Gama (SIL OFL)\n" +
+            "MedievalSharp - Wojciech Kalinowski (SIL OFL)\n\n" +
+            "<color=#F5CB73>Everything else</color>\n" +
+            "UI art, music, sound, trees and props generated for this project\n\n" +
+            "Made with Unity",
+            26, UIKit.Parchment, TextAlignmentOptions.Top);
+        t.rectTransform.Place(new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0, -150), new Vector2(960, 580));
+        SharedPanels.BackButton(creditsPage.transform, () => Show(titlePage));
+    }
+
     // exposed for the automated smoke test
     public void DebugShow(string page)
     {
-        Show(page switch { "play" => playPage, "customise" => customisePage, "settings" => settingsPage, "help" => helpPage, _ => titlePage });
+        Show(page switch { "play" => playPage, "customise" => customisePage, "settings" => settingsPage, "help" => helpPage, "feats" => featsPage, "credits" => creditsPage, _ => titlePage });
     }
 }
 

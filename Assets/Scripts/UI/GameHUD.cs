@@ -547,6 +547,7 @@ public class GameHUD : MonoBehaviour
         UpdateThreats();
 
         hintTimer -= dt;
+        if (hintTimer > 0f) hintText.text = GameInput.ControlsHint;
         hintText.alpha = Mathf.Clamp01(hintTimer / 2f) * 0.85f;
 
         fpsText.gameObject.SetActive(GameSettings.ShowFps);

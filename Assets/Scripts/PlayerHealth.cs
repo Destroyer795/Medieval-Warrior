@@ -118,6 +118,7 @@ public class PlayerHealth : MonoBehaviour
                 {
                     if (enemy != null) enemy.Stagger(transform.position, 8f);
                     GameHUD.Toast("Perfect block!", UIKit.Gold, "shield");
+                    Feats.Add("perfectblocks");
                     return;
                 }
                 amount *= 0.15f;

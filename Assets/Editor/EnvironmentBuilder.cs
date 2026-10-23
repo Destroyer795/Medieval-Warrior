@@ -1087,9 +1087,9 @@ public static class EnvironmentBuilder
                 go.transform.rotation = Quaternion.Euler(0, R(0, 360), 0);
                 var flag = go.AddComponent<BannerFlag>();
                 flag.field = fields[banners % fields.Length];
-                flag.width = b.kind == "Castle" ? 4.2f : 3f;
-                flag.height = b.kind == "Castle" ? 2.6f : 1.9f;
-                flag.poleHeight = b.kind == "Castle" ? 7f : 5f;
+                flag.width = b.kind == "Castle" ? 6f : 4.4f;
+                flag.height = b.kind == "Castle" ? 3.8f : 2.8f;
+                flag.poleHeight = b.kind == "Castle" ? 9f : 6.5f;
                 banners++;
             }
             else if (b.kind == "House" && rng.NextDouble() < 0.45)

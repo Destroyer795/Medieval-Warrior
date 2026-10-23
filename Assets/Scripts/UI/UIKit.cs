@@ -80,6 +80,7 @@ public static class UIKit
         scaler.referenceResolution = new Vector2(1920, 1080);
         scaler.matchWidthOrHeight = 0.5f;
         go.AddComponent<GraphicRaycaster>();
+        go.AddComponent<GamepadUISelector>();
         return c;
     }
 
@@ -199,8 +200,9 @@ public static class UIKit
         img.rectTransform.sizeDelta = new Vector2(width, height);
         var b = img.gameObject.AddComponent<Button>();
         b.transition = Selectable.Transition.SpriteSwap;
-        b.spriteState = new SpriteState { highlightedSprite = Sprite("button_hover"), selectedSprite = Sprite(style), pressedSprite = Sprite("button_pressed") };
-        var nav = b.navigation; nav.mode = Navigation.Mode.None; b.navigation = nav;
+        // "selected" (gamepad focus) looks like hover so controller players can see where they are
+        b.spriteState = new SpriteState { highlightedSprite = Sprite("button_hover"), selectedSprite = Sprite("button_hover"), pressedSprite = Sprite("button_pressed") };
+        var nav = b.navigation; nav.mode = Navigation.Mode.Automatic; b.navigation = nav;
         var t = Text(img.transform, label, fontSize, Gold);
         t.rectTransform.Fill(6);
         t.textWrappingMode = TextWrappingModes.NoWrap;
@@ -241,7 +243,7 @@ public static class UIKit
         var s = holder.gameObject.AddComponent<Slider>();
         s.fillRect = fill.rectTransform; s.handleRect = handle.rectTransform; s.targetGraphic = handle;
         s.minValue = min; s.maxValue = max; s.value = value;
-        var nav = s.navigation; nav.mode = Navigation.Mode.None; s.navigation = nav;
+        var nav = s.navigation; nav.mode = Navigation.Mode.Automatic; s.navigation = nav;
         var readout = Text(row.transform, "", 26, Gold, TextAlignmentOptions.MidlineRight);
         readout.Layout(-1, 90);
         format ??= v => Mathf.RoundToInt(v * 100) + "%";
@@ -263,7 +265,7 @@ public static class UIKit
         var spacer = Rect("Spacer", row.transform); spacer.Layout(-1, 1, 1);
         var t = box.gameObject.AddComponent<Toggle>();
         t.graphic = check; t.targetGraphic = box; t.isOn = value;
-        var nav = t.navigation; nav.mode = Navigation.Mode.None; t.navigation = nav;
+        var nav = t.navigation; nav.mode = Navigation.Mode.Automatic; t.navigation = nav;
         t.onValueChanged.AddListener(v => { AudioManager.Play2D("ui_click", 0.8f); onChange?.Invoke(v); });
         box.gameObject.AddComponent<UIHoverFx>().clickSound = false;
         return t;
@@ -312,7 +314,7 @@ public static class UIKit
         var right = Img(row.transform, "arrow_right", Color.white, "Next"); right.raycastTarget = true; right.Layout(44, 44);
         var lb = left.gameObject.AddComponent<Button>(); lb.onClick.AddListener(() => h.Set(h.index - 1));
         var rb = right.gameObject.AddComponent<Button>(); rb.onClick.AddListener(() => h.Set(h.index + 1));
-        foreach (var b in new[] { lb, rb }) { var n = b.navigation; n.mode = Navigation.Mode.None; b.navigation = n; b.gameObject.AddComponent<UIHoverFx>(); }
+        foreach (var b in new[] { lb, rb }) { var n = b.navigation; n.mode = Navigation.Mode.Automatic; b.navigation = n; b.gameObject.AddComponent<UIHoverFx>(); }
         h.Set(index, false);
         return h;
     }

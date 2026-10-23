@@ -71,7 +71,7 @@ public class SmokeTestDriver : MonoBehaviour
         Capture("01_menu_title");
         if (menu != null)
         {
-            foreach (var page in new[] { "play", "customise", "settings", "help" })
+            foreach (var page in new[] { "play", "customise", "settings", "help", "feats", "credits" })
             {
                 menu.DebugShow(page);
                 yield return Wait(0.6f);

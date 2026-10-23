@@ -130,25 +130,26 @@ public class PlayerControlSpeed : MonoBehaviour
         // --- 1. WEAPON SWITCH
         if (!Dodging)
         {
-            if (Input.GetKeyDown(KeyCode.Alpha1)) Equip(Weapon.Sword);
-            if (Input.GetKeyDown(KeyCode.Alpha2)) Equip(Weapon.Bow);
-            if (Input.GetKeyDown(KeyCode.Q)) Equip(CurrentWeapon == Weapon.Sword ? Weapon.Bow : Weapon.Sword);
+            if (GameInput.SwordDown) Equip(Weapon.Sword);
+            if (GameInput.BowDown) Equip(Weapon.Bow);
+            if (GameInput.SwapDown) Equip(CurrentWeapon == Weapon.Sword ? Weapon.Bow : Weapon.Sword);
         }
 
         // --- 2. BLOCK / AIM INPUT
         bool canAct = !Stunned && !Dodging;
-        isBlocking = canAct && CurrentWeapon == Weapon.Sword && (Input.GetKey(KeyCode.E) || Input.GetMouseButton(1));
-        IsAiming = canAct && CurrentWeapon == Weapon.Bow && (Input.GetMouseButton(1) || debugAim);
+        isBlocking = canAct && CurrentWeapon == Weapon.Sword && GameInput.SecondaryHeld;
+        IsAiming = canAct && CurrentWeapon == Weapon.Bow && (GameInput.SecondaryHeld || debugAim);
 
         // --- 3. MOVEMENT
-        float moveX = Input.GetAxisRaw("Horizontal");
-        float moveZ = Input.GetAxisRaw("Vertical");
+        Vector2 move = GameInput.Move;
+        float moveX = move.x;
+        float moveZ = move.y;
         Vector3 movement = CameraRelative(moveX, moveZ);
 
-        bool wantsSprint = Input.GetKey(KeyCode.LeftShift) && movement.sqrMagnitude > 0.01f && !isBlocking && !IsAiming && !IsDrawing;
+        bool wantsSprint = GameInput.SprintHeld && movement.sqrMagnitude > 0.01f && !isBlocking && !IsAiming && !IsDrawing;
         bool isRunning = wantsSprint && !exhausted && Stamina > 0f;
 
-        if (Input.GetKeyDown(KeyCode.Space) && canAct) TryDodge(movement);
+        if (GameInput.DodgeDown && canAct) TryDodge(movement);
 
         desiredVelocity = Vector3.zero;
         if (Dodging)
@@ -295,7 +296,7 @@ public class PlayerControlSpeed : MonoBehaviour
 
     void UpdateSword()
     {
-        if (!Input.GetMouseButtonDown(0) || Time.time - lastAttack < attackCooldown) return;
+        if (!GameInput.AttackDown || Time.time - lastAttack < attackCooldown) return;
 
         if (isBlocking)
         {
@@ -382,7 +383,7 @@ public class PlayerControlSpeed : MonoBehaviour
 
     void UpdateBow()
     {
-        if (Input.GetMouseButtonDown(0))
+        if (GameInput.AttackDown)
         {
             if (Arrows <= 0)
             {
@@ -397,7 +398,7 @@ public class PlayerControlSpeed : MonoBehaviour
         if (IsDrawing)
         {
             DrawAmount = Mathf.Min(1f, DrawAmount + Time.deltaTime * Boons.DrawSpeed / drawTime);
-            if (Input.GetMouseButtonUp(0) || !Input.GetMouseButton(0))
+            if (!GameInput.AttackHeld)
             {
                 if (DrawAmount > 0.15f) Fire();
                 else CancelDraw();

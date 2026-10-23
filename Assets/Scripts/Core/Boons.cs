@@ -50,6 +50,7 @@ public static class Boons
     public static void Apply(BoonId id, GameObject player)
     {
         stacks[id] = Stacks(id) + 1;
+        if (Total >= 6) Feats.Unlock("blessed");
         if (player == null) return;
         var health = player.GetComponent<PlayerHealth>();
         var control = player.GetComponent<PlayerControlSpeed>();

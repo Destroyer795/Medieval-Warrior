@@ -23,6 +23,7 @@ public static class Combat
 
         // copy: damage can kill zombies, which removes them from the list
         var zombies = EnemyController.All.ToArray();
+        int killed = 0;
         foreach (var z in zombies)
         {
             if (z == null || z == source || z.IsDead) continue;
@@ -30,8 +31,10 @@ public static class Combat
             if (to.magnitude > radius) continue;
             float falloff = 1f - Mathf.Clamp01(to.magnitude / radius) * 0.5f;
             z.TakeDamage(damage * 0.25f * falloff, to.normalized, 9f * falloff);
+            if (z.IsDead) killed++;
             if (GameManager.instance != null) GameManager.instance.RegisterExplosionHit(z);
         }
+        if (killed >= 3 && source != null && source.type == ZombieType.Bloater) Feats.Unlock("chain_reaction");
     }
 
     public static Material ResourceMaterial(string name, Color fallback)

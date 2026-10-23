@@ -62,24 +62,29 @@ heraldic shield in your colours, objective plaque, combo meter, boss bar, weapon
 count, crosshair, hit markers, enemy health bars, off-screen threat arrows, kill feed, banners,
 pause menu, end-of-match stats. Main menu over a live fly-around of the castle.
 
+**Feats** – fifteen achievements that persist between sessions (Centurion, Eagle Eye, Kingslayer,
+Chain Reaction, Untouchable, Legend, ...) with progress shown in the main menu.
+
 **Customisation** – hero name, tabard/shield colour, crest, armour metal, leather tone and bow
 finish, previewed live on a turntable. **Settings** – volumes, mouse sensitivity, invert Y, FOV,
 graphics quality, fullscreen, screen shake, damage numbers, FPS counter.
 
 ## Controls
 
-| Input | Action |
-|-------|--------|
-| `W A S D` | Move |
-| Mouse | Look |
-| `Shift` | Sprint |
-| `Space` | Dodge roll |
-| Left mouse | Sword combo / hold to draw the bow |
-| Right mouse or `E` | Raise shield (sword) / aim (bow) |
-| Block + left mouse | Shield bash |
-| `Q`, `1`, `2` | Swap weapon |
-| Scroll | Zoom |
-| `Esc` / `P` | Pause |
+| Action | Keyboard & mouse | Gamepad |
+|--------|------------------|---------|
+| Move | `W A S D` | Left stick |
+| Look | Mouse | Right stick |
+| Sprint | `Shift` | Left stick click / left bumper |
+| Dodge roll | `Space` | A / Cross |
+| Sword combo, hold to draw the bow | Left mouse | Right trigger |
+| Raise shield (sword) / aim (bow) | Right mouse or `E` | Left trigger |
+| Shield bash | Block + left mouse | Block + right trigger |
+| Swap weapon | `Q` (or `1` / `2`) | Y / Triangle (d-pad left/right) |
+| Zoom | Scroll | D-pad up/down |
+| Pause | `Esc` / `P` | Start |
+
+Menus work with the mouse or a controller (d-pad/stick to move, A to choose).
 
 ---
 

@@ -40,6 +40,10 @@ the same lighting settings; the builder writes them into all three scenes.
 | `FX` | Particle bursts built in code, hit-stop, screen shake. |
 | `AudioManager` | `Play2D`, `PlayAt` (3D), `PlayMusic` and `SetBattleIntensity` (war-drum layer driven by how many zombies are near); clips come from `Resources/Audio` by name. |
 | `Boons` | Per-match upgrades: definitions, stacks, `Roll` (offer three), `Apply` (one-off effects) and the multipliers gameplay code reads (`SwordDamage`, `DrawSpeed`, `Pierce`, `FireArrows`, ...). `GameManager.OfferBoon` freezes time and `GameHUD.ShowBoons` shows the cards. |
+| `GameInput` | Every gameplay input in one place (keyboard/mouse + gamepad via the Input System). Use it instead of `Input.*`. |
+| `Feats` | Persistent achievements: `Feats.Add(stat)` for counters, `Feats.Unlock(id)` for events. Disabled while tests run. |
+| `GamepadUISelector` | On every UIKit canvas: keeps a control focused on the frontmost screen while a gamepad is used. |
+| `BannerFlag`, `ChimneySmoke`, `SkyDrift` | World ambience placed by the builder. |
 | `TintVariation` | Per-house colour wash via MaterialPropertyBlock (set by the builder). |
 | `UIKit` | Builds styled UI in code (panels, buttons, sliders, toggles, selectors, input fields). |
 | `GameHUD`, `MainMenuUI`, `SharedPanels` | The screens themselves. |

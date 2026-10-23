@@ -56,16 +56,17 @@ public class CameraFollow : MonoBehaviour
         bool paused = Time.timeScale < 0.01f;
 
         // ROTATION: mouse look while the cursor is captured (otherwise hold right mouse)
-        if (!paused && (Cursor.lockState == CursorLockMode.Locked || Input.GetMouseButton(1)))
+        if (!paused && (Cursor.lockState == CursorLockMode.Locked || Input.GetMouseButton(1) || GameInput.UsingGamepad))
         {
             float sens = rotationSpeed * GameSettings.MouseSensitivity / 3.5f * (aimBlend > 0.5f ? 0.6f : 1f);
-            currentYaw += Input.GetAxis("Mouse X") * sens;
-            currentPitch -= Input.GetAxis("Mouse Y") * sens * (GameSettings.InvertY ? -1f : 1f);
+            Vector2 look = GameInput.Look;
+            currentYaw += look.x * sens;
+            currentPitch -= look.y * sens * (GameSettings.InvertY ? -1f : 1f);
             currentPitch = Mathf.Clamp(currentPitch, minPitch, maxPitch);
         }
 
         // ZOOM INPUT (Mouse Scroll)
-        float scrollInput = paused ? 0f : Input.GetAxis("Mouse ScrollWheel");
+        float scrollInput = paused ? 0f : GameInput.Zoom;
         if (scrollInput != 0)
             currentDistance = Mathf.Clamp(currentDistance - scrollInput * zoomSpeed, minZoom, maxZoom);
 

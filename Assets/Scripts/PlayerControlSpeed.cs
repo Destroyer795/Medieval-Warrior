@@ -1,5 +1,7 @@
 using UnityEngine;
 using System.Collections.Generic;
+using UnityEngine.Animations;
+using UnityEngine.Playables;
 
 public enum Weapon { Sword, Bow }
 
@@ -71,7 +73,14 @@ public class PlayerControlSpeed : MonoBehaviour
     Transform leftHand, swordHand, spine;
     Transform swordUpperArm;
     float swordPoseStarted = -99f;
-    static readonly int SwordAttackState = Animator.StringToHash("Base Layer.WK_heavy_infantry_08_attack_B");
+    PlayableGraph swordGraph;
+    AnimatorControllerPlayable locomotionController;
+    AnimationLayerMixerPlayable swordMixer;
+    AnimationClipPlayable swordClip;
+    AvatarMask swordMask;
+    int attackSet = -1;
+    public int SwordVariant { get; private set; }
+    public bool HasUpperBodySwordLayer => swordGraph.IsValid();
     ArcherRig rig;
     KnightGear gear;
     public KnightGear Gear => gear;
@@ -108,6 +117,7 @@ public class PlayerControlSpeed : MonoBehaviour
         swordHand = FindBone(transform, "Bip001 R Hand");
         swordUpperArm = FindBone(transform, "Bip001 R UpperArm");
         spine = FindBone(transform, "Bip001 Spine1") ?? FindBone(transform, "Bip001 Spine");
+        InitSwordLayer();
         if (!TryGetComponent(out KnightAppearance _)) gameObject.AddComponent<KnightAppearance>();
         rig = gameObject.AddComponent<ArcherRig>();
         rig.Init(this);
@@ -152,7 +162,7 @@ public class PlayerControlSpeed : MonoBehaviour
         float moveZ = move.y;
         Vector3 movement = CameraRelative(moveX, moveZ);
 
-        bool wantsSprint = GameInput.SprintHeld && movement.sqrMagnitude > 0.01f && !isBlocking && !IsAiming && !IsDrawing;
+        bool wantsSprint = (debugSprint || GameInput.SprintHeld) && movement.sqrMagnitude > 0.01f && !isBlocking && !IsAiming && !IsDrawing;
         bool isRunning = wantsSprint && !exhausted && Stamina > 0f;
 
         if (GameInput.DodgeDown && canAct) TryDodge(movement);
@@ -164,8 +174,8 @@ public class PlayerControlSpeed : MonoBehaviour
         {
             float k = (dodgeUntil - Time.time) / dodgeTime;
             desiredVelocity = dodgeDir * dodgeSpeed * Mathf.Lerp(0.35f, 1f, k);
-            animator.SetBool("isMoving", true);
-            animator.SetBool("isRunning", true);
+            SetAnimationBool("isMoving", true);
+            SetAnimationBool("isRunning", true);
         }
         else if (!Stunned && movement.sqrMagnitude > 0.01f)
         {
@@ -183,13 +193,13 @@ public class PlayerControlSpeed : MonoBehaviour
                 turnToMove = true;
             }
             desiredVelocity = movement * currentSpeed;
-            animator.SetBool("isMoving", true);
-            animator.SetBool("isRunning", isRunning && !(IsAiming || IsDrawing));
+            SetAnimationBool("isMoving", true);
+            SetAnimationBool("isRunning", isRunning && !(IsAiming || IsDrawing));
         }
         else
         {
-            animator.SetBool("isMoving", false);
-            animator.SetBool("isRunning", false);
+            SetAnimationBool("isMoving", false);
+            SetAnimationBool("isRunning", false);
         }
 
         // archers face where the camera looks
@@ -240,10 +250,11 @@ public class PlayerControlSpeed : MonoBehaviour
         }
         else if (IsDrawing) CancelDraw();
         ProcessPendingHits();
+        UpdateSwordLayer();
 
         // Sync with Health Script
         if (myHealthScript != null) myHealthScript.isShieldBlocking = isBlocking;
-        animator.SetBool("defend", isBlocking);
+        SetAnimationBool("defend", isBlocking);
     }
 
     Vector3 CameraRelative(float x, float z)
@@ -352,13 +363,76 @@ public class PlayerControlSpeed : MonoBehaviour
         if (rb != null) rb.AddForce(transform.forward * 2.5f, ForceMode.VelocityChange); // small lunge
     }
 
-    void StartSwordPose()
+    void InitSwordLayer()
+    {
+        if (animator == null || animator.runtimeAnimatorController == null) return;
+        AnimationClip clip = null;
+        foreach (var candidate in animator.runtimeAnimatorController.animationClips)
+            if (candidate.name.Contains("08_attack_B")) { clip = candidate; break; }
+        Transform upperBody = FindBone(transform, "Bip001 Spine");
+        if (clip == null || upperBody == null) return;
+        swordMask = new AvatarMask { name = "Runtime sword upper-body mask" };
+        var bones = GetComponentsInChildren<Transform>();
+        swordMask.transformCount = bones.Length;
+        for (int i = 0; i < bones.Length; i++)
+        {
+            string path = "";
+            for (Transform bone = bones[i]; bone != transform; bone = bone.parent)
+                path = path.Length == 0 ? bone.name : bone.name + "/" + path;
+            swordMask.SetTransformPath(i, path);
+            swordMask.SetTransformActive(i, bones[i] == upperBody || bones[i].IsChildOf(upperBody));
+        }
+        for (int part = 0; part < (int)AvatarMaskBodyPart.LastBodyPart; part++)
+            swordMask.SetHumanoidBodyPartActive((AvatarMaskBodyPart)part,
+                part != (int)AvatarMaskBodyPart.Root && part != (int)AvatarMaskBodyPart.LeftLeg && part != (int)AvatarMaskBodyPart.RightLeg);
+        swordGraph = PlayableGraph.Create("Knight locomotion and upper-body sword");
+        swordGraph.SetTimeUpdateMode(DirectorUpdateMode.GameTime);
+        locomotionController = AnimatorControllerPlayable.Create(swordGraph, animator.runtimeAnimatorController);
+        swordClip = AnimationClipPlayable.Create(swordGraph, clip);
+        swordClip.SetApplyFootIK(false);
+        swordClip.SetApplyPlayableIK(false);
+        swordClip.SetSpeed(clip.length / 0.55f);
+        swordMixer = AnimationLayerMixerPlayable.Create(swordGraph, 2);
+        swordGraph.Connect(locomotionController, 0, swordMixer, 0);
+        swordGraph.Connect(swordClip, 0, swordMixer, 1);
+        swordMixer.SetInputWeight(0, 1f);
+        swordMixer.SetInputWeight(1, 0f);
+        swordMixer.SetLayerMaskFromAvatarMask(1, swordMask);
+        var output = AnimationPlayableOutput.Create(swordGraph, "Knight pose", animator);
+        output.SetSourcePlayable(swordMixer);
+        swordGraph.Play();
+    }
+
+    void SetAnimationBool(string parameter, bool value)
+    {
+        if (locomotionController.IsValid()) locomotionController.SetBool(parameter, value);
+        else animator.SetBool(parameter, value);
+    }
+
+    void UpdateSwordLayer()
+    {
+        if (!swordGraph.IsValid()) return;
+        float elapsed = Time.time - swordPoseStarted;
+        float weight = elapsed >= 0f && elapsed < 0.55f && CurrentWeapon == Weapon.Sword && !isBlocking && !Stunned && !Dodging
+            ? Mathf.SmoothStep(0f, 1f, elapsed / 0.06f) * (1f - Mathf.SmoothStep(0f, 1f, (elapsed - 0.42f) / 0.13f)) : 0f;
+        swordMixer.SetInputWeight(1, weight);
+    }
+
+    void StartSwordPose(int variant = -1)
     {
         swordPoseStarted = Time.time;
-        animator.ResetTrigger("isAttacking");
-        if (animator.HasState(0, SwordAttackState))
-            animator.CrossFadeInFixedTime(SwordAttackState, 0.045f, 0, 0f);
-        else animator.SetTrigger("isAttacking");
+        if (variant < 0 && ComboStep == 0) attackSet++;
+        SwordVariant = variant >= 0 ? variant % 6 : ComboStep + Mathf.Max(0, attackSet % 2) * 3;
+        if (swordGraph.IsValid())
+        {
+            locomotionController.ResetTrigger("isAttacking");
+            swordClip.SetTime(0d);
+            swordClip.SetDone(false);
+            UpdateSwordLayer();
+        }
+        else animator.ResetTrigger("isAttacking");
+        // Without a usable mask, keep locomotion and use procedural upper-body
+        // motion rather than replacing the full-body pose and freezing the legs.
     }
 
     void PoseSwordCombo()
@@ -373,6 +447,12 @@ public class PlayerControlSpeed : MonoBehaviour
         Vector3 arm = ComboStep == 0 ? new Vector3(-12f, 0f, 0f)
             : ComboStep == 1 ? new Vector3(8f, Mathf.Lerp(65f, -45f, cut), 0f)
             : new Vector3(Mathf.Lerp(-55f, 28f, cut), -12f, 0f);
+        if (SwordVariant == 3)
+        { torso = new Vector3(-8f, Mathf.Lerp(20f, -18f, cut), -12f); arm = new Vector3(Mathf.Lerp(25f, -48f, cut), -20f, -18f); }
+        else if (SwordVariant == 4)
+        { torso = new Vector3(6f, Mathf.Lerp(-30f, 30f, cut), 0f); arm = new Vector3(24f, Mathf.Lerp(-48f, 55f, cut), 16f); }
+        else if (SwordVariant == 5)
+        { torso = new Vector3(Mathf.Lerp(-18f, 22f, cut), Mathf.Lerp(15f, -18f, cut), -10f); arm = new Vector3(Mathf.Lerp(-65f, 35f, cut), 30f, -20f); }
         Quaternion frame = transform.rotation;
         if (spine != null) spine.rotation = frame * Quaternion.Euler(torso * envelope) * Quaternion.Inverse(frame) * spine.rotation;
         if (swordUpperArm != null) swordUpperArm.rotation = frame * Quaternion.Euler(arm * envelope) * Quaternion.Inverse(frame) * swordUpperArm.rotation;
@@ -533,17 +613,20 @@ public class PlayerControlSpeed : MonoBehaviour
     // ---- hooks for the automated smoke test (no input devices in batch mode)
     bool debugAim;
     Vector2? debugMovement;
-    public void DebugMove(Vector2? move) => debugMovement = move;
+    bool debugSprint;
+    public void DebugMove(Vector2? move, bool sprint = false) { debugMovement = move; debugSprint = sprint; }
     public void DebugAim(bool on) => debugAim = on;
     public void DebugSwing() => DebugSwingStep(2);
     public void DebugSwingStep(int step) { ComboStep = Mathf.Clamp(step, 0, 2); StartSwordPose(); pendingHits.Add((Time.time + (ComboStep == 2 ? 0.25f : 0.2f), ComboStep)); }
+    public void DebugSwingVariant(int variant) { ComboStep = variant % 3; StartSwordPose(variant); }
     public void DebugFireAt(Vector3 target, float draw)
     {
         if (Arrows <= 0) return;
         Arrows--;
         Vector3 origin = rig != null ? rig.ArrowOrigin : transform.position + Vector3.up * 1.4f;
         Vector3 dir = (target - origin).normalized;
-        Arrow.Fire(origin + dir * 0.2f, dir, Mathf.Lerp(24f, 58f, draw), Mathf.Lerp(1f, 3.4f, draw), Mathf.Lerp(2f, 9f, draw), transform);
+        Arrow.Fire(origin + dir * 0.2f, dir, Mathf.Lerp(24f, 58f, draw), Mathf.Lerp(1f, 3.4f, draw), Mathf.Lerp(2f, 9f, draw), transform,
+            Boons.Pierce, Boons.FireArrows && draw > 0.95f);
         if (GameManager.instance != null) GameManager.instance.RegisterArrowFired();
         if (rig != null) rig.Release();
     }
@@ -590,8 +673,15 @@ public class PlayerControlSpeed : MonoBehaviour
 
     void OnDisable()
     {
-        if (animator != null) { animator.SetBool("isMoving", false); animator.SetBool("isRunning", false); }
+        if (animator != null) { SetAnimationBool("isMoving", false); SetAnimationBool("isRunning", false); }
         isBlocking = false;
         if (myHealthScript != null) myHealthScript.isShieldBlocking = false;
+        if (swordMixer.IsValid()) swordMixer.SetInputWeight(1, 0f);
+    }
+
+    void OnDestroy()
+    {
+        if (swordGraph.IsValid()) swordGraph.Destroy();
+        if (swordMask != null) Destroy(swordMask);
     }
 }

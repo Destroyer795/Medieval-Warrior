@@ -17,6 +17,12 @@ public class KnightGear : MonoBehaviour
     Transform swordProp, shieldProp, pelvis, spine;
     float swordLength, shieldHeight;
     bool stowed;
+    PlayerControlSpeed owner;
+    Transform quiver;
+    readonly List<GameObject> storedArrows = new List<GameObject>();
+    int shownArrows = -1, quiverCapacity;
+    float hipHalfWidth = 0.2f;
+    public int VisibleArrowCount => Mathf.Max(0, shownArrows);
     Transform leftShoulder, rightShoulder, neck;
     float backDepth = 0.12f, shieldThickness;
     public Quaternion ChestRotation
@@ -46,6 +52,10 @@ public class KnightGear : MonoBehaviour
         leftShoulder = FindBone(transform, "Bip001 L UpperArm");
         rightShoulder = FindBone(transform, "Bip001 R UpperArm");
         neck = FindBone(transform, "Bip001 Neck");
+        owner = GetComponent<PlayerControlSpeed>();
+        quiver = ProceduralModels.Spawn("Right Hip Quiver", ProceduralModels.HipQuiverMesh(), ProceduralModels.HipQuiverMaterials()).transform;
+        quiver.SetParent(transform, false);
+        UpdateQuiver();
         if (smr == null || smr.sharedMesh == null) { Report = "no skinned mesh"; return; }
         try { Analyse(); }
         catch (System.Exception e) { Report = "analysis failed: " + e.Message; Ready = false; }
@@ -144,11 +154,15 @@ public class KnightGear : MonoBehaviour
         for (int i = 0; i < verts.Length; i++)
         {
             if (gearVertices.Contains(i)) continue;
+            Vector3 hipOffset = M.MultiplyPoint3x4(verts[i]) - (pelvis != null ? pelvis.position : transform.position + Vector3.up * 0.9f);
+            if (Mathf.Abs(Vector3.Dot(hipOffset, transform.up)) < 0.15f)
+                hipHalfWidth = Mathf.Max(hipHalfWidth, Vector3.Dot(hipOffset, transform.right));
             Vector3 d = M.MultiplyPoint3x4(verts[i]) - (spine != null ? spine.position : transform.position + Vector3.up * 1.2f);
             if (Mathf.Abs(Vector3.Dot(d, transform.up)) < 0.18f && Mathf.Abs(Vector3.Dot(d, transform.right)) < 0.24f)
                 rear = Mathf.Min(rear, Vector3.Dot(d, transform.forward));
         }
         backDepth = Mathf.Clamp(-rear, 0.06f, 0.22f);
+        hipHalfWidth = Mathf.Clamp(hipHalfWidth, 0.18f, 0.35f);
         for (int s = 0; s < original.subMeshCount; s++)
         {
             var keep = new List<int>();
@@ -257,6 +271,7 @@ public class KnightGear : MonoBehaviour
 
     void LateUpdate()
     {
+        UpdateQuiver();
         if (!Ready || !stowed) return;
         // keep the props wearing the same (customised) material as the knight
         var mat = smr.sharedMaterial;
@@ -276,5 +291,43 @@ public class KnightGear : MonoBehaviour
         Vector3 back = BackSurface + sz * (shieldThickness + 0.012f);
         Vector3 sy = Vector3.Cross(sz, sx).normalized;
         shieldProp.SetPositionAndRotation(back, Quaternion.LookRotation(sz, sy));
+    }
+
+    void UpdateQuiver()
+    {
+        if (owner == null || quiver == null) return;
+        int capacity = Mathf.Max(1, Mathf.Max(owner.maxArrows, owner.Arrows));
+        if (capacity != quiverCapacity)
+        {
+            while (storedArrows.Count < capacity)
+            {
+                var arrow = Arrow.Model();
+                arrow.name = "Stored Arrow " + (storedArrows.Count + 1);
+                arrow.transform.SetParent(quiver, false);
+                arrow.transform.localScale = Vector3.one * 0.65f;
+                arrow.transform.localRotation = Quaternion.LookRotation(Vector3.down, Vector3.forward);
+                foreach (var renderer in arrow.GetComponentsInChildren<Renderer>())
+                    renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                storedArrows.Add(arrow);
+            }
+            for (int i = 0; i < storedArrows.Count; i++)
+            {
+                float angle = i * 2.399963f;
+                float radius = Mathf.Sqrt((i + 0.5f) / capacity) * 0.095f;
+                storedArrows[i].transform.localPosition = new Vector3(Mathf.Cos(angle) * radius, 0.73f + (i % 4) * 0.012f, Mathf.Sin(angle) * radius);
+            }
+            quiver.localScale = new Vector3(Mathf.Max(1f, Mathf.Sqrt(capacity / 45f)), 1f, Mathf.Max(1f, Mathf.Sqrt(capacity / 45f)));
+            quiverCapacity = capacity;
+            shownArrows = -1;
+        }
+        if (shownArrows != owner.Arrows)
+        {
+            shownArrows = owner.Arrows;
+            for (int i = 0; i < storedArrows.Count; i++) storedArrows[i].SetActive(i < shownArrows);
+        }
+        Vector3 hip = pelvis != null ? pelvis.position : transform.position + Vector3.up * 0.9f;
+        float sideOffset = hipHalfWidth + 0.135f * quiver.localScale.x + 0.015f;
+        quiver.SetPositionAndRotation(hip + transform.right * sideOffset - transform.up * 0.4f - transform.forward * 0.04f,
+            transform.rotation * Quaternion.Euler(0f, 0f, -10f));
     }
 }

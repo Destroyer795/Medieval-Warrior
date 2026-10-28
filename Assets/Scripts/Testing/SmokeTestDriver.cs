@@ -114,7 +114,7 @@ public class SmokeTestDriver : MonoBehaviour
         // clear the field, then line up one of each type in front of the knight
         foreach (var z in EnemyController.All.ToArray()) Destroy(z.gameObject);
         yield return null;
-        health.InvulnerableUntil = Time.time + 25f;
+        health.InvulnerableUntil = Time.time + 60f;
         // Exercise the real Update/FixedUpdate path, including the interpolated Rigidbody.
         var playerBody = player.GetComponent<Rigidbody>();
         var inputCamera = Camera.main.GetComponent<CameraFollow>();
@@ -144,11 +144,32 @@ public class SmokeTestDriver : MonoBehaviour
         playerBody.rotation = movementRotation;
         playerBody.linearVelocity = Vector3.zero;
         // Reproduce obstruction handling in both free orbit and shoulder aim.
-        var swordHand = Bone(player.transform, "Bip001 R Hand");
-        var swingHands = new Vector3[3];
-        for (int swing = 0; swing < 3; swing++)
+        Check(player.HasUpperBodySwordLayer, "runtime upper-body attack mask is active");
+        var leftFoot = Bone(player.transform, "Bip001 L Foot");
+        foreach (bool sprint in new[] { false, true })
         {
-            player.DebugSwingStep(swing);
+            player.DebugMove(Vector2.up, sprint);
+            yield return Wait(0.4f);
+            player.DebugSwingVariant(sprint ? 4 : 3);
+            yield return Wait(0.07f);
+            Quaternion footBefore = leftFoot.localRotation;
+            Vector3 beforeAttackMove = playerBody.position;
+            yield return Wait(0.2f);
+            Check(Quaternion.Angle(footBefore, leftFoot.localRotation) > 2f,
+                (sprint ? "running" : "walking") + " legs continue animating during a sword attack");
+            Check(Vector3.ProjectOnPlane(playerBody.position - beforeAttackMove, Vector3.up).magnitude > 0.2f,
+                (sprint ? "running" : "walking") + " translation continues during a sword attack");
+            player.DebugMove(null);
+            yield return Wait(0.4f);
+            playerBody.position = movementStart;
+            playerBody.rotation = movementRotation;
+            playerBody.linearVelocity = Vector3.zero;
+        }
+        var swordHand = Bone(player.transform, "Bip001 R Hand");
+        var swingHands = new Vector3[6];
+        for (int swing = 0; swing < 6; swing++)
+        {
+            player.DebugSwingVariant(swing);
             yield return Wait(0.22f);
             int index = swing;
             lateCheck = () =>
@@ -162,6 +183,9 @@ public class SmokeTestDriver : MonoBehaviour
         }
         Check(Vector3.Distance(swingHands[0], swingHands[1]) > 0.04f, "backhand differs visibly from first cut");
         Check(Vector3.Distance(swingHands[0], swingHands[2]) > 0.04f, "overhead finisher differs visibly from first cut");
+        for (int variant = 3; variant < 6; variant++)
+            Check(Vector3.Distance(swingHands[variant], swingHands[variant - 3]) > 0.04f,
+                "alternate sword variation " + variant + " differs from its original combo step");
         // The camera sphere must stay outside the wall throughout retraction.
         var cameraWall = GameObject.CreatePrimitive(PrimitiveType.Cube);
         cameraWall.name = "Camera regression wall";
@@ -191,6 +215,73 @@ public class SmokeTestDriver : MonoBehaviour
         var spawner = ZombieSpawner.Instance;
         var cam = Camera.main;
         Vector3 fwd = cam.transform.forward; fwd.y = 0; fwd.Normalize();
+        int savedAmmo = player.Arrows, savedCapacity = player.maxArrows;
+        var hipQuiver = player.transform.Find("Right Hip Quiver");
+        Check(hipQuiver != null && Vector3.Dot(hipQuiver.position - player.transform.position, player.transform.right) > 0.1f,
+            "quiver is mounted on the right hip");
+        Check(player.Gear.VisibleArrowCount == savedAmmo, "quiver starts with exact ammo count");
+        player.DebugFireAt(player.transform.position + Vector3.up * 40f, 1f);
+        yield return null;
+        yield return null;
+        Check(player.Gear.VisibleArrowCount == savedAmmo - 1, "firing removes one physical quiver arrow");
+        player.maxArrows += 15;
+        player.AddArrows(player.maxArrows);
+        yield return null;
+        yield return null;
+        int physicalArrows = hipQuiver.Cast<Transform>().Count(t => t.name.StartsWith("Stored Arrow") && t.gameObject.activeSelf);
+        Check(physicalArrows == player.Arrows && player.Gear.VisibleArrowCount == player.maxArrows,
+            "expanded quiver displays every refilled arrow");
+        lateCheck = () => CaptureFrom("11q_quiver_full", hipQuiver.position + player.transform.right * 1.5f + Vector3.up * 0.6f, hipQuiver.position + Vector3.up * 0.4f);
+        yield return null;
+        while (player.Arrows > 0) player.DebugFireAt(player.transform.position + Vector3.up * 40f, 1f);
+        yield return null;
+        yield return null;
+        Check(player.Gear.VisibleArrowCount == 0 && !hipQuiver.Cast<Transform>().Any(t => t.name.StartsWith("Stored Arrow") && t.gameObject.activeSelf),
+            "quiver is physically empty at zero ammo");
+        lateCheck = () => CaptureFrom("11r_quiver_empty", hipQuiver.position + player.transform.right * 1.5f + Vector3.up * 0.6f, hipQuiver.position + Vector3.up * 0.4f);
+        yield return null;
+        foreach (var projectile in Object.FindObjectsByType<Arrow>(FindObjectsSortMode.None)) Destroy(projectile.gameObject);
+        player.maxArrows = savedCapacity;
+        player.AddArrows(savedAmmo);
+        yield return null;
+        yield return null;
+        Check(player.Gear.VisibleArrowCount == savedAmmo, "arrow pickup refills the visible quiver");
+
+        Vector3 burnAt = player.transform.position + fwd * 7f;
+        if (UnityEngine.AI.NavMesh.SamplePosition(burnAt, out var burnGround, 5f, UnityEngine.AI.NavMesh.AllAreas)) burnAt = burnGround.position;
+        var burningEnemy = Instantiate(spawner.zombiePrefab, burnAt, Quaternion.LookRotation(-fwd)).GetComponent<EnemyController>();
+        burningEnemy.Init(ZombieType.Brute, false, false);
+        burningEnemy.player = null;
+        Boons.Apply(BoonId.FireArrows, player.gameObject);
+        player.DebugFireAt(burningEnemy.transform.position + Vector3.up * 0.9f * burningEnemy.transform.localScale.y, 1f);
+        Check(Object.FindObjectsByType<Arrow>(FindObjectsSortMode.None).Any(a => a.IsFlaming && a.GetComponentInChildren<ParticleSystem>() != null),
+            "fully drawn fire arrow has an active flame emitter");
+        yield return Wait(0.5f);
+        Check(burningEnemy.IsBurning, "fire arrow impact ignites the zombie");
+        Check(burningEnemy.transform.Find("Burning Flames") != null, "burning zombie has sustained flames");
+        float burningHealth = burningEnemy.Health;
+        yield return Wait(0.8f);
+        Check(burningEnemy.Health < burningHealth - 0.3f, "ignited zombie takes ongoing fire damage");
+        lateCheck = () => CaptureFrom("11s_zombie_burning", burnAt + player.transform.right * 3f + Vector3.up * 1.7f, burnAt + Vector3.up * 1.1f);
+        yield return null;
+        yield return Wait(3.5f);
+        Check(!burningEnemy.IsBurning && burningEnemy.transform.Find("Burning Flames") == null, "burn expires and removes zombie flames");
+        burningEnemy.Ignite(2f, burningEnemy.Health * 2f);
+        yield return Wait(0.8f);
+        Check(burningEnemy.IsDead && burningEnemy.transform.Find("Burning Flames") == null, "burn damage can kill and cleans up flames");
+        Destroy(burningEnemy.gameObject);
+        var lethalTarget = Instantiate(spawner.zombiePrefab, burnAt, Quaternion.LookRotation(-fwd)).GetComponent<EnemyController>();
+        lethalTarget.Init(ZombieType.Walker, false, false);
+        lethalTarget.player = null;
+        player.DebugFireAt(lethalTarget.transform.position + Vector3.up * 0.9f, 1f);
+        yield return Wait(0.45f);
+        Check(lethalTarget.IsDead && lethalTarget.transform.Find("Burning Flames") != null,
+            "lethal fire arrow hits still show an ignition burst");
+        Destroy(lethalTarget.gameObject);
+        foreach (var projectile in Object.FindObjectsByType<Arrow>(FindObjectsSortMode.None)) Destroy(projectile.gameObject);
+        Boons.Reset();
+        player.AddArrows(player.maxArrows);
+        yield return null;
         var line = new List<EnemyController>();
         int n = 0;
         foreach (ZombieType t in System.Enum.GetValues(typeof(ZombieType)))
@@ -309,6 +400,17 @@ public class SmokeTestDriver : MonoBehaviour
             var bowMesh = stowedBow.GetComponent<MeshFilter>().sharedMesh;
             float bowGap = bowMesh.vertices.Min(v => Vector3.Dot(stowedBow.TransformPoint(v) - player.Gear.BackSurface, backNormal));
             Check(bowGap >= -0.01f && bowGap < 0.035f, $"bow grip sits flush against chest mount ({bowGap:F3} m)");
+            float farthestBow = bowMesh.vertices.Max(v => Vector3.Dot(stowedBow.TransformPoint(v) - player.Gear.BackSurface, backNormal));
+            Check(farthestBow < 0.11f, "entire stowed bow lies within 11 cm of the back plane");
+            var bowString = stowedBow.GetComponentInChildren<LineRenderer>();
+            float stringMin = float.MaxValue, stringMax = float.MinValue;
+            for (int i = 0; i < bowString.positionCount; i++)
+            {
+                float depth = Vector3.Dot(bowString.GetPosition(i) - player.Gear.BackSurface, backNormal);
+                stringMin = Mathf.Min(stringMin, depth); stringMax = Mathf.Max(stringMax, depth);
+            }
+            Check(stringMin > 0f && stringMax < 0.08f && stringMax - stringMin < 0.01f,
+                "stowed bowstring lies flat and close to the back");
             CaptureFrom("14i_bow_stowed", player.Gear.BackSurface + backNormal * 1.7f + Vector3.up * 0.25f, player.Gear.BackSurface);
         };
         yield return null;

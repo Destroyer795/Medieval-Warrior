@@ -199,6 +199,13 @@ public static class EnvironmentBuilder
         m.color = color;
         m.SetFloat("_Glossiness", smoothness);
         m.SetFloat("_Metallic", 0f);
+        if (name == "FoundationStone" || name == "Rock")
+        {
+            m.SetFloat("_SpecularHighlights", 0f);
+            m.SetFloat("_GlossyReflections", 0f);
+            m.EnableKeyword("_SPECULARHIGHLIGHTS_OFF");
+            m.EnableKeyword("_GLOSSYREFLECTIONS_OFF");
+        }
         m.mainTexture = albedo;
         if (tiling.HasValue) m.mainTextureScale = tiling.Value;
         if (normal != null)
@@ -219,13 +226,13 @@ public static class EnvironmentBuilder
         return new Mats
         {
             bark = SaveMaterial("Bark", new Color(0.45f, 0.31f, 0.2f), 0.05f),
-            leaf = SaveMaterial("Leaves", new Color(0.34f, 0.62f, 0.2f), 0.12f),
-            leafLight = SaveMaterial("LeavesLight", new Color(0.55f, 0.76f, 0.26f), 0.12f),
+            leaf = SaveMaterial("Leaves", new Color(0.25f, 0.36f, 0.18f), 0f),
+            leafLight = SaveMaterial("LeavesLight", new Color(0.34f, 0.44f, 0.24f), 0f),
             pine = SaveMaterial("PineNeedles", new Color(0.17f, 0.42f, 0.22f), 0.08f),
             autumn = SaveMaterial("LeavesAutumn", new Color(0.93f, 0.6f, 0.2f), 0.12f),
-            bush = SaveMaterial("Bush", new Color(0.3f, 0.56f, 0.2f), 0.1f),
+            bush = SaveMaterial("Bush", new Color(0.36f, 0.45f, 0.25f), 0f),
             rock = SaveMaterial("Rock", new Color(0.86f, 0.86f, 0.82f), 0.15f, Tex<Texture2D>("Rock_Mossy_D"), Tex<Texture2D>("Rock_Mossy_N")),
-            foundation = SaveMaterial("FoundationStone", new Color(0.92f, 0.88f, 0.82f), 0.1f, Tex<Texture2D>("Cobble_D"), Tex<Texture2D>("Cobble_N")),
+            foundation = SaveMaterial("FoundationStone", new Color(0.72f, 0.70f, 0.63f), 0f, Tex<Texture2D>("Cobble_D"), Tex<Texture2D>("Cobble_N")),
         };
     }
 
@@ -263,6 +270,52 @@ public static class EnvironmentBuilder
                 return center + Vector3.Scale(p * n, radius);
             }).ToArray();
             for (int i = 0; i < f.Length; i += 3) Tri(sub, jitter[f[i]], jitter[f[i + 1]], jitter[f[i + 2]]);
+        }
+
+        public void Leaf(int sub, Vector3 center, Vector3 outward, float length, float width)
+        {
+            Vector3 along = (Vector3.up * 0.7f + outward * 0.3f).normalized;
+            Vector3 across = Vector3.Cross(along, outward).normalized;
+            if (across.sqrMagnitude < 0.01f) across = Vector3.right;
+            Vector3 basePoint = center - along * length * 0.5f;
+            Vector3 tip = center + along * length * 0.5f;
+            Vector3 left = center - across * width * 0.5f;
+            Vector3 right = center + across * width * 0.5f;
+            Vector3 ridge = center + outward * width * 0.15f;
+            pivot = center;
+            Tri(sub, basePoint, left, ridge);
+            Tri(sub, left, tip, ridge);
+            Tri(sub, tip, right, ridge);
+            Tri(sub, right, basePoint, ridge);
+            // Closed underside: leaves remain visible from behind and underneath.
+            Vector3 underside = center - outward * width * 0.08f;
+            Tri(sub, left, basePoint, underside);
+            Tri(sub, tip, left, underside);
+            Tri(sub, right, tip, underside);
+            Tri(sub, basePoint, right, underside);
+        }
+
+        public void Blade(Vector3 root, Vector3 bend, float height, float width)
+        {
+            // Triangular cross sections give each blade actual volume from every
+            // angle. These are tapered solids, never camera-facing grass cards.
+            pivot = root + Vector3.up * height * 0.35f;
+            var rings = new Vector3[2, 3];
+            for (int ring = 0; ring < 2; ring++)
+            {
+                float t = ring * 0.55f;
+                for (int side = 0; side < 3; side++)
+                    rings[ring, side] = root + Vector3.up * (height * t) + bend * t * t
+                        + Ring(side, 3, 0f) * width * (1f - t * 0.7f);
+            }
+            Vector3 tip = root + Vector3.up * height + bend;
+            for (int side = 0; side < 3; side++)
+            {
+                int next = (side + 1) % 3;
+                Tri(0, rings[0, side], rings[0, next], rings[1, side]);
+                Tri(0, rings[0, next], rings[1, next], rings[1, side]);
+                Tri(0, rings[1, side], rings[1, next], tip);
+            }
         }
 
         public void Cone(int sub, Vector3 baseCenter, float radius, float height, int sides)
@@ -323,6 +376,15 @@ public static class EnvironmentBuilder
             m.subMeshCount = subs.Length;
             for (int i = 0; i < subs.Length; i++) m.SetTriangles(subs[i], i);
             m.RecalculateNormals();
+            if (name.StartsWith("Grass", StringComparison.Ordinal))
+            {
+                // Blend the blade normals toward the meadow normal, a common
+                // foliage treatment that avoids dark, wire-like side faces.
+                var normals = m.normals;
+                for (int i = 0; i < normals.Length; i++)
+                    normals[i] = Vector3.Slerp(normals[i], Vector3.up, 0.7f).normalized;
+                m.normals = normals;
+            }
             m.RecalculateTangents();
             m.RecalculateBounds();
             return m;
@@ -362,7 +424,7 @@ public static class EnvironmentBuilder
 
     class Prefabs { public GameObject[] trees; public GameObject[] bushes; public GameObject[] rocks; }
 
-    static GameObject SavePrefab(string name, Mesh mesh, Material[] materials, bool collider, float colliderRadius = 0.2f, float colliderHeight = 2f)
+    static GameObject SavePrefab(string name, Mesh mesh, Material[] materials, bool collider, float colliderRadius = 0.2f, float colliderHeight = 2f, bool castShadows = true)
     {
         string meshPath = $"{GenDir}/{name}_Mesh.asset";
         mesh = SaveMesh(mesh, meshPath);
@@ -371,7 +433,7 @@ public static class EnvironmentBuilder
         go.AddComponent<MeshFilter>().sharedMesh = mesh;
         var mr = go.AddComponent<MeshRenderer>();
         mr.sharedMaterials = materials;
-        mr.shadowCastingMode = ShadowCastingMode.On;
+        mr.shadowCastingMode = castShadows ? ShadowCastingMode.On : ShadowCastingMode.Off;
         if (collider)
         {
             var cc = go.AddComponent<CapsuleCollider>();
@@ -416,14 +478,24 @@ public static class EnvironmentBuilder
         }
 
         var bushes = new List<GameObject>();
-        Material[] bushMats = { m.bush, m.leafLight, m.leaf };
         for (int k = 0; k < 3; k++)
         {
-            var mb = new MeshBuilder(1);
-            int blobs = 2 + k;
-            for (int i = 0; i < blobs; i++)
-                mb.Blob(0, new Vector3(R(-0.35f, 0.35f), R(0.2f, 0.32f), R(-0.35f, 0.35f)), new Vector3(R(0.38f, 0.5f), R(0.3f, 0.42f), R(0.38f, 0.5f)), 0.15f);
-            bushes.Add(SavePrefab("Bush_" + k, mb.ToMesh("Bush"), new[] { bushMats[k] }, false));
+            var mb = new MeshBuilder(3);
+            float height = 0.42f + k * 0.1f;
+            for (int stem = 0; stem < 5; stem++)
+                mb.Cylinder(0, new Vector3(R(-0.18f, 0.18f), 0f, R(-0.18f, 0.18f)), 0.018f, 0.006f, height * R(0.5f, 0.9f), 5);
+            // Overlapping pointed leaves give the existing bush assets a broken,
+            // organic silhouette instead of a solid faceted ball.
+            for (int leaf = 0; leaf < 240; leaf++)
+            {
+                float yaw = R(0f, Mathf.PI * 2f), y = R(-0.8f, 1f);
+                float radial = Mathf.Sqrt(1f - y * y);
+                Vector3 normal = new Vector3(Mathf.Cos(yaw) * radial, y, Mathf.Sin(yaw) * radial);
+                float shell = R(0.65f, 1f);
+                Vector3 center = new Vector3(normal.x * 0.42f, height * 0.65f + normal.y * height * 0.5f, normal.z * 0.38f) * shell;
+                mb.Leaf(leaf % 5 == 0 ? 2 : 1, center, normal, R(0.12f, 0.2f), R(0.05f, 0.09f));
+            }
+            bushes.Add(SavePrefab("Bush_" + k, mb.ToMesh("Bush"), new[] { m.bark, m.bush, m.leafLight }, false));
         }
 
         var rocks = new List<GameObject>();
@@ -768,20 +840,24 @@ public static class EnvironmentBuilder
             l.diffuseTexture = Tex<Texture2D>(tex + "_D");
             l.normalMapTexture = Tex<Texture2D>(tex + "_N");
             l.tileSize = new Vector2(tile, tile);
-            l.normalScale = 1f;
+            l.normalScale = 0.35f;
             l.smoothness = 0f;
             l.metallic = 0f;
             l.diffuseRemapMax = tint;
+            // Store muted remap colors for compatible terrain shaders. Built-in
+            // Standard uses layer smoothness and normalScale above instead.
+            l.diffuseRemapMin = Color.clear;
+            l.diffuseRemapMax = new Color(tint.r, tint.g, tint.b, 0f);
             EditorUtility.SetDirty(l);
             return l;
         }
         td.terrainLayers = new[]
         {
-            Layer("Layer_GrassLush", "Grass_Lush", 7f, Color.white),
-            Layer("Layer_GrassMeadow", "Grass_Meadow", 9f, Color.white),
-            Layer("Layer_Dirt", "Dirt_Path", 5f, Color.white),
-            Layer("Layer_Cobble", "Cobble", 3f, Color.white),
-            Layer("Layer_Rock", "Rock_Mossy", 10f, Color.white),
+            Layer("Layer_GrassLush", "Grass_Lush", 5f, new Color(0.76f, 0.80f, 0.68f)),
+            Layer("Layer_GrassMeadow", "Grass_Meadow", 6.5f, new Color(0.82f, 0.81f, 0.69f)),
+            Layer("Layer_Dirt", "Dirt_Path", 3.5f, new Color(0.72f, 0.69f, 0.60f)),
+            Layer("Layer_Cobble", "Cobble", 2.5f, new Color(0.84f, 0.83f, 0.76f)),
+            Layer("Layer_Rock", "Rock_Mossy", 8f, new Color(0.78f, 0.82f, 0.74f)),
         };
 
         var go = Terrain.CreateTerrainGameObject(td);
@@ -795,9 +871,20 @@ public static class EnvironmentBuilder
         terrain.drawInstanced = true;
         terrain.treeDistance = 450f;
         terrain.treeBillboardDistance = 450f;
-        terrain.detailObjectDistance = 120f;
+        terrain.detailObjectDistance = 170f;
         terrain.detailObjectDensity = 1f;
         terrain.shadowCastingMode = ShadowCastingMode.TwoSided;
+        // Lambert terrain has no specular/reflection lobe, including its built-in
+        // additional-layer and distant-basemap passes. Dry soil stays matte.
+        string mattePath = GenDir + "/TerrainMatte.mat";
+        var matte = AssetDatabase.LoadAssetAtPath<Material>(mattePath);
+        var diffuseShader = Shader.Find("Nature/Terrain/Diffuse");
+        if (diffuseShader == null) throw new InvalidOperationException("Built-in diffuse terrain shader is unavailable");
+        if (matte == null) { matte = new Material(diffuseShader); AssetDatabase.CreateAsset(matte, mattePath); }
+        matte.shader = diffuseShader;
+        matte.enableInstancing = true;
+        EditorUtility.SetDirty(matte);
+        terrain.materialTemplate = matte;
 
         PaintTerrain(td, origin);
         PlaceDetails(td, origin);
@@ -828,13 +915,14 @@ public static class EnvironmentBuilder
                 float n2 = Mathf.PerlinNoise(p.x * 0.21f + 100f, p.y * 0.21f + 100f);
 
                 Array.Clear(w, 0, layers);
-                float meadow = Mathf.SmoothStep(0, 1, Mathf.InverseLerp(0.42f, 0.62f, n1));
+                float meadow = Mathf.SmoothStep(0, 1, Mathf.InverseLerp(0.28f, 0.72f, n1));
                 w[(int)L.GrassLush] = 1f - meadow;
                 w[(int)L.GrassMeadow] = meadow;
 
                 float dirt = 0f, cobble = 0f;
                 // trampled castle grounds: dirt lanes with grass tufts surviving in patches
-                if (InsideWalls(p, -4f)) dirt = Mathf.Max(dirt, Mathf.SmoothStep(0, 1, Mathf.InverseLerp(0.62f, 0.38f, n2 * 0.6f + n1 * 0.4f)) * 0.85f + 0.1f);
+                if (InsideWalls(p, -4f)) dirt = 0.12f + Mathf.SmoothStep(0, 1,
+                    Mathf.InverseLerp(0.65f, 0.3f, n1)) * 0.32f;
                 // dirt roads
                 float road = RoadDistance(p);
                 dirt = Mathf.Max(dirt, 1f - Mathf.SmoothStep(0, 1, Mathf.InverseLerp(2.2f, 4.2f, road)));
@@ -843,9 +931,13 @@ public static class EnvironmentBuilder
                 if (nb != null)
                 {
                     bool paved = nb.kind == "House" || nb.kind == "Castle";
-                    float apron = paved ? 1.1f + n2 * 0.8f : 0.4f;
-                    cobble = Mathf.Max(cobble, 1f - Mathf.SmoothStep(0, 1, Mathf.InverseLerp(apron * 0.6f, apron + 0.5f, sd)));
-                    dirt = Mathf.Max(dirt, 1f - Mathf.SmoothStep(0, 1, Mathf.InverseLerp(1.8f, 3.8f + n2 * 1.8f, sd)));
+                    // Broad, continuous feathering avoids a sharp ring around the plinth.
+                    float wornDistance = sd + (n2 - 0.5f) * 0.65f;
+                    float apron = paved ? 0.55f : 0.15f;
+                    if (paved) cobble = 1f - Mathf.SmoothStep(0, 1, Mathf.InverseLerp(0.12f, apron + 0.5f, wornDistance));
+                    // Muted worn soil against walls; irregular edges fade back to meadow.
+                    float soil = 1f - Mathf.SmoothStep(0, 1, Mathf.InverseLerp(0.2f, 2.8f + n1, wornDistance));
+                    dirt = Mathf.Max(dirt, soil * (paved ? 0.85f : 0.65f));
                 }
                 float rock = Mathf.SmoothStep(0, 1, Mathf.InverseLerp(26f, 38f, slope));
 
@@ -871,6 +963,36 @@ public static class EnvironmentBuilder
 
     static void PlaceDetails(TerrainData td, Vector3 origin)
     {
+        DetailPrototype GrassMesh(string name, int blades, float h0, float h1, Color color)
+        {
+            var mb = new MeshBuilder(1);
+            // Separate seed keeps grass geometry stable without changing world scatter.
+            var random = new Random(9157 + blades * 31 + name.Length);
+            for (int blade = 0; blade < blades; blade++)
+            {
+                float angle = (float)random.NextDouble() * Mathf.PI * 2f;
+                float radius = Mathf.Sqrt((float)random.NextDouble()) * 0.18f;
+                Vector3 root = new Vector3(Mathf.Cos(angle) * radius, -0.015f, Mathf.Sin(angle) * radius);
+                Vector3 bend = new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle)) * Mathf.Lerp(0.08f, 0.24f, (float)random.NextDouble());
+                mb.Blade(root, bend, Mathf.Lerp(0.7f, 1f, (float)random.NextDouble()), Mathf.Lerp(0.008f, 0.016f, (float)random.NextDouble()));
+            }
+            Material material = SaveMaterial(name + "Material", color, 0f);
+            material.enableInstancing = true;
+            material.SetFloat("_SpecularHighlights", 0f);
+            material.EnableKeyword("_SPECULARHIGHLIGHTS_OFF");
+            material.SetFloat("_GlossyReflections", 0f);
+            material.EnableKeyword("_GLOSSYREFLECTIONS_OFF");
+            EditorUtility.SetDirty(material);
+            GameObject prefab = SavePrefab(name, mb.ToMesh(name), new[] { material }, false, castShadows: false);
+            return new DetailPrototype
+            {
+                prototype = prefab, usePrototypeMesh = true, useInstancing = true,
+                renderMode = DetailRenderMode.VertexLit,
+                minWidth = 0.8f, maxWidth = 1.2f, minHeight = h0, maxHeight = h1,
+                healthyColor = Color.white, dryColor = Color.white,
+                noiseSpread = 0.5f, noiseSeed = blades * 101, positionJitter = 1f, alignToGround = 0.25f,
+            };
+        }
         DetailPrototype Proto(string tex, float w0, float w1, float h0, float h1, Color healthy, Color dry, DetailRenderMode mode) => new DetailPrototype
         {
             prototypeTexture = Tex<Texture2D>(tex),
@@ -880,21 +1002,24 @@ public static class EnvironmentBuilder
             minHeight = h0, maxHeight = h1,
             healthyColor = healthy, dryColor = dry,
             noiseSpread = 0.3f,
+            noiseSeed = tex.Length * 97 + tex[tex.Length - 1],
+            positionJitter = 1f,
+            alignToGround = 0.15f,
         };
         td.detailPrototypes = new[]
         {
-            Proto("GrassDense", 0.55f, 0.95f, 0.32f, 0.62f, new Color(0.96f, 1f, 0.92f), new Color(1f, 0.95f, 0.76f), DetailRenderMode.Grass),
-            Proto("GrassWild", 0.6f, 1.05f, 0.55f, 1.0f, new Color(0.95f, 1f, 0.9f), new Color(1f, 0.92f, 0.7f), DetailRenderMode.Grass),
-            Proto("GrassShort", 0.38f, 0.62f, 0.22f, 0.38f, new Color(0.96f, 1f, 0.92f), new Color(1f, 0.96f, 0.8f), DetailRenderMode.Grass),
+            GrassMesh("GrassDense3D", 7, 0.22f, 0.36f, new Color(0.43f, 0.51f, 0.26f)),
+            GrassMesh("GrassWild3D", 5, 0.32f, 0.48f, new Color(0.48f, 0.53f, 0.29f)),
+            GrassMesh("GrassShort3D", 6, 0.12f, 0.22f, new Color(0.45f, 0.53f, 0.28f)),
             Proto("FlowersYellow", 0.35f, 0.5f, 0.3f, 0.45f, Color.white, Color.white, DetailRenderMode.GrassBillboard),
             Proto("FlowersRed", 0.35f, 0.5f, 0.3f, 0.45f, Color.white, Color.white, DetailRenderMode.GrassBillboard),
             Proto("FlowersWhite", 0.35f, 0.5f, 0.3f, 0.45f, Color.white, Color.white, DetailRenderMode.GrassBillboard),
             Proto("FlowersPurple", 0.35f, 0.5f, 0.3f, 0.45f, Color.white, Color.white, DetailRenderMode.GrassBillboard),
         };
         td.wavingGrassTint = Color.white;
-        td.wavingGrassStrength = 0.35f;
-        td.wavingGrassAmount = 0.3f;
-        td.wavingGrassSpeed = 0.4f;
+        td.wavingGrassStrength = 0.25f;
+        td.wavingGrassAmount = 0.28f;
+        td.wavingGrassSpeed = 0.35f;
         td.SetDetailScatterMode(DetailScatterMode.InstanceCountMode);
         td.SetDetailResolution(DetailRes, 32);
 
@@ -909,26 +1034,28 @@ public static class EnvironmentBuilder
                 if ((p - Center).magnitude > PlainRadius + 60f) continue;
                 float grassy = SplatAt(p, origin, L.GrassLush) + SplatAt(p, origin, L.GrassMeadow);
                 float sd = NearestBuilding(p, out _);
-                if (sd < 0.35f || grassy < 0.35f) continue;
+                if (sd < 0.18f) continue;
+                float pathEdge = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(2.1f, 3.8f, RoadDistance(p)));
+                float seam = Mathf.SmoothStep(0, 1, Mathf.InverseLerp(0.4f, 0.9f, sd)) *
+                    (1f - Mathf.SmoothStep(0, 1, Mathf.InverseLerp(2f, 5f, sd)));
+                // Preserve sparse seam tufts even over painted dirt; keep solid paving clear.
+                float seamGrass = seam * (1f - SplatAt(p, origin, L.Cobble));
                 float clump = Mathf.PerlinNoise(p.x * 0.15f + 7f, p.y * 0.15f + 3f);
                 float wildness = Mathf.PerlinNoise(p.x * 0.04f - 9f, p.y * 0.04f + 2f);
-                bool inside = InsideWalls(p, 2f);
-                float hug = sd < 5f ? 1f : 0f;   // thicker grass hugging building bases and wall feet hides the seam
-                float amount = grassy * (clump * 1.6f + hug) + (float)rng.NextDouble() * 0.5f;
-                if (inside)
-                {
-                    // the town: mostly short, trodden grass with fuller clumps against the walls
-                    shortGrass[iz, ix] = Mathf.RoundToInt(Mathf.Clamp(amount * 1.2f, 0f, 3f));
-                    if (hug > 0f || clump > 0.62f) dense[iz, ix] = Mathf.RoundToInt(Mathf.Clamp(amount * 0.8f, 0f, 2f));
-                }
-                else
-                {
-                    dense[iz, ix] = Mathf.RoundToInt(Mathf.Clamp(amount, 0f, 3f));
-                    if (wildness > 0.52f || hug > 0f) wild[iz, ix] = Mathf.RoundToInt(Mathf.Clamp(amount * (wildness - 0.4f) * 2f, 0f, 2f));
-                    else shortGrass[iz, ix] = Mathf.RoundToInt(Mathf.Clamp(amount * 0.6f, 0f, 2f));
-                }
+                float coverage = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0.05f, 0.7f, grassy));
+                coverage = Mathf.Max(coverage, seamGrass * 0.5f) * pathEdge;
+                // Stochastic rounding maintains a continuous underlayer without
+                // imposing visible contours at a fixed noise/density threshold.
+                float amount = coverage * Mathf.Lerp(0.6f, 1f, clump);
+                int count = Mathf.FloorToInt(amount);
+                if (rng.NextDouble() < amount - count) count++;
+                shortGrass[iz, ix] = count;
+                if (count > 0 && rng.NextDouble() < clump * 0.18f)
+                { dense[iz, ix] = 1; shortGrass[iz, ix]--; }
+                if (count > 0 && !InsideWalls(p, 0f) && rng.NextDouble() < wildness * 0.035f)
+                { wild[iz, ix] = 1; if (shortGrass[iz, ix] > 0) shortGrass[iz, ix]--; }
 
-                float flowerChance = 0.008f + (sd < 4.5f ? 0.07f : 0f) + (SplatAt(p, origin, L.GrassMeadow) > 0.5f ? 0.05f : 0f);
+                float flowerChance = 0.002f + (sd < 4.5f ? 0.012f : 0f) + (SplatAt(p, origin, L.GrassMeadow) > 0.5f ? 0.01f : 0f);
                 if (rng.NextDouble() < flowerChance * grassy)
                 {
                     int kind = (int)(Mathf.PerlinNoise(p.x * 0.05f, p.y * 0.05f) * 4f * 0.999f + rng.Next(2)) % 4;
@@ -1007,8 +1134,20 @@ public static class EnvironmentBuilder
 
             // a stone plinth slightly wider than the walls, half buried
             var mb = new MeshBuilder(1);
-            Vector3 h = new Vector3(b.half.x + 0.25f, 0, b.half.y + 0.25f);
-            mb.Box(0, new Vector3(-h.x, -0.5f, -h.z), new Vector3(h.x, 0.4f, h.z), 0.45f);
+            Vector3 h = new Vector3(b.half.x + 0.18f, 0, b.half.y + 0.18f);
+            float lowestGround = b.bottom;
+            // Sample the expanded perimeter so the plinth stays buried on uneven pads.
+            for (int edge = 0; edge < 4; edge++)
+                for (int sample = 0; sample <= 8; sample++)
+                {
+                    float u = Mathf.Lerp(-1f, 1f, sample / 8f);
+                    Vector2 q = edge < 2 ? new Vector2(u * h.x, (edge == 0 ? 1f : -1f) * h.z)
+                        : new Vector2((edge == 2 ? 1f : -1f) * h.x, u * h.z);
+                    Vector2 p = b.center + b.axisX * q.x + b.axisZ * q.y;
+                    lowestGround = Mathf.Min(lowestGround, WorldHeight(p.x, p.y));
+                }
+            float bottom = Mathf.Min(-0.5f, lowestGround - (b.bottom + 0.12f) - 0.25f);
+            mb.Box(0, new Vector3(-h.x, bottom, -h.z), new Vector3(h.x, 0.03f, h.z), 0.45f);
             var mesh = mb.ToMesh(b.go.name + "_Plinth");
             string path = $"{GenDir}/Plinths/{b.go.name.Replace(" ", "_").Replace("(", "").Replace(")", "")}.asset";
             EnsureFolder(GenDir + "/Plinths");
@@ -1033,7 +1172,7 @@ public static class EnvironmentBuilder
         foreach (var b in buildings.Where(b => b.kind == "House" || b.kind == "Wall" || b.kind == "Tower" || b.kind == "Castle"))
         {
             float perimeter = 4f * (b.half.x + b.half.y);
-            int n = Mathf.Clamp(Mathf.RoundToInt(perimeter / (b.kind == "Wall" ? 1.6f : 2.2f)), 2, 14);
+            int n = Mathf.Clamp(Mathf.RoundToInt(perimeter / (b.kind == "Wall" ? 3.5f : 4.5f)), 1, 8);
             for (int i = 0; i < n; i++)
             {
                 if (rng.NextDouble() < 0.3) continue;
@@ -1048,16 +1187,23 @@ public static class EnvironmentBuilder
                     _ => new Vector2(-b.half.x, u * b.half.y),
                 };
                 Vector2 outward = side switch { 0 => b.axisZ, 1 => -b.axisZ, 2 => b.axisX, _ => -b.axisX };
-                Vector2 p = b.center + b.axisX * local.x + b.axisZ * local.y + outward * R(0.15f, 0.45f) * s;
+                float edgeOffset = b.kind == "House" ? R(0.38f, 0.75f) : R(0.18f, 0.55f);
+                Vector2 p = b.center + b.axisX * local.x + b.axisZ * local.y + outward * edgeOffset;
                 if (NearestBuilding(p, out var other) < 0.05f && other != b) continue;
                 if (RoadDistance(p) < 2.2f) continue;
 
                 bool rock = rng.NextDouble() < (b.kind == "House" ? 0.25 : 0.45);
                 var prefab = rock ? prefabs.rocks[rng.Next(prefabs.rocks.Length)] : prefabs.bushes[rng.Next(prefabs.bushes.Length)];
                 var go = (GameObject)PrefabUtility.InstantiatePrefab(prefab, root);
-                go.transform.position = new Vector3(p.x, WorldHeight(p.x, p.y) - 0.05f, p.y);
                 go.transform.rotation = Quaternion.Euler(0, R(0, 360), 0);
-                go.transform.localScale = Vector3.one * s * (rock ? R(0.35f, 0.7f) : R(0.6f, 1.05f));
+                go.transform.localScale = Vector3.one * s * (rock ? R(0.22f, 0.45f) : R(0.35f, 0.65f));
+                go.transform.position = new Vector3(p.x, WorldHeight(p.x, p.y), p.y);
+                var renderers = go.GetComponentsInChildren<Renderer>();
+                if (renderers.Length > 0)
+                {
+                    float meshBottom = renderers.Min(r => r.bounds.min.y);
+                    go.transform.position += Vector3.up * (WorldHeight(p.x, p.y) - meshBottom - (rock ? 0.08f : 0.04f));
+                }
                 count++;
             }
         }
@@ -1301,18 +1447,18 @@ public static class EnvironmentBuilder
         ao.thicknessModifier.Override(1.4f);
         ao.color.Override(new Color(0.1f, 0.08f, 0.12f));
         var bloom = Add<Bloom>();
-        bloom.intensity.Override(1.1f);
-        bloom.threshold.Override(1.05f);
+        bloom.intensity.Override(0.25f);
+        bloom.threshold.Override(1.25f);
         bloom.softKnee.Override(0.6f);
         bloom.diffusion.Override(7f);
         var grading = Add<ColorGrading>();
         grading.gradingMode.Override(GradingMode.HighDefinitionRange);
         grading.tonemapper.Override(Tonemapper.ACES);
-        grading.postExposure.Override(0.3f);
-        grading.temperature.Override(5f);
+        grading.postExposure.Override(0.1f);
+        grading.temperature.Override(0f);
         grading.tint.Override(1f);
-        grading.saturation.Override(6f);
-        grading.contrast.Override(8f);
+        grading.saturation.Override(-10f);
+        grading.contrast.Override(4f);
         var vignette = Add<Vignette>();
         vignette.intensity.Override(0.26f);
         vignette.smoothness.Override(0.45f);
@@ -1440,7 +1586,24 @@ public static class EnvironmentBuilder
             ("3_house_base", hc + new Vector3(house.half.magnitude + 4f, 1.5f, -(house.half.magnitude + 4f)), hc),
             ("4_landscape", keep + new Vector3(-0.3f, 0.12f, -2.1f) * CastleRadius, keep + new Vector3(0, 8, 0)),
             ("5_walls_outside", keep + new Vector3(0.75f, 0.03f, -1.15f) * CastleRadius + Vector3.up * 2f, keep + new Vector3(0, 6, 0)),
-        };
+        }.ToList();
+        var shrub = Object.FindObjectsByType<MeshRenderer>(FindObjectsSortMode.None)
+            .Where(r => r.gameObject.name.StartsWith("Bush_", StringComparison.Ordinal))
+            .OrderBy(r => (r.bounds.center - pp).sqrMagnitude).FirstOrDefault();
+        if (shrub != null)
+        {
+            Vector3 focus = shrub.bounds.center;
+            shots.Add(("6_shrub_detail", focus + new Vector3(0.8f, 0.35f, -1.2f), focus));
+            Vector3 grass = focus + Vector3.right * 0.9f;
+            for (int angle = 0; angle < 360; angle += 30)
+            {
+                Vector3 candidate = focus + Quaternion.Euler(0f, angle, 0f) * Vector3.forward * 3f;
+                if (NearestBuilding(new Vector2(candidate.x, candidate.z), out _) > 2f)
+                { grass = candidate; break; }
+            }
+            grass.y = WorldHeight(grass.x, grass.z) + 0.1f;
+            shots.Add(("7_grass_detail", grass + new Vector3(0.5f, 0.35f, -0.7f), grass));
+        }
         Vector3 oldPos = cam.transform.position; Quaternion oldRot = cam.transform.rotation;
         var rt = new RenderTexture(1600, 900, 24, RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB);
         var tex = new Texture2D(1600, 900, TextureFormat.RGB24, false);

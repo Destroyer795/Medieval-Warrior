@@ -117,6 +117,32 @@ public static class ProceduralModels
     }
 
     // ------------------------------------------------------------ bow (limbs bend towards +Z, string at -Z)
+    public static Mesh HipQuiverMesh() => Cached("hip_quiver", () =>
+    {
+        var k = new MeshKit(2);
+        const int sides = 12;
+        for (int side = 0; side < sides; side++)
+        {
+            float a = side * Mathf.PI * 2f / sides, b = (side + 1) * Mathf.PI * 2f / sides;
+            Vector3 bottomA = new Vector3(Mathf.Cos(a) * 0.11f, 0f, Mathf.Sin(a) * 0.11f);
+            Vector3 bottomB = new Vector3(Mathf.Cos(b) * 0.11f, 0f, Mathf.Sin(b) * 0.11f);
+            Vector3 topA = new Vector3(Mathf.Cos(a) * 0.135f, 0.52f, Mathf.Sin(a) * 0.135f);
+            Vector3 topB = new Vector3(Mathf.Cos(b) * 0.135f, 0.52f, Mathf.Sin(b) * 0.135f);
+            k.Tri(0, bottomA, bottomB, topA); k.Tri(0, bottomB, topB, topA);
+            // A real open rim, not a capped cylinder concealing an empty quiver.
+            k.Tube(1, topA, topB, 0.014f, 0.014f, 4);
+        }
+        k.Box(0, new Vector3(0, 0.015f, 0), new Vector3(0.14f, 0.03f, 0.14f));
+        k.Box(1, new Vector3(-0.085f, 0.43f, 0), new Vector3(0.07f, 0.15f, 0.05f));
+        return k.Build("Right hip quiver");
+    });
+
+    public static Material[] HipQuiverMaterials() => new[]
+    {
+        Mat("hip_quiver_leather", new Color(0.22f, 0.1f, 0.045f), 0f),
+        Mat("hip_quiver_rim", new Color(0.48f, 0.3f, 0.12f), 0.1f),
+    };
+
     public static Mesh BowMesh() => Cached("bow", () =>
     {
         var k = new MeshKit(2); // 0 wood, 1 trim/grip (the string is a live LineRenderer, see ArcherRig)

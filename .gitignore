@@ -14,6 +14,7 @@
 *.csproj
 *.unityproj
 *.sln
+*.slnx
 *.suo
 *.tmp
 *.user
@@ -36,3 +37,7 @@ Thumbs.db
 
 # Embedded locally (slow CDN); the manifest still pins 3.5.4 from the registry
 /Packages/com.unity.postprocessing/
+
+# Local verification logs, screenshots, reports and working backups
+/*.log
+/Artifacts/

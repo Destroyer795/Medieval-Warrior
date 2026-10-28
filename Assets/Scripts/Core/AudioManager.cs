@@ -42,9 +42,9 @@ public class AudioManager : MonoBehaviour
         go.transform.SetParent(transform);
         var s = go.AddComponent<AudioSource>();
         s.playOnAwake = false;
-        s.rolloffMode = AudioRolloffMode.Linear;
-        s.minDistance = 4f;
-        s.maxDistance = 55f;
+        s.rolloffMode = AudioRolloffMode.Logarithmic;
+        s.minDistance = 3f;
+        s.maxDistance = 45f;
         s.dopplerLevel = 0f;
         voices.Add(s);
         return s;

@@ -184,14 +184,15 @@ public static class FX
 
     static IEnumerator FadeSwipe(GameObject go, MeshRenderer mr, bool heavy)
     {
-        float life = heavy ? 0.22f : 0.16f;
+        float life = heavy ? 0.18f : 0.14f;
         for (float t = 0; t < life && go != null; t += Time.deltaTime)
         {
             float k = t / life;
-            swipeBlock.SetColor("_TintColor", new Color(1f, 0.95f, 0.85f, (1f - k) * (heavy ? 0.75f : 0.55f)));
-            swipeBlock.SetColor("_Color", new Color(1f, 0.95f, 0.85f, (1f - k) * 0.6f));
+            float opacity = 1f - Mathf.SmoothStep(0f, 1f, k);
+            swipeBlock.SetColor("_TintColor", new Color(1f, 0.95f, 0.85f, opacity * (heavy ? 0.9f : 0.75f)));
+            swipeBlock.SetColor("_Color", new Color(1f, 0.95f, 0.85f, opacity * 0.75f));
             mr.SetPropertyBlock(swipeBlock);
-            go.transform.localScale = Vector3.one * Mathf.Lerp(0.85f, 1.1f, k);
+            go.transform.localScale = Vector3.one * Mathf.Lerp(0.9f, 0.97f, k);
             yield return null;
         }
         if (go != null) Object.Destroy(go);
@@ -211,7 +212,7 @@ public static class FX
             float a = Mathf.Lerp(-75f, 75f, t) * Mathf.Deg2Rad;
             Vector3 dir = new Vector3(Mathf.Sin(a), Mathf.Cos(a) * 0.35f, Mathf.Cos(a));
             float fade = Mathf.Sin(t * Mathf.PI);
-            foreach (var (r, vcoord) in new[] { (0.55f, 0f), (1.15f, 0.5f), (1.55f, 1f) })
+            foreach (var (r, vcoord) in new[] { (0.85f, 0f), (1.12f, 0.5f), (1.35f, 1f) })
             {
                 v.Add(dir.normalized * r);
                 uv.Add(new Vector2(0.5f, vcoord));

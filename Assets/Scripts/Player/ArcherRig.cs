@@ -26,6 +26,7 @@ public class ArcherRig : MonoBehaviour
     Vector3 bowTargetLocal, drawTargetLocal;
     float aimYaw, aimPitch;
     bool targetsReady, aimReady;
+    GameObject nockedFlame;
 
     const float BowHalf = 0.62f, NockZ = -0.03f;
 
@@ -205,9 +206,10 @@ public class ArcherRig : MonoBehaviour
             var gear = pc.Gear;
             Quaternion chest = gear != null && gear.Ready ? gear.ChestRotation : transform.rotation;
             Vector3 back = gear != null && gear.Ready ? gear.BackSurface : transform.position + Vector3.up * 1.25f - transform.forward * 0.12f;
-            // Rest the curved grip against the armor; the limb tips arch away.
-            bow.SetPositionAndRotation(back + chest * new Vector3(0f, 0.04f, -0.245f),
-                chest * Quaternion.Euler(0f, 0f, 32f));
+            // The bow and string occupy local YZ. Turn that entire plane onto
+            // the back, then roll it diagonally within the chest plane.
+            bow.SetPositionAndRotation(back + chest * new Vector3(0f, 0.04f, -0.055f),
+                chest * Quaternion.AngleAxis(32f, Vector3.forward) * Quaternion.AngleAxis(90f, Vector3.up));
             w = 0f;
         }
 
@@ -219,7 +221,7 @@ public class ArcherRig : MonoBehaviour
         bowString.SetPosition(1, pull);
         bowString.SetPosition(2, bottom);
 
-        bool showArrow = inHand && pc.Arrows > 0 && w > 0.6f && releaseKick < 0.05f;
+        bool showArrow = inHand && pc.enabled && pc.Arrows > 0 && w > 0.6f && releaseKick < 0.05f;
         if (nocked.gameObject.activeSelf != showArrow) nocked.gameObject.SetActive(showArrow);
         if (showArrow)
         {
@@ -227,5 +229,8 @@ public class ArcherRig : MonoBehaviour
             if (shaft.sqrMagnitude < 0.01f) shaft = aim;
             nocked.SetPositionAndRotation(pull, Quaternion.LookRotation(shaft, bow.up));
         }
+        bool burningNock = showArrow && pc.IsDrawing && pc.DrawAmount > 0.95f && Boons.FireArrows;
+        if (burningNock && nockedFlame == null) nockedFlame = FX.AttachFlame(nocked, Vector3.forward * 0.9f, 0.5f);
+        else if (!burningNock && nockedFlame != null) { FX.Extinguish(nockedFlame); nockedFlame = null; }
     }
 }

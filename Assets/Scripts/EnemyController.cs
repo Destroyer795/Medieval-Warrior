@@ -91,6 +91,7 @@ public class EnemyController : MonoBehaviour
 
     void OnDisable()
     {
+        if (burningFlames != null) { FX.Extinguish(burningFlames); burningFlames = null; }
         All.Remove(this);
         ReleaseToken();
     }
@@ -536,6 +537,7 @@ public class EnemyController : MonoBehaviour
     {
         if (IsDead) return;
         IsDead = true;
+        if (burningFlames != null) { FX.Extinguish(burningFlames); burningFlames = null; }
         state = State.Dead;
         All.Remove(this);   // corpses don't count towards caps or wave progress
         ReleaseToken();
@@ -561,21 +563,29 @@ public class EnemyController : MonoBehaviour
 
     // ---- fire (from Fire Arrows): damage over time, embers, can't be put out
     float burnUntil, burnDps, emberTimer, burnAccum;
+    GameObject burningFlames;
 
     public void Ignite(float seconds, float dps)
     {
-        if (IsDead) return;
+        if (IsDead || seconds <= 0f || dps <= 0f) return;
         if (Time.time > burnUntil) AudioManager.PlayAt("explosion", transform.position, 0.15f, 0.3f);
         burnUntil = Mathf.Max(burnUntil, Time.time + seconds);
         burnDps = Mathf.Max(burnDps, dps);
+        if (burningFlames == null) burningFlames = FX.AttachFlame(transform, Vector3.up * 0.9f, 1.6f);
     }
 
     public bool IsBurning => Time.time < burnUntil && !IsDead;
 
     void UpdateBurning()
     {
-        if (!IsBurning) return;
+        if (!IsBurning)
+        {
+            if (burningFlames != null) { FX.Extinguish(burningFlames); burningFlames = null; }
+            burnDps = 0f;
+            return;
+        }
         Health -= burnDps * Time.deltaTime;
+        health = Mathf.Max(0, Mathf.CeilToInt(Health));
         burnAccum += burnDps * Time.deltaTime;
         emberTimer -= Time.deltaTime;
         if (emberTimer <= 0f)

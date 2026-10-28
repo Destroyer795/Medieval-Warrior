@@ -2,6 +2,7 @@ using UnityEngine;
 
 // Third-person orbit camera: mouse look, scroll zoom, over-the-shoulder aim for the bow,
 // wall collision and trauma-based screen shake.
+[DefaultExecutionOrder(50)]
 public class CameraFollow : MonoBehaviour
 {
     [Header("Target")]
@@ -36,6 +37,11 @@ public class CameraFollow : MonoBehaviour
     private float aimBlend, trauma;
     private PlayerControlSpeed player;
     private Camera cam;
+    float orbitYaw, orbitPitch, yawVelocity, pitchVelocity, boomDistance, boomVelocity;
+    Vector3 followPoint;
+
+    // Input heading is independent of camera follow lag and trauma shake.
+    public Vector3 LookDirection => Quaternion.Euler(orbitPitch, orbitYaw, 0f) * Vector3.forward;
 
     void Start()
     {
@@ -45,6 +51,10 @@ public class CameraFollow : MonoBehaviour
             currentDistance = Mathf.Clamp(Vector3.Distance(transform.position, target.position), Mathf.Max(minZoom, 4f), maxZoom);
             currentYaw = target.eulerAngles.y;
             player = target.GetComponent<PlayerControlSpeed>();
+            orbitYaw = currentYaw;
+            orbitPitch = currentPitch;
+            boomDistance = currentDistance;
+            followPoint = target.position + Vector3.up * 1.5f;
         }
     }
 
@@ -54,11 +64,13 @@ public class CameraFollow : MonoBehaviour
     {
         if (target == null) return;
         bool paused = Time.timeScale < 0.01f;
+        if (paused) return;
+        float dt = Mathf.Min(Time.unscaledDeltaTime, 0.05f);
 
         // ROTATION: mouse look while the cursor is captured (otherwise hold right mouse)
         if (!paused && (Cursor.lockState == CursorLockMode.Locked || Input.GetMouseButton(1) || GameInput.UsingGamepad))
         {
-            float sens = rotationSpeed * GameSettings.MouseSensitivity / 3.5f * (aimBlend > 0.5f ? 0.6f : 1f);
+            float sens = rotationSpeed * GameSettings.MouseSensitivity / 3.5f * Mathf.Lerp(1f, 0.6f, aimBlend);
             Vector2 look = GameInput.Look;
             currentYaw += look.x * sens;
             currentPitch -= look.y * sens * (GameSettings.InvertY ? -1f : 1f);
@@ -71,31 +83,35 @@ public class CameraFollow : MonoBehaviour
             currentDistance = Mathf.Clamp(currentDistance - scrollInput * zoomSpeed, minZoom, maxZoom);
 
         bool aiming = player != null && player.CurrentWeapon == Weapon.Bow && (player.IsAiming || player.IsDrawing);
-        aimBlend = Mathf.MoveTowards(aimBlend, aiming ? 1f : 0f, Time.unscaledDeltaTime * 5f);
+        aimBlend = Mathf.MoveTowards(aimBlend, aiming ? 1f : 0f, dt * 4f);
         float e = aimBlend * aimBlend * (3f - 2f * aimBlend);
 
         // CALCULATE POSITION
-        Quaternion rotation = Quaternion.Euler(currentPitch, currentYaw, 0);
-        Vector3 focusPoint = target.position + Vector3.up * 1.5f + rotation * (aimShoulder * e);
+        float angularSmooth = Mathf.Lerp(0.055f, 0.035f, e);
+        orbitYaw = Mathf.SmoothDampAngle(orbitYaw, currentYaw, ref yawVelocity, angularSmooth, Mathf.Infinity, dt);
+        orbitPitch = Mathf.SmoothDampAngle(orbitPitch, currentPitch, ref pitchVelocity, angularSmooth, Mathf.Infinity, dt);
+        Quaternion rotation = Quaternion.Euler(orbitPitch, orbitYaw, 0);
+        Vector3 targetPoint = target.position + Vector3.up * 1.5f;
+        if ((targetPoint - followPoint).sqrMagnitude > 100f)
+        { followPoint = targetPoint; currentVelocity = Vector3.zero; }
+        followPoint = Vector3.SmoothDamp(followPoint, targetPoint, ref currentVelocity,
+            Mathf.Lerp(Mathf.Clamp(smoothSpeed, 0.03f, 0.12f), 0.045f, e), Mathf.Infinity, dt);
+        // Resolve the shoulder offset first, so aiming beside a wall cannot place
+        // the boom's origin on the other side of it.
+        Vector3 shoulder = rotation * (aimShoulder * e);
+        float shoulderLength = shoulder.magnitude;
+        Vector3 focusPoint = followPoint;
+        if (shoulderLength > 0.001f)
+            focusPoint += shoulder.normalized * ClearDistance(followPoint, shoulder.normalized, shoulderLength);
         float distance = Mathf.Lerp(currentDistance, aimDistance, e);
-        Vector3 desiredPosition = focusPoint - (rotation * Vector3.forward * distance);
-
-        // COLLISION: pull the camera in front of walls / terrain instead of clipping through them
-        Vector3 toCamera = desiredPosition - focusPoint;
-        RaycastHit[] hits = Physics.SphereCastAll(focusPoint, collisionRadius, toCamera.normalized, toCamera.magnitude, ~0, QueryTriggerInteraction.Ignore);
-        float closest = toCamera.magnitude;
-        foreach (RaycastHit hit in hits)
-        {
-            if (hit.distance <= 0f || hit.collider.transform.IsChildOf(target)) continue;
-            if (hit.collider.GetComponentInParent<EnemyController>() != null) continue;
-            closest = Mathf.Min(closest, hit.distance);
-        }
-        desiredPosition = focusPoint + toCamera.normalized * Mathf.Max(closest, 0.5f);
-
-        // SMOOTH MOVE (snappier when aiming so the crosshair feels precise)
-        float smooth = Mathf.Lerp(smoothSpeed, 0.03f, e);
-        transform.position = Vector3.SmoothDamp(transform.position, desiredPosition, ref currentVelocity, smooth, Mathf.Infinity, Time.unscaledDeltaTime);
-        transform.rotation = Quaternion.LookRotation(focusPoint + rotation * Vector3.forward * 20f * e - transform.position + (1f - e) * (focusPoint - transform.position));
+        Vector3 back = -(rotation * Vector3.forward);
+        float clear = ClearDistance(focusPoint, back, distance);
+        // Obstruction retracts immediately; release eases out. Never smooth an
+        // already collision-corrected world position back through a wall.
+        if (clear < boomDistance) { boomDistance = clear; boomVelocity = 0f; }
+        else boomDistance = Mathf.SmoothDamp(boomDistance, clear, ref boomVelocity, 0.18f, Mathf.Infinity, dt);
+        transform.position = focusPoint + back * Mathf.Min(boomDistance, clear);
+        transform.rotation = rotation;
 
         // SHAKE
         if (trauma > 0f && !paused)
@@ -107,5 +123,16 @@ public class CameraFollow : MonoBehaviour
         }
 
         if (cam != null) cam.fieldOfView = Mathf.Lerp(GameSettings.FieldOfView, GameSettings.FieldOfView - aimFovDrop, e);
+    }
+
+    float ClearDistance(Vector3 origin, Vector3 direction, float distance)
+    {
+        float clear = distance;
+        foreach (var hit in Physics.SphereCastAll(origin, collisionRadius, direction, distance, ~0, QueryTriggerInteraction.Ignore))
+        {
+            if (hit.collider.transform.IsChildOf(target) || hit.collider.GetComponentInParent<EnemyController>() != null) continue;
+            clear = Mathf.Min(clear, Mathf.Max(0f, hit.distance - 0.04f));
+        }
+        return clear;
     }
 }

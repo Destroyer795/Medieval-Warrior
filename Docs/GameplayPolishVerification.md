@@ -39,3 +39,16 @@ Logs and captures are local verification output and are ignored by Git. Unity-ge
 ## Limits
 
 The foliage retains a stylized procedural appearance. Mesh grass is static; its material does not apply terrain-card wind animation. Flowers remain texture details. Frame rate on the target hardware has not been measured.
+
+## Latest combat and ammunition regression
+
+The latest Unity CLI run passed **107 checks**, exited 0, and logged zero runtime errors/exceptions. It includes the earlier environment and gameplay coverage plus:
+
+- A runtime upper-body attack layer preserves walking/running foot animation and horizontal movement while six procedural sword variants play. No attack clips or controller assets were added or edited.
+- The entire stowed bow and string lie alongside the back plane, rather than touching the torso only at the grip.
+- Fully drawn shots with the Fire Arrows upgrade have sustained flame effects. Surviving zombies ignite and take four seconds of burn damage; lethal hits produce a brief ignition burst. Tests cover ignition, ongoing damage, expiry, death cleanup and lethal-hit feedback.
+- A runtime right-hip quiver shows one physical arrow per available shot, scales for capacity increases, removes arrows when firing, refills through ammo pickups and is physically empty at zero ammo. Tests count active stored-arrow models as well as checking the displayed count.
+
+Full/empty quiver, burning-zombie and attack captures were visually inspected. Compilation and source whitespace checks passed. Menu music retains the hash above. Existing Unity shutdown allocator diagnostics are not claimed to be resolved by these gameplay changes.
+
+For this suite, use `Artifacts/FireQuiver/Smoke` as the smoke runner's `-shotDir`. Its `report.txt` records all 107 results. Generated logs, captures and runtime-only meshes remain outside the committed asset set.

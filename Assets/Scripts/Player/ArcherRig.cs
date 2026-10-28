@@ -16,11 +16,16 @@ public class ArcherRig : MonoBehaviour
 
     PlayerControlSpeed pc;
     Transform cam;
+    CameraFollow orbitCamera;
     Transform spine, neck, head, lUpper, lFore, lHand, rUpper, rFore, rHand;
     Transform bow, nocked;
     LineRenderer bowString;
     float weight, releaseKick, drawSmoothed;
     Vector3 stringPoint;
+    Quaternion torsoOffset = Quaternion.identity;
+    Vector3 bowTargetLocal, drawTargetLocal;
+    float aimYaw, aimPitch;
+    bool targetsReady, aimReady;
 
     const float BowHalf = 0.62f, NockZ = -0.03f;
 
@@ -31,6 +36,7 @@ public class ArcherRig : MonoBehaviour
     {
         pc = owner;
         if (Camera.main != null) cam = Camera.main.transform;
+        if (cam != null) orbitCamera = cam.GetComponent<CameraFollow>();
         spine = Find("Bip001 Spine1") ?? Find("Bip001 Spine");
         neck = Find("Bip001 Neck");
         head = Find("Bip001 Head");
@@ -93,10 +99,22 @@ public class ArcherRig : MonoBehaviour
         releaseKick = Mathf.MoveTowards(releaseKick, 0f, dt * 3.5f);
 
         Vector3 aim = transform.forward;
-        if (cam != null && aiming) aim = cam.forward;
+        if (cam != null && aiming) aim = orbitCamera != null ? orbitCamera.LookDirection : cam.forward;
         else if (cam == null && Camera.main != null) cam = Camera.main.transform;
 
+        Vector3 flatAim = Vector3.ProjectOnPlane(aim, Vector3.up).normalized;
+        if (flatAim.sqrMagnitude < 0.01f) flatAim = transform.forward;
+        float pitch = Mathf.Clamp(Mathf.Asin(Mathf.Clamp(aim.normalized.y, -1f, 1f)) * Mathf.Rad2Deg, -45f, 45f);
+        float yaw = Mathf.Atan2(flatAim.x, flatAim.z) * Mathf.Rad2Deg;
+        if (!aimReady) { aimYaw = yaw; aimPitch = pitch; aimReady = true; }
+        float aimBlend = 1f - Mathf.Exp(-22f * dt);
+        aimYaw = Mathf.LerpAngle(aimYaw, yaw, aimBlend);
+        aimPitch = Mathf.Clamp(Mathf.Lerp(aimPitch, pitch, aimBlend), -45f, 45f);
+        // Smooth angles separately: a spherical interpolation across opposite headings
+        // can otherwise take the hands over the pole and exceed the pitch limit.
+        aim = Quaternion.Euler(-aimPitch, aimYaw, 0f) * Vector3.forward;
         if (Ready && w > 0.001f) Pose(aim, w);
+        else { targetsReady = false; torsoOffset = Quaternion.identity; }
         PlaceBow(bowOut, aim, w);
     }
 
@@ -105,31 +123,40 @@ public class ArcherRig : MonoBehaviour
         Vector3 flat = Vector3.ProjectOnPlane(aim, Vector3.up).normalized;
         if (flat.sqrMagnitude < 0.01f) flat = transform.forward;
         Vector3 right = Vector3.Cross(Vector3.up, flat).normalized;
-        float pitch = Mathf.Asin(Mathf.Clamp(aim.y, -0.95f, 0.95f)) * Mathf.Rad2Deg;
+        float pitch = Mathf.Clamp(Mathf.Asin(Mathf.Clamp(aim.y, -1f, 1f)) * Mathf.Rad2Deg, -45f, 45f);
 
         // 1. side-on stance: open the chest away from the bow arm and lean with the shot
         if (spine != null)
         {
-            spine.rotation = Quaternion.AngleAxis(torsoTurn * w, Vector3.up) * spine.rotation;
-            spine.rotation = Quaternion.AngleAxis(-pitch * 0.45f * w, right) * spine.rotation;
+            // Let the physics root follow yaw; keep the additive chest twist modest.
+            Quaternion targetOffset = Quaternion.AngleAxis(-pitch * 0.35f, right) * Quaternion.AngleAxis(Mathf.Clamp(torsoTurn, -35f, 35f), Vector3.up);
+            torsoOffset = Quaternion.Slerp(torsoOffset, targetOffset, 1f - Mathf.Exp(-18f * Time.deltaTime));
+            spine.rotation = Quaternion.Slerp(Quaternion.identity, torsoOffset, w) * spine.rotation;
         }
 
         // 2. bow arm straight down the line of the shot
         float lReach = Vector3.Distance(lUpper.position, lFore.position) + Vector3.Distance(lFore.position, lHand.position);
         Vector3 bowTarget = lUpper.position + aim * lReach * 0.96f;
         Vector3 bowHint = lUpper.position + aim * lReach * 0.5f - Vector3.up * 0.35f - right * 0.15f;
-        SolveTwoBone(lUpper, lFore, lHand, bowTarget, bowHint, w);
+        // Smooth in player space so walking does not drag the hand behind the body.
+        float blend = 1f - Mathf.Exp(-24f * Time.deltaTime);
+        Vector3 localBow = transform.InverseTransformPoint(bowTarget);
+        bowTargetLocal = targetsReady ? Vector3.Lerp(bowTargetLocal, localBow, blend) : localBow;
+        SolveTwoBone(lUpper, lFore, lHand, transform.TransformPoint(bowTargetLocal), bowHint, w);
 
         // 3. draw hand on the string: brace height -> anchor at the cheek -> follow-through
         Vector3 grip = lHand.position;
         Vector3 brace = grip - aim * 0.16f;
         Vector3 anchorBase = head != null ? head.position : neck != null ? neck.position + Vector3.up * 0.12f : grip - aim * fullDrawDistance;
-        Vector3 anchor = anchorBase + right * 0.06f - Vector3.up * 0.1f + aim * 0.05f;
+        Vector3 anchor = anchorBase + right * 0.12f - Vector3.up * 0.1f + aim * 0.05f;
         float d = drawSmoothed * drawSmoothed * (3f - 2f * drawSmoothed);
         Vector3 hand = Vector3.Lerp(brace, anchor, d);
         if (releaseKick > 0f) hand += (-aim * 0.14f + right * 0.1f) * releaseKick;
         Vector3 drawHint = rUpper.position - aim * 0.45f + Vector3.up * 0.3f + right * 0.3f;
-        SolveTwoBone(rUpper, rFore, rHand, hand, drawHint, w);
+        Vector3 localHand = transform.InverseTransformPoint(hand);
+        drawTargetLocal = targetsReady ? Vector3.Lerp(drawTargetLocal, localHand, blend) : localHand;
+        targetsReady = true;
+        SolveTwoBone(rUpper, rFore, rHand, transform.TransformPoint(drawTargetLocal), drawHint, w);
 
         stringPoint = Vector3.Lerp(brace, rHand.position, w);
     }

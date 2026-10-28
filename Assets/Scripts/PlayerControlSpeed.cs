@@ -12,7 +12,7 @@ public class PlayerControlSpeed : MonoBehaviour
     public float runSpeed = 10.0f;
     public float blockSpeed = 2.0f;
     public float aimSpeed = 2.6f;
-    public float rotationSpeed = 700.0f;
+    public float rotationSpeed = 1080.0f;
 
     [Header("Stamina")]
     public float maxStamina = 100f;
@@ -56,16 +56,19 @@ public class PlayerControlSpeed : MonoBehaviour
 
     private Animator animator;
     private Transform cameraTransform;
+    private CameraFollow orbitCamera;
     private PlayerHealth myHealthScript;
     private Rigidbody rb;
     private Vector3 desiredVelocity;
+    private Quaternion desiredFacing;
+    private bool turnToMove, hasFacing;
 
     float lastAttack = -9f, lastStaminaUse = -9f, stunnedUntil, dodgeUntil, bashReady;
     Vector3 dodgeDir;
     bool exhausted;
     float blockWeight, aimWeight, stepTimer, leanWeight;
     int stepIndex;
-    Transform leftHand, spine;
+    Transform leftHand, swordHand, spine;
     ArcherRig rig;
     KnightGear gear;
     public KnightGear Gear => gear;
@@ -74,9 +77,12 @@ public class PlayerControlSpeed : MonoBehaviour
     void Start()
     {
         animator = GetComponent<Animator>();
+        // The Rigidbody owns the root; clips may only pose the skeleton.
+        if (animator != null) animator.applyRootMotion = false;
         myHealthScript = GetComponent<PlayerHealth>();
         rb = GetComponent<Rigidbody>();
         if (Camera.main != null) cameraTransform = Camera.main.transform;
+        if (cameraTransform != null) orbitCamera = cameraTransform.GetComponent<CameraFollow>();
 
         if (rb != null)
         {
@@ -90,6 +96,7 @@ public class PlayerControlSpeed : MonoBehaviour
         Arrows = startArrows;
         if (shieldArmBone == null) shieldArmBone = FindBone(transform, "Bip001 L UpperArm");
         leftHand = FindBone(transform, "Bip001 L Hand");
+        swordHand = FindBone(transform, "Bip001 R Hand");
         spine = FindBone(transform, "Bip001 Spine1") ?? FindBone(transform, "Bip001 Spine");
         if (!TryGetComponent(out KnightAppearance _)) gameObject.AddComponent<KnightAppearance>();
         rig = gameObject.AddComponent<ArcherRig>();
@@ -130,7 +137,7 @@ public class PlayerControlSpeed : MonoBehaviour
         IsAiming = canAct && CurrentWeapon == Weapon.Bow && (GameInput.SecondaryHeld || debugAim);
 
         // --- 3. MOVEMENT
-        Vector2 move = GameInput.Move;
+        Vector2 move = debugMovement ?? GameInput.Move;
         float moveX = move.x;
         float moveZ = move.y;
         Vector3 movement = CameraRelative(moveX, moveZ);
@@ -141,6 +148,8 @@ public class PlayerControlSpeed : MonoBehaviour
         if (GameInput.DodgeDown && canAct) TryDodge(movement);
 
         desiredVelocity = Vector3.zero;
+        turnToMove = false;
+        hasFacing = false;
         if (Dodging)
         {
             float k = (dodgeUntil - Time.time) / dodgeTime;
@@ -157,16 +166,15 @@ public class PlayerControlSpeed : MonoBehaviour
             else if (isRunning) currentSpeed = runSpeed;
 
             currentSpeed *= Boons.MoveSpeed;
-            if (rb != null) desiredVelocity = movement * currentSpeed;
-            else transform.Translate(movement * currentSpeed * Time.deltaTime, Space.World);
-
             if (!(IsAiming || IsDrawing))
             {
-                Quaternion toRotation = Quaternion.LookRotation(movement, Vector3.up);
-                transform.rotation = Quaternion.RotateTowards(transform.rotation, toRotation, rotationSpeed * Time.deltaTime);
+                desiredFacing = Quaternion.LookRotation(movement, Vector3.up);
+                hasFacing = true;
+                turnToMove = true;
             }
+            desiredVelocity = movement * currentSpeed;
             animator.SetBool("isMoving", true);
-            animator.SetBool("isRunning", isRunning);
+            animator.SetBool("isRunning", isRunning && !(IsAiming || IsDrawing));
         }
         else
         {
@@ -177,20 +185,36 @@ public class PlayerControlSpeed : MonoBehaviour
         // archers face where the camera looks
         if ((IsAiming || IsDrawing) && cameraTransform != null)
         {
-            Vector3 f = cameraTransform.forward; f.y = 0;
-            if (f.sqrMagnitude > 0.01f) transform.rotation = Quaternion.RotateTowards(transform.rotation, Quaternion.LookRotation(f), rotationSpeed * 1.5f * Time.deltaTime);
+            Vector3 f = orbitCamera != null ? orbitCamera.LookDirection : cameraTransform.forward; f.y = 0;
+            if (f.sqrMagnitude > 0.01f)
+            {
+                desiredFacing = Quaternion.LookRotation(f);
+                hasFacing = true;
+            }
+        }
+
+        if (rb == null)
+        {
+            Quaternion facing = hasFacing ? TurnTowards(transform.rotation, Time.deltaTime) : transform.rotation;
+            transform.rotation = facing;
+            transform.position += AlignedVelocity(facing) * Time.deltaTime;
         }
 
         // footsteps, quicker when running
-        if (rb != null && desiredVelocity.sqrMagnitude > 0.5f)
+        Vector3 stepVelocity = rb != null ? Vector3.ProjectOnPlane(rb.linearVelocity, Vector3.up) : desiredVelocity;
+        float stepSpeed = Mathf.Min(stepVelocity.magnitude, desiredVelocity.magnitude);
+        if (stepSpeed > 0.7f && !Stunned)
         {
-            stepTimer -= Time.deltaTime * desiredVelocity.magnitude;
+            stepTimer -= Time.deltaTime * stepSpeed;
             if (stepTimer <= 0f)
             {
                 stepTimer = 1.55f;
-                AudioManager.PlayAt("step" + (stepIndex++ % 4), transform.position, Dodging ? 0.5f : 0.32f, 0.1f);
+                // Reuse the four existing clips with alternating pitch variation.
+                AudioManager.PlayAt("step" + (stepIndex++ % 4), transform.position, Dodging ? 0.5f : 0.32f,
+                    (stepIndex & 1) == 0 ? 0.07f : 0.13f);
             }
         }
+        else stepTimer = 0f;
 
         // --- 4. STAMINA
         if (isRunning) UseStamina(sprintCost * Time.deltaTime);
@@ -215,10 +239,23 @@ public class PlayerControlSpeed : MonoBehaviour
     Vector3 CameraRelative(float x, float z)
     {
         if (cameraTransform == null) return new Vector3(x, 0, z);
-        Vector3 camForward = cameraTransform.forward, camRight = cameraTransform.right;
-        camForward.y = 0; camRight.y = 0;
-        camForward.Normalize(); camRight.Normalize();
+        Vector3 look = orbitCamera != null ? orbitCamera.LookDirection : cameraTransform.forward;
+        Vector3 camForward = Vector3.ProjectOnPlane(look, Vector3.up).normalized;
+        if (camForward.sqrMagnitude < 0.01f) camForward = Vector3.forward;
+        Vector3 camRight = Vector3.Cross(Vector3.up, camForward);
         return camForward * z + camRight * x;
+    }
+
+    Quaternion TurnTowards(Quaternion from, float dt) => Quaternion.RotateTowards(from, desiredFacing,
+        Mathf.Max(1080f, rotationSpeed) * (turnToMove ? 1f : 1.5f) * dt);
+
+    Vector3 AlignedVelocity(Quaternion facing)
+    {
+        if (!turnToMove || desiredVelocity.sqrMagnitude < 0.0001f) return desiredVelocity;
+        Vector3 forward = facing * Vector3.forward;
+        float alignment = Vector3.Dot(forward, desiredVelocity.normalized);
+        // Pivot first: A/D must not start by walking diagonally, S must not slide backwards.
+        return alignment < 0.98f ? Vector3.zero : forward * desiredVelocity.magnitude;
     }
 
     void FixedUpdate()
@@ -226,7 +263,9 @@ public class PlayerControlSpeed : MonoBehaviour
         if (rb == null || rb.isKinematic) return;
         if (Stunned && !Dodging) return;   // let knockback forces play out
 
-        Vector3 v = desiredVelocity;
+        Quaternion facing = hasFacing ? TurnTowards(rb.rotation, Time.fixedDeltaTime) : rb.rotation;
+        if (hasFacing) rb.MoveRotation(facing);
+        Vector3 v = AlignedVelocity(facing);
 
         // too steep to walk up (mountains frame the valley, they aren't a ladder)
         if (v.sqrMagnitude > 0.01f && Physics.Raycast(rb.position + Vector3.up * 0.6f, Vector3.down, out var ground, 1.6f, ~0, QueryTriggerInteraction.Ignore))
@@ -330,6 +369,12 @@ public class PlayerControlSpeed : MonoBehaviour
             Vector3 dir = (enemy.transform.position - transform.position).normalized;
             if (Vector3.Dot(transform.forward, dir) > 0.3f)
             {
+                Vector3 swordOrigin = swordHand != null ? swordHand.position : hitPosition;
+                Vector3 contact = hit.ClosestPoint(swordOrigin);
+                Vector3 toCollider = hit.bounds.center - swordOrigin;
+                if (toCollider.sqrMagnitude > 0.0001f && hit.Raycast(new Ray(swordOrigin, toCollider.normalized), out var swordHit, toCollider.magnitude))
+                    contact = swordHit.point;
+                FX.Sparks(contact, -dir + Vector3.up * 0.15f);
                 enemy.TakeDamage(damage, dir, knock);
                 hitEnemies.Add(enemy); // one hit per enemy
                 if (enemy.IsDead && Boons.LifeSteal > 0f && myHealthScript != null) myHealthScript.Heal(Boons.LifeSteal);
@@ -340,7 +385,7 @@ public class PlayerControlSpeed : MonoBehaviour
         if (hitEnemies.Count > 0)
         {
             AudioManager.PlayAt("sword_hit", hitPosition, 1f, 0.1f);
-            FX.HitStop(finisher ? 0.07f : 0.04f);
+            FX.HitStop(finisher ? 0.08f : 0.04f);
             FX.Shake(finisher ? 0.35f : 0.18f);
         }
     }
@@ -451,6 +496,8 @@ public class PlayerControlSpeed : MonoBehaviour
 
     // ---- hooks for the automated smoke test (no input devices in batch mode)
     bool debugAim;
+    Vector2? debugMovement;
+    public void DebugMove(Vector2? move) => debugMovement = move;
     public void DebugAim(bool on) => debugAim = on;
     public void DebugSwing() { lastAttack = -9f; ComboStep = 2; animator.SetTrigger("isAttacking"); pendingHits.Add((Time.time + 0.2f, 2)); }
     public void DebugFireAt(Vector3 target, float draw)

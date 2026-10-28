@@ -69,6 +69,9 @@ public class PlayerControlSpeed : MonoBehaviour
     float blockWeight, aimWeight, stepTimer, leanWeight;
     int stepIndex;
     Transform leftHand, swordHand, spine;
+    Transform swordUpperArm;
+    float swordPoseStarted = -99f;
+    static readonly int SwordAttackState = Animator.StringToHash("Base Layer.WK_heavy_infantry_08_attack_B");
     ArcherRig rig;
     KnightGear gear;
     public KnightGear Gear => gear;
@@ -79,6 +82,12 @@ public class PlayerControlSpeed : MonoBehaviour
         animator = GetComponent<Animator>();
         // The Rigidbody owns the root; clips may only pose the skeleton.
         if (animator != null) animator.applyRootMotion = false;
+        if (animator != null) animator.cullingMode = AnimatorCullingMode.AlwaysAnimate;
+        foreach (var skin in GetComponentsInChildren<SkinnedMeshRenderer>())
+        {
+            skin.updateWhenOffscreen = true;
+            skin.forceMatrixRecalculationPerRender = true;
+        }
         myHealthScript = GetComponent<PlayerHealth>();
         rb = GetComponent<Rigidbody>();
         if (Camera.main != null) cameraTransform = Camera.main.transform;
@@ -97,6 +106,7 @@ public class PlayerControlSpeed : MonoBehaviour
         if (shieldArmBone == null) shieldArmBone = FindBone(transform, "Bip001 L UpperArm");
         leftHand = FindBone(transform, "Bip001 L Hand");
         swordHand = FindBone(transform, "Bip001 R Hand");
+        swordUpperArm = FindBone(transform, "Bip001 R UpperArm");
         spine = FindBone(transform, "Bip001 Spine1") ?? FindBone(transform, "Bip001 Spine");
         if (!TryGetComponent(out KnightAppearance _)) gameObject.AddComponent<KnightAppearance>();
         rig = gameObject.AddComponent<ArcherRig>();
@@ -334,12 +344,38 @@ public class PlayerControlSpeed : MonoBehaviour
 
         ComboStep = Time.time - lastAttack < comboWindow ? (ComboStep + 1) % 3 : 0;
         lastAttack = Time.time;
-        animator.SetTrigger("isAttacking");
+        StartSwordPose();
         if (myHealthScript != null) myHealthScript.ActivateParry();
         AudioManager.PlayAt("sword_swing", transform.position, 0.8f, 0.12f);
         FX.Swipe(transform, ComboStep);
-        pendingHits.Add((Time.time + 0.2f, ComboStep));
+        pendingHits.Add((Time.time + (ComboStep == 2 ? 0.25f : 0.2f), ComboStep));
         if (rb != null) rb.AddForce(transform.forward * 2.5f, ForceMode.VelocityChange); // small lunge
+    }
+
+    void StartSwordPose()
+    {
+        swordPoseStarted = Time.time;
+        animator.ResetTrigger("isAttacking");
+        if (animator.HasState(0, SwordAttackState))
+            animator.CrossFadeInFixedTime(SwordAttackState, 0.045f, 0, 0f);
+        else animator.SetTrigger("isAttacking");
+    }
+
+    void PoseSwordCombo()
+    {
+        float phase = (Time.time - swordPoseStarted) / 0.55f;
+        if (phase < 0f || phase >= 1f || CurrentWeapon != Weapon.Sword || isBlocking || Stunned || Dodging) return;
+        float envelope = Mathf.Sin(phase * Mathf.PI);
+        float cut = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0.15f, 0.65f, phase));
+        Vector3 torso = ComboStep == 0 ? new Vector3(0f, Mathf.Lerp(-14f, 20f, cut), -6f)
+            : ComboStep == 1 ? new Vector3(0f, Mathf.Lerp(28f, -26f, cut), 8f)
+            : new Vector3(Mathf.Lerp(-12f, 18f, cut), 0f, 0f);
+        Vector3 arm = ComboStep == 0 ? new Vector3(-12f, 0f, 0f)
+            : ComboStep == 1 ? new Vector3(8f, Mathf.Lerp(65f, -45f, cut), 0f)
+            : new Vector3(Mathf.Lerp(-55f, 28f, cut), -12f, 0f);
+        Quaternion frame = transform.rotation;
+        if (spine != null) spine.rotation = frame * Quaternion.Euler(torso * envelope) * Quaternion.Inverse(frame) * spine.rotation;
+        if (swordUpperArm != null) swordUpperArm.rotation = frame * Quaternion.Euler(arm * envelope) * Quaternion.Inverse(frame) * swordUpperArm.rotation;
     }
 
     void ProcessPendingHits()
@@ -499,7 +535,8 @@ public class PlayerControlSpeed : MonoBehaviour
     Vector2? debugMovement;
     public void DebugMove(Vector2? move) => debugMovement = move;
     public void DebugAim(bool on) => debugAim = on;
-    public void DebugSwing() { lastAttack = -9f; ComboStep = 2; animator.SetTrigger("isAttacking"); pendingHits.Add((Time.time + 0.2f, 2)); }
+    public void DebugSwing() => DebugSwingStep(2);
+    public void DebugSwingStep(int step) { ComboStep = Mathf.Clamp(step, 0, 2); StartSwordPose(); pendingHits.Add((Time.time + (ComboStep == 2 ? 0.25f : 0.2f), ComboStep)); }
     public void DebugFireAt(Vector3 target, float draw)
     {
         if (Arrows <= 0) return;
@@ -533,6 +570,7 @@ public class PlayerControlSpeed : MonoBehaviour
 
     void LateUpdate()
     {
+        PoseSwordCombo();
         float k = 1f - Mathf.Exp(-14f * Time.deltaTime);
         blockWeight = Mathf.Lerp(blockWeight, isBlocking ? 1f : 0f, k);
         aimWeight = Mathf.Lerp(aimWeight, CurrentWeapon == Weapon.Bow && (IsAiming || IsDrawing) ? 1f : 0f, k);

@@ -202,8 +202,12 @@ public class ArcherRig : MonoBehaviour
         else
         {
             // slung diagonally across the back
-            Vector3 back = (spine != null ? spine.position : transform.position + Vector3.up * 1.3f) - transform.forward * 0.3f + Vector3.up * 0.1f;
-            bow.SetPositionAndRotation(back, Quaternion.LookRotation(-transform.forward, Vector3.up) * Quaternion.Euler(0, 0, 38f));
+            var gear = pc.Gear;
+            Quaternion chest = gear != null && gear.Ready ? gear.ChestRotation : transform.rotation;
+            Vector3 back = gear != null && gear.Ready ? gear.BackSurface : transform.position + Vector3.up * 1.25f - transform.forward * 0.12f;
+            // Rest the curved grip against the armor; the limb tips arch away.
+            bow.SetPositionAndRotation(back + chest * new Vector3(0f, 0.04f, -0.245f),
+                chest * Quaternion.Euler(0f, 0f, 32f));
             w = 0f;
         }
 

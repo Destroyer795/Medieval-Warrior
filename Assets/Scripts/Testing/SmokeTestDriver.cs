@@ -9,12 +9,20 @@ using UnityEngine.SceneManagement;
 
 // Runtime half of the automated smoke test (editor only, compiled out of builds).
 // Only wakes up when Temp/mw_smoke.txt exists, i.e. when SmokeTest started play mode.
+[DefaultExecutionOrder(200)]
 public class SmokeTestDriver : MonoBehaviour
 {
     string shotDir;
     readonly StringBuilder report = new StringBuilder();
     readonly List<string> errors = new List<string>();
     int failures;
+    System.Action lateCheck;
+    void LateUpdate()
+    {
+        var check = lateCheck;
+        lateCheck = null;
+        check?.Invoke();
+    }
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     static void Boot()
@@ -136,6 +144,24 @@ public class SmokeTestDriver : MonoBehaviour
         playerBody.rotation = movementRotation;
         playerBody.linearVelocity = Vector3.zero;
         // Reproduce obstruction handling in both free orbit and shoulder aim.
+        var swordHand = Bone(player.transform, "Bip001 R Hand");
+        var swingHands = new Vector3[3];
+        for (int swing = 0; swing < 3; swing++)
+        {
+            player.DebugSwingStep(swing);
+            yield return Wait(0.22f);
+            int index = swing;
+            lateCheck = () =>
+            {
+                swingHands[index] = player.transform.InverseTransformPoint(swordHand.position);
+                CaptureFrom("11_combo_" + index, player.transform.position + player.transform.forward * 2.5f + Vector3.up * 1.4f,
+                    player.transform.position + Vector3.up * 1.2f);
+            };
+            yield return null;
+            yield return Wait(0.5f);
+        }
+        Check(Vector3.Distance(swingHands[0], swingHands[1]) > 0.04f, "backhand differs visibly from first cut");
+        Check(Vector3.Distance(swingHands[0], swingHands[2]) > 0.04f, "overhead finisher differs visibly from first cut");
         // The camera sphere must stay outside the wall throughout retraction.
         var cameraWall = GameObject.CreatePrimitive(PrimitiveType.Cube);
         cameraWall.name = "Camera regression wall";
@@ -262,6 +288,30 @@ public class SmokeTestDriver : MonoBehaviour
         pitchField.SetValue(inputCamera, savedPitch);
         player.DebugHoldDraw(0f);
         player.DebugAim(false);
+
+        lateCheck = () =>
+        {
+            var slungShield = player.transform.Find("Slung Shield");
+            Vector3 backNormal = player.Gear.ChestRotation * Vector3.back;
+            var shieldMesh = slungShield.GetComponent<MeshFilter>().sharedMesh;
+            float shieldGap = shieldMesh.vertices.Min(v => Vector3.Dot(slungShield.TransformPoint(v) - player.Gear.BackSurface, backNormal));
+            Check(shieldGap >= -0.01f && shieldGap < 0.035f, $"shield sits flush against chest mount ({shieldGap:F3} m)");
+            Check(Vector3.Dot(backNormal, player.transform.forward) < -0.3f, "shield mount faces behind the knight");
+            CaptureFrom("14h_shield_stowed", player.Gear.BackSurface + backNormal * 1.7f + Vector3.up * 0.25f, player.Gear.BackSurface);
+        };
+        yield return null;
+        player.Equip(Weapon.Sword);
+        yield return Wait(0.7f);
+        lateCheck = () =>
+        {
+            var stowedBow = player.transform.Find("Bow (equipment)");
+            Vector3 backNormal = player.Gear.ChestRotation * Vector3.back;
+            var bowMesh = stowedBow.GetComponent<MeshFilter>().sharedMesh;
+            float bowGap = bowMesh.vertices.Min(v => Vector3.Dot(stowedBow.TransformPoint(v) - player.Gear.BackSurface, backNormal));
+            Check(bowGap >= -0.01f && bowGap < 0.035f, $"bow grip sits flush against chest mount ({bowGap:F3} m)");
+            CaptureFrom("14i_bow_stowed", player.Gear.BackSurface + backNormal * 1.7f + Vector3.up * 0.25f, player.Gear.BackSurface);
+        };
+        yield return null;
 
         // rolling terrain inside the walls, and every house seated on it
         var terrain = Terrain.activeTerrain;

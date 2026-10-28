@@ -49,6 +49,7 @@ public class EnemyController : MonoBehaviour
 
     float baseSpeed, damage, attackTimer, stateTimer, repathTimer, groanTimer, flashTimer;
     float circleAngle, circleRadius;
+    int groanIndex;
     bool hasToken, initialised, enraged, hitDealt;
     Vector3 knockVelocity, lastPosition, detourTarget;
     float stuckTimer, detourTimer, unreachableTimer;
@@ -145,13 +146,14 @@ public class EnemyController : MonoBehaviour
         circleAngle = UnityEngine.Random.Range(0f, 360f);
         circleRadius = UnityEngine.Random.Range(3.6f, 5.2f);
         groanTimer = UnityEngine.Random.Range(1f, 6f);
+        groanIndex = UnityEngine.Random.Range(0, 3);
         lastPosition = transform.position;
 
         if (emerge) StartEmerging();
         else SetState(type == ZombieType.Spitter ? State.Kite : State.Hunt);
 
         if (type == ZombieType.Brute || type == ZombieType.Warlord)
-            AudioManager.PlayAt("brute_roar", transform.position, 1f, 0.05f);
+            AudioManager.PlayZombieVoice("brute_roar", transform.position, type);
     }
 
     // ------------------------------------------------------------ main loop
@@ -172,7 +174,7 @@ public class EnemyController : MonoBehaviour
         groanTimer -= Time.deltaTime;
         if (groanTimer <= 0f)
         {
-            AudioManager.PlayAt("zombie_groan" + UnityEngine.Random.Range(0, 3), transform.position, 0.55f, 0.15f);
+            AudioManager.PlayZombieVoice("zombie_groan" + (groanIndex++ % 3), transform.position, type);
             groanTimer = UnityEngine.Random.Range(5f, 11f);
         }
 
@@ -264,7 +266,8 @@ public class EnemyController : MonoBehaviour
     {
         SetState(State.Attack);
         if (pAttack) animator.SetTrigger(hAttack);
-        AudioManager.PlayAt(type == ZombieType.Spitter ? "spit" : "zombie_attack", transform.position, 0.8f);
+        if (type == ZombieType.Spitter) AudioManager.PlayAt("spit", transform.position, 0.8f);
+        else AudioManager.PlayZombieVoice("zombie_attack", transform.position, type);
     }
 
     void UpdateAttack()
@@ -546,7 +549,7 @@ public class EnemyController : MonoBehaviour
         }
         if (myCollider != null) myCollider.enabled = false;
         if (navAgent != null) navAgent.enabled = false;
-        AudioManager.PlayAt("zombie_die", transform.position, 0.8f, 0.15f);
+        AudioManager.PlayZombieVoice("zombie_die", transform.position, type);
 
         if (GameManager.instance != null) GameManager.instance.AddKill(this);
         DropLoot();
@@ -611,7 +614,7 @@ public class EnemyController : MonoBehaviour
         enraged = true;
         baseSpeed *= 1.45f;
         timeBetweenAttacks *= 0.65f;
-        AudioManager.PlayAt("brute_roar", transform.position, 1f, 0f);
+        AudioManager.PlayZombieVoice("brute_roar", transform.position, type);
         FX.Shake(0.6f);
         GameHUD.Announce("The Warlord is enraged - the dead answer its call!", UIKit.Blood);
         Summon(3);
@@ -640,7 +643,7 @@ public class EnemyController : MonoBehaviour
         SetState(State.Charge);
         chargeHit = false;
         chargeDir = Flat(player.position - transform.position).normalized;
-        AudioManager.PlayAt("brute_roar", transform.position, 0.9f, 0.05f);
+        AudioManager.PlayZombieVoice("brute_roar", transform.position, type);
         GameHUD.Toast(Stats.name + " charges!", new Color(1f, 0.5f, 0.35f), "skull", 1.4f, 28);
     }
 

@@ -95,6 +95,7 @@ public class PlayerHealth : MonoBehaviour
 
         var enemy = attacker != null ? attacker.GetComponent<EnemyController>() : null;
         bool melee = enemy != null && !unblockable && Vector3.Distance(attacker.position, transform.position) < 4f;
+        bool blocked = false;
 
         if (isParrying && melee)
         {
@@ -122,6 +123,7 @@ public class PlayerHealth : MonoBehaviour
                     return;
                 }
                 amount *= 0.15f;
+                blocked = true;
                 knockback *= 0.3f;
                 if (controller != null && !Boons.FreeBlocking) controller.DrainStamina(12f);
             }
@@ -137,8 +139,8 @@ public class PlayerHealth : MonoBehaviour
         }
         if (hurtSoundCooldown <= 0f)
         {
-            AudioManager.PlayAt("player_hurt", transform.position, 0.9f);
-            hurtSoundCooldown = 0.25f;
+            AudioManager.PlayPlayerDamage(transform.position, amount, Fraction, blocked);
+            hurtSoundCooldown = 0.35f;
         }
         FX.Blood(transform.position + Vector3.up * 1.2f, attacker != null ? transform.position - attacker.position : Vector3.up, 1f, false);
         FX.Shake(Mathf.Clamp(amount / 30f, 0.15f, 0.8f));

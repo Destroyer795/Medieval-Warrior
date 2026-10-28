@@ -17,6 +17,24 @@ public class KnightGear : MonoBehaviour
     Transform swordProp, shieldProp, pelvis, spine;
     float swordLength, shieldHeight;
     bool stowed;
+    Transform leftShoulder, rightShoulder, neck;
+    float backDepth = 0.12f, shieldThickness;
+    public Quaternion ChestRotation
+    {
+        get
+        {
+            if (leftShoulder == null || rightShoulder == null || neck == null || spine == null) return transform.rotation;
+            Vector3 up = (neck.position - spine.position).normalized;
+            if (Vector3.Dot(up, transform.up) < 0.5f) up = transform.up;
+            Vector3 right = (rightShoulder.position - leftShoulder.position).normalized;
+            Vector3 forward = Vector3.Cross(right, up).normalized;
+            if (forward.sqrMagnitude < 0.01f || up.sqrMagnitude < 0.01f) return transform.rotation;
+            if (Vector3.Dot(forward, transform.forward) < 0f) forward = -forward;
+            return Quaternion.RotateTowards(transform.rotation, Quaternion.LookRotation(forward, up), 60f);
+        }
+    }
+    public Vector3 BackSurface => (spine != null ? spine.position : transform.position + Vector3.up * 1.2f)
+        + ChestRotation * new Vector3(0f, 0.04f, -backDepth);
 
     class Island { public List<int> tris = new List<int>(); public HashSet<int> verts = new HashSet<int>(); public int bone; }
 
@@ -25,6 +43,9 @@ public class KnightGear : MonoBehaviour
         smr = GetComponentInChildren<SkinnedMeshRenderer>();
         pelvis = FindBone(transform, "Bip001 Pelvis");
         spine = FindBone(transform, "Bip001 Spine1") ?? FindBone(transform, "Bip001 Spine");
+        leftShoulder = FindBone(transform, "Bip001 L UpperArm");
+        rightShoulder = FindBone(transform, "Bip001 R UpperArm");
+        neck = FindBone(transform, "Bip001 Neck");
         if (smr == null || smr.sharedMesh == null) { Report = "no skinned mesh"; return; }
         try { Analyse(); }
         catch (System.Exception e) { Report = "analysis failed: " + e.Message; Ready = false; }
@@ -118,6 +139,16 @@ public class KnightGear : MonoBehaviour
         withoutGear = Instantiate(original);
         withoutGear.name = original.name + " (no gear)";
         var drop = new HashSet<int>(sword.tris.Concat(shield.tris));
+        var gearVertices = new HashSet<int>(sword.verts.Concat(shield.verts));
+        float rear = -0.06f;
+        for (int i = 0; i < verts.Length; i++)
+        {
+            if (gearVertices.Contains(i)) continue;
+            Vector3 d = M.MultiplyPoint3x4(verts[i]) - (spine != null ? spine.position : transform.position + Vector3.up * 1.2f);
+            if (Mathf.Abs(Vector3.Dot(d, transform.up)) < 0.18f && Mathf.Abs(Vector3.Dot(d, transform.right)) < 0.24f)
+                rear = Mathf.Min(rear, Vector3.Dot(d, transform.forward));
+        }
+        backDepth = Mathf.Clamp(-rear, 0.06f, 0.22f);
         for (int s = 0; s < original.subMeshCount; s++)
         {
             var keep = new List<int>();
@@ -132,6 +163,8 @@ public class KnightGear : MonoBehaviour
 
         swordProp = BuildProp("Sheathed Sword", sword, allTris, verts, binds, M, true, out swordLength);
         shieldProp = BuildProp("Slung Shield", shield, allTris, verts, binds, M, false, out shieldHeight);
+        // The PCA origin is the centroid, not necessarily the bounds centre.
+        shieldThickness = Mathf.Max(0f, -shieldProp.GetComponent<MeshFilter>().sharedMesh.bounds.min.z);
         swordProp.gameObject.SetActive(false);
         shieldProp.gameObject.SetActive(false);
         Ready = true;
@@ -238,8 +271,9 @@ public class KnightGear : MonoBehaviour
         Vector3 yAxis = Vector3.Cross(flat, blade).normalized;
         swordProp.SetPositionAndRotation(hip + blade * swordLength * 0.32f, Quaternion.LookRotation(flat, yAxis));
         // shield: face outwards on the back, long side up
-        Vector3 back = (spine != null ? spine.position : transform.position + up * 1.2f) - fwd * 0.28f;
-        Vector3 sz = -fwd, sx = up;
+        Quaternion chest = ChestRotation;
+        Vector3 sz = chest * Vector3.back, sx = chest * Vector3.up;
+        Vector3 back = BackSurface + sz * (shieldThickness + 0.012f);
         Vector3 sy = Vector3.Cross(sz, sx).normalized;
         shieldProp.SetPositionAndRotation(back, Quaternion.LookRotation(sz, sy));
     }

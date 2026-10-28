@@ -9,6 +9,7 @@ public class AudioManager : MonoBehaviour
     readonly List<AudioSource> voices = new List<AudioSource>();
     AudioSource music, battle;
     float musicScale = 1f, battleTarget, battleLevel;
+    static float nextAmbientVoice;
 
     static AudioManager Instance
     {
@@ -34,10 +35,15 @@ public class AudioManager : MonoBehaviour
         return c;
     }
 
-    AudioSource FreeVoice()
+    AudioSource FreeVoice(int priority = 128)
     {
         foreach (var v in voices) if (!v.isPlaying) return v;
-        if (voices.Count >= 24) return voices[Random.Range(0, voices.Count)];
+        if (voices.Count >= 24)
+        {
+            AudioSource leastImportant = voices[0];
+            foreach (var v in voices) if (v.priority > leastImportant.priority) leastImportant = v;
+            return leastImportant.priority >= priority ? leastImportant : null;
+        }
         var go = new GameObject("Voice");
         go.transform.SetParent(transform);
         var s = go.AddComponent<AudioSource>();
@@ -55,7 +61,10 @@ public class AudioManager : MonoBehaviour
     {
         var clip = Instance.Clip(name);
         if (clip == null) return;
-        var v = Instance.FreeVoice();
+        var v = Instance.FreeVoice(64);
+        if (v == null) return;
+        if (v.TryGetComponent<AudioLowPassFilter>(out var filter)) filter.enabled = false;
+        v.priority = 64;
         v.transform.position = Vector3.zero;
         v.spatialBlend = 0f;
         v.pitch = pitch;
@@ -65,17 +74,48 @@ public class AudioManager : MonoBehaviour
     }
 
     /// <summary>Plays a positional sound with a little pitch variation so repeats don't sound robotic.</summary>
-    public static void PlayAt(string name, Vector3 position, float volume = 1f, float pitchJitter = 0.08f)
+    public static void PlayAt(string name, Vector3 position, float volume = 1f, float pitchJitter = 0.08f,
+        float basePitch = 1f, float lowPass = 22000f, int priority = 128, float spatialBlend = 0.85f)
     {
         var clip = Instance.Clip(name);
         if (clip == null) return;
-        var v = Instance.FreeVoice();
+        var v = Instance.FreeVoice(priority);
+        if (v == null) return;
+        var filter = v.GetComponent<AudioLowPassFilter>();
+        if (lowPass < 22000f && filter == null) filter = v.gameObject.AddComponent<AudioLowPassFilter>();
+        if (filter != null) { filter.enabled = lowPass < 22000f; filter.cutoffFrequency = lowPass; }
+        v.priority = priority;
         v.transform.position = position;
-        v.spatialBlend = 0.85f;
-        v.pitch = 1f + Random.Range(-pitchJitter, pitchJitter);
+        v.spatialBlend = spatialBlend;
+        v.pitch = Mathf.Clamp(basePitch + Random.Range(-pitchJitter, pitchJitter), 0.4f, 1.6f);
         v.volume = volume * GameSettings.SfxVolume;
         v.clip = clip;
         v.Play();
+    }
+
+    public static void PlayPlayerDamage(Vector3 position, float damage, float healthFraction, bool blocked)
+    {
+        float force = Mathf.InverseLerp(3f, 30f, damage);
+        PlayAt("shield_block", position, blocked ? 0.35f : Mathf.Lerp(0.12f, 0.28f, force), 0.06f,
+            0.85f, 6500f, 40, 0.2f);
+        if (!blocked)
+            PlayAt("player_hurt", position, Mathf.Lerp(0.65f, 1f, force), 0.07f,
+                healthFraction < 0.25f ? 0.84f : 0.97f, 10000f, 24, 0.1f);
+    }
+
+    public static void PlayZombieVoice(string clip, Vector3 position, ZombieType type)
+    {
+        float distance = Camera.main != null ? Vector3.Distance(Camera.main.transform.position, position) : 0f;
+        if (distance > 45f) return;
+        bool ambient = clip.StartsWith("zombie_groan", System.StringComparison.Ordinal);
+        // Stagger the horde instead of letting dozens of identical groans mask attacks.
+        if (ambient && Time.time < nextAmbientVoice) return;
+        if (ambient) nextAmbientVoice = Time.time + 0.3f;
+        float pitch = type == ZombieType.Warlord ? 0.62f : type == ZombieType.Brute ? 0.7f
+            : type == ZombieType.Bloater ? 0.76f : type == ZombieType.Runner ? 1.04f : 0.86f;
+        float volume = ambient ? 0.5f : clip == "brute_roar" ? 0.95f : 0.75f;
+        float filter = Mathf.Lerp(9000f, 2200f, Mathf.InverseLerp(5f, 40f, distance));
+        PlayAt(clip, position + Vector3.up * 1.2f, volume, 0.045f, pitch, filter, ambient ? 180 : 80, 1f);
     }
 
     public static void PlayMusic(string name, float volume = 1f)

@@ -5,7 +5,68 @@ using UnityEngine;
 public static class FX
 {
     static Material particleMat;
+    static Material flameMat;
     static MonoBehaviour runner;
+
+    public static GameObject AttachFlame(Transform parent, Vector3 localPosition, float size, bool addLight = false)
+    {
+        var root = new GameObject("Burning Flames");
+        root.transform.SetParent(parent, false);
+        root.transform.localPosition = localPosition;
+        var ps = root.AddComponent<ParticleSystem>();
+        ps.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+        var main = ps.main;
+        main.loop = true; main.playOnAwake = false;
+        main.simulationSpace = ParticleSystemSimulationSpace.World;
+        main.scalingMode = ParticleSystemScalingMode.Shape;
+        main.maxParticles = 100;
+        main.startLifetime = new ParticleSystem.MinMaxCurve(0.3f, 0.7f);
+        main.startSpeed = new ParticleSystem.MinMaxCurve(0.1f * size, 0.4f * size);
+        main.startSize = new ParticleSystem.MinMaxCurve(0.18f * size, 0.32f * size);
+        main.startColor = new Color(1f, 0.65f, 0.1f, 0.9f);
+        var emission = ps.emission; emission.rateOverTime = 45f;
+        var shape = ps.shape; shape.shapeType = ParticleSystemShapeType.Sphere; shape.radius = 0.20f * size;
+        shape.radiusThickness = 0f;
+        var velocity = ps.velocityOverLifetime;
+        velocity.enabled = true; velocity.space = ParticleSystemSimulationSpace.World;
+        velocity.x = new ParticleSystem.MinMaxCurve(0f, 0f);
+        velocity.y = new ParticleSystem.MinMaxCurve(0.6f * size, 1.2f * size);
+        velocity.z = new ParticleSystem.MinMaxCurve(0f, 0f);
+        Gradient(ps, new Color(1f, 0.8f, 0.15f, 0.95f), new Color(0.8f, 0.08f, 0.01f, 0f));
+        var growth = ps.sizeOverLifetime; growth.enabled = true;
+        growth.size = new ParticleSystem.MinMaxCurve(1f, AnimationCurve.EaseInOut(0f, 1f, 1f, 0f));
+        var renderer = ps.GetComponent<ParticleSystemRenderer>();
+        renderer.renderMode = ParticleSystemRenderMode.Stretch;
+        renderer.lengthScale = 1.5f;
+        renderer.velocityScale = 0.15f;
+        if (flameMat == null)
+        {
+            var shader = Shader.Find("Legacy Shaders/Particles/Additive") ?? Shader.Find("Particles/Additive") ?? Shader.Find("Sprites/Default");
+            flameMat = new Material(shader) { name = "Runtime flame glow", mainTexture = Resources.Load<Texture2D>("UI/glow") };
+            flameMat.SetColor("_TintColor", Color.white);
+        }
+        renderer.sharedMaterial = flameMat;
+        renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        if (addLight)
+        {
+            var light = root.AddComponent<Light>();
+            light.color = new Color(1f, 0.35f, 0.05f); light.range = 1.4f * size;
+            light.intensity = 0.7f; light.shadows = LightShadows.None;
+            light.renderMode = LightRenderMode.ForceVertex;
+        }
+        ps.Play();
+        return root;
+    }
+
+    public static void Extinguish(GameObject flame)
+    {
+        if (flame == null) return;
+        flame.transform.SetParent(null, true);
+        foreach (var ps in flame.GetComponentsInChildren<ParticleSystem>())
+            ps.Stop(true, ParticleSystemStopBehavior.StopEmitting);
+        if (flame.TryGetComponent<Light>(out var light)) light.enabled = false;
+        Object.Destroy(flame, 0.6f);
+    }
 
     static Material ParticleMat
     {

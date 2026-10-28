@@ -11,6 +11,8 @@ public class Arrow : MonoBehaviour
     Vector3 fallVelocity, spin;
     int pierce;
     float age;
+    GameObject flame;
+    public bool IsFlaming => fire && flame != null;
     readonly System.Collections.Generic.HashSet<EnemyController> pierced = new System.Collections.Generic.HashSet<EnemyController>();
 
     const float Length = 0.9f;
@@ -27,6 +29,7 @@ public class Arrow : MonoBehaviour
         a.owner = owner;
         a.pierce = pierce;
         a.fire = fire;
+        if (fire) a.flame = FX.AttachFlame(go.transform, Vector3.forward * Length, 0.65f, true);
 
         var trail = go.AddComponent<TrailRenderer>();
         trail.sharedMaterial = Resources.Load<Material>("FX/Particle");
@@ -49,6 +52,7 @@ public class Arrow : MonoBehaviour
     void Update()
     {
         age += Time.deltaTime;
+        if (fire && (age > 6f || stuckInEnemy && (stuckIn == null || !stuckIn.IsBurning))) Extinguish();
         if (falling) { UpdateFall(); return; }
         if (stuck)
         {
@@ -126,6 +130,7 @@ public class Arrow : MonoBehaviour
 
     void BeginFall()
     {
+        Extinguish();
         stuck = false;
         falling = true;
         stuckInEnemy = false;
@@ -156,6 +161,7 @@ public class Arrow : MonoBehaviour
 
     void BecomePickup()
     {
+        Extinguish();
         var trail = GetComponent<TrailRenderer>();
         if (trail != null) Destroy(trail);
         var p = gameObject.AddComponent<Pickup>();
@@ -166,12 +172,30 @@ public class Arrow : MonoBehaviour
         Destroy(this);
     }
 
+    void Extinguish()
+    {
+        fire = false;
+        FX.Extinguish(flame);
+        flame = null;
+    }
+
     void HitEnemy(EnemyController enemy, Vector3 point)
     {
         bool headshot = point.y > enemy.transform.position.y + 1.45f * enemy.transform.localScale.y;
         float dmg = damage * (headshot ? 2f : 1f);
         enemy.TakeDamage(dmg, velocity.normalized, knockback);
-        if (fire && !enemy.IsDead) enemy.Ignite(4f, 0.6f);
+        if (fire)
+        {
+            FX.Embers(point, 12);
+            if (!enemy.IsDead) enemy.Ignite(4f, 1f);
+            else
+            {
+                // Fully drawn arrows kill ordinary walkers outright. They still
+                // need visible ignition feedback rather than a silent non-burn.
+                var impactFlames = FX.AttachFlame(enemy.transform, Vector3.up * 0.7f, 1.5f);
+                Destroy(impactFlames, 1.2f);
+            }
+        }
         AudioManager.PlayAt("arrow_flesh", point, 0.9f);
         if (GameManager.instance != null) GameManager.instance.RegisterArrowHit(enemy, headshot);
         GameHUD.HitMarker(headshot);

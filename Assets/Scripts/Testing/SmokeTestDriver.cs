@@ -107,6 +107,61 @@ public class SmokeTestDriver : MonoBehaviour
         foreach (var z in EnemyController.All.ToArray()) Destroy(z.gameObject);
         yield return null;
         health.InvulnerableUntil = Time.time + 25f;
+        // Exercise the real Update/FixedUpdate path, including the interpolated Rigidbody.
+        var playerBody = player.GetComponent<Rigidbody>();
+        var inputCamera = Camera.main.GetComponent<CameraFollow>();
+        Vector3 inputForward = Vector3.ProjectOnPlane(inputCamera.LookDirection, Vector3.up).normalized;
+        Vector3 inputRight = Vector3.Cross(Vector3.up, inputForward);
+        Vector3 movementStart = player.transform.position;
+        Quaternion movementRotation = player.transform.rotation;
+        Check(!player.GetComponent<Animator>().applyRootMotion, "player root motion disabled");
+        foreach (var moveCase in new[] { Vector2.left, Vector2.right, Vector2.down })
+        {
+            playerBody.position = movementStart;
+            playerBody.rotation = Quaternion.LookRotation(inputForward);
+            playerBody.linearVelocity = Vector3.zero;
+            player.DebugMove(moveCase);
+            yield return Wait(0.45f);
+            Vector3 expected = inputRight * moveCase.x + inputForward * moveCase.y;
+            Vector3 travelled = Vector3.ProjectOnPlane(playerBody.position - movementStart, Vector3.up);
+            string key = moveCase == Vector2.left ? "A" : moveCase == Vector2.right ? "D" : "S";
+            Check(Vector3.Angle(playerBody.rotation * Vector3.forward, expected) < 3f, key + " faces the requested cardinal direction");
+            Check(Vector3.Dot(travelled, expected) > 0.25f, key + " moves in the requested direction");
+            Check(Mathf.Abs(Vector3.Dot(travelled, Vector3.Cross(Vector3.up, expected))) < 0.12f, key + " does not walk diagonally while pivoting");
+            player.DebugMove(Vector2.zero);
+            yield return Wait(0.1f);
+        }
+        player.DebugMove(null);
+        playerBody.position = movementStart;
+        playerBody.rotation = movementRotation;
+        playerBody.linearVelocity = Vector3.zero;
+        // Reproduce obstruction handling in both free orbit and shoulder aim.
+        // The camera sphere must stay outside the wall throughout retraction.
+        var cameraWall = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        cameraWall.name = "Camera regression wall";
+        cameraWall.transform.SetPositionAndRotation(movementStart + Vector3.up * 1.5f - inputForward * 1.5f,
+            Quaternion.LookRotation(inputForward));
+        cameraWall.transform.localScale = new Vector3(4f, 4f, 0.25f);
+        var cameraWallCollider = cameraWall.GetComponent<Collider>();
+        foreach (bool aimCase in new[] { false, true })
+        {
+            player.Equip(aimCase ? Weapon.Bow : Weapon.Sword);
+            player.DebugAim(aimCase);
+            float minimumClearance = float.MaxValue;
+            for (int frame = 0; frame < 25; frame++)
+            {
+                // WaitForEndOfFrame is not dispatched by the Editor in batch mode.
+                yield return null;
+                minimumClearance = Mathf.Min(minimumClearance,
+                    Vector3.Distance(Camera.main.transform.position, cameraWallCollider.ClosestPoint(Camera.main.transform.position)));
+            }
+            Check(minimumClearance >= inputCamera.collisionRadius - 0.03f,
+                (aimCase ? "aim" : "free orbit") + " camera stays outside obstruction");
+        }
+        Destroy(cameraWall);
+        player.DebugAim(false);
+        player.Equip(Weapon.Sword);
+        yield return Wait(0.5f);
         var spawner = ZombieSpawner.Instance;
         var cam = Camera.main;
         Vector3 fwd = cam.transform.forward; fwd.y = 0; fwd.Normalize();
@@ -182,6 +237,29 @@ public class SmokeTestDriver : MonoBehaviour
         Check(fullGap > braceGap + 0.06f, $"draw hand pulls the string back ({braceGap:F2} m -> {fullGap:F2} m between hands)");
         Check(player.Gear != null && player.Gear.Ready, "sword and shield stowed for the bow (" + (player.Gear != null ? player.Gear.Report : "no gear") + ")");
         Check(armAngle < 30f, $"bow arm points along the aim ({armAngle:F0} deg off)");
+        var yawField = typeof(CameraFollow).GetField("currentYaw", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+        var pitchField = typeof(CameraFollow).GetField("currentPitch", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+        float savedYaw = (float)yawField.GetValue(inputCamera), savedPitch = (float)pitchField.GetValue(inputCamera);
+        foreach (float yawOffset in new[] { -90f, 90f })
+        {
+            yawField.SetValue(inputCamera, savedYaw + yawOffset);
+            pitchField.SetValue(inputCamera, 0f);
+            yield return Wait(0.7f);
+            Vector3 look = Vector3.ProjectOnPlane(inputCamera.LookDirection, Vector3.up).normalized;
+            Check(Vector3.Angle(playerBody.rotation * Vector3.forward, look) < 3f, $"bow body follows yaw {yawOffset}");
+            Check(Vector3.Angle(lHand.position - lUpper.position, look) < 30f, $"bow arm follows yaw {yawOffset}");
+            Capture(yawOffset < 0 ? "14f_bow_left_yaw" : "14g_bow_right_yaw");
+        }
+        foreach (float extremePitch in new[] { -70f, 70f })
+        {
+            pitchField.SetValue(inputCamera, extremePitch);
+            yield return Wait(0.7f);
+            var heldBow = player.transform.Find("Bow (equipment)");
+            float bowPitch = Mathf.Asin(Mathf.Clamp(heldBow.forward.y, -1f, 1f)) * Mathf.Rad2Deg;
+            Check(Mathf.Abs(bowPitch) <= 45.1f, $"bow pitch stays clamped at camera pitch {extremePitch}");
+        }
+        yawField.SetValue(inputCamera, savedYaw);
+        pitchField.SetValue(inputCamera, savedPitch);
         player.DebugHoldDraw(0f);
         player.DebugAim(false);
 

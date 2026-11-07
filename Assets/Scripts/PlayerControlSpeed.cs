@@ -68,23 +68,43 @@ public class PlayerControlSpeed : MonoBehaviour
     float lastAttack = -9f, lastStaminaUse = -9f, stunnedUntil, dodgeUntil, bashReady;
     Vector3 dodgeDir;
     bool exhausted;
+    bool locomotionRunning;
+    float locomotionRate=1;
+    public float LocomotionPlaybackRate => locomotionRate;
     float blockWeight, aimWeight, stepTimer, leanWeight;
     int stepIndex;
-    Transform leftHand, swordHand, spine;
+    Transform leftHand, shieldForearm, swordHand, spine;
     Transform swordUpperArm;
     float swordPoseStarted = -99f;
+    float swordBufferedUntil=-99f;
+    readonly List<(float time,int step)> pendingSwishes=new List<(float,int)>();
+    public int SwordSequence { get; private set; }
+    public float SwordAge => Time.time-swordPoseStarted;
+    float swordLayerWeight, swordEntryWeight, shieldGuardWeight;
+    public float SwordLayerWeight => swordLayerWeight;
+    public float SwordCrossfade => swordGraph.IsValid()&&authoredStrikes ? strikes.GetInputWeight(SwordVariant) : 0;
     PlayableGraph swordGraph;
     AnimatorControllerPlayable locomotionController;
     AnimationLayerMixerPlayable swordMixer;
     AnimationClipPlayable swordClip;
+    AnimationClipPlayable shieldGuard;
+    AnimationMixerPlayable strikes;
+    AnimationClipPlayable[] strikeClips;
+    int previousStrike;
+    bool authoredStrikes;
     AvatarMask swordMask;
+    AvatarMask shieldGuardMask;
     int attackSet = -1;
     public int SwordVariant { get; private set; }
     public bool HasUpperBodySwordLayer => swordGraph.IsValid();
+    public int SwordAnimationCount => authoredStrikes ? strikeClips.Length : 1;
+    public string SwordMoveName => SwordMoves.All[SwordVariant].name;
     ArcherRig rig;
     KnightGear gear;
+    ShieldDefensePose shieldDefense;
+    public ShieldDefensePose DefensePose => shieldDefense;
     public KnightGear Gear => gear;
-    readonly List<(float time, int step)> pendingHits = new List<(float, int)>();
+    readonly List<(float time, int step, int variant)> pendingHits = new List<(float, int, int)>();
 
     void Start()
     {
@@ -114,6 +134,7 @@ public class PlayerControlSpeed : MonoBehaviour
         Arrows = startArrows;
         if (shieldArmBone == null) shieldArmBone = FindBone(transform, "Bip001 L UpperArm");
         leftHand = FindBone(transform, "Bip001 L Hand");
+        shieldForearm = FindBone(transform, "Bip001 L Forearm");
         swordHand = FindBone(transform, "Bip001 R Hand");
         swordUpperArm = FindBone(transform, "Bip001 R UpperArm");
         spine = FindBone(transform, "Bip001 Spine1") ?? FindBone(transform, "Bip001 Spine");
@@ -122,6 +143,7 @@ public class PlayerControlSpeed : MonoBehaviour
         rig = gameObject.AddComponent<ArcherRig>();
         rig.Init(this);
         gear = gameObject.AddComponent<KnightGear>();
+        if(MarchwardenVisual.Asset!=null)shieldDefense=new ShieldDefensePose(gameObject);
     }
 
     static Transform FindBone(Transform root, string name)
@@ -141,6 +163,7 @@ public class PlayerControlSpeed : MonoBehaviour
 
     void Update()
     {
+        shieldDefense?.Restore();
         if (Paused) return;
 
         // --- 1. WEAPON SWITCH
@@ -153,7 +176,7 @@ public class PlayerControlSpeed : MonoBehaviour
 
         // --- 2. BLOCK / AIM INPUT
         bool canAct = !Stunned && !Dodging;
-        isBlocking = canAct && CurrentWeapon == Weapon.Sword && GameInput.SecondaryHeld;
+        isBlocking = canAct && CurrentWeapon == Weapon.Sword && (GameInput.SecondaryHeld || debugBlock);
         IsAiming = canAct && CurrentWeapon == Weapon.Bow && (GameInput.SecondaryHeld || debugAim);
 
         // --- 3. MOVEMENT
@@ -164,6 +187,7 @@ public class PlayerControlSpeed : MonoBehaviour
 
         bool wantsSprint = (debugSprint || GameInput.SprintHeld) && movement.sqrMagnitude > 0.01f && !isBlocking && !IsAiming && !IsDrawing;
         bool isRunning = wantsSprint && !exhausted && Stamina > 0f;
+        locomotionRunning=isRunning;
 
         if (GameInput.DodgeDown && canAct) TryDodge(movement);
 
@@ -172,6 +196,7 @@ public class PlayerControlSpeed : MonoBehaviour
         hasFacing = false;
         if (Dodging)
         {
+            locomotionRunning=true;
             float k = (dodgeUntil - Time.time) / dodgeTime;
             desiredVelocity = dodgeDir * dodgeSpeed * Mathf.Lerp(0.35f, 1f, k);
             SetAnimationBool("isMoving", true);
@@ -194,7 +219,13 @@ public class PlayerControlSpeed : MonoBehaviour
             }
             desiredVelocity = movement * currentSpeed;
             SetAnimationBool("isMoving", true);
-            SetAnimationBool("isRunning", isRunning && !(IsAiming || IsDrawing));
+            // Normal travel is a jog at this game's 3.4 m/s. Use the charge
+            // gait above the walk cycle's natural range instead of racing its
+            // short combat steps and leaving the feet sliding over the ground.
+            var visualAsset=MarchwardenVisual.Asset;
+            locomotionRunning=!(IsAiming||IsDrawing||isBlocking)&&
+                (isRunning||(visualAsset!=null&&currentSpeed>visualAsset.nativeWalkSpeed*2));
+            SetAnimationBool("isRunning",locomotionRunning);
         }
         else
         {
@@ -249,12 +280,14 @@ public class PlayerControlSpeed : MonoBehaviour
             else UpdateBow();
         }
         else if (IsDrawing) CancelDraw();
-        ProcessPendingHits();
+        if (CurrentWeapon != Weapon.Sword || Stunned || Dodging || isBlocking)
+        {pendingHits.Clear();pendingSwishes.Clear();swordBufferedUntil=-99f;}
+        else ProcessPendingHits();
         UpdateSwordLayer();
 
         // Sync with Health Script
         if (myHealthScript != null) myHealthScript.isShieldBlocking = isBlocking;
-        SetAnimationBool("defend", isBlocking);
+        SetAnimationBool("defend", isBlocking && shieldDefense==null);
     }
 
     Vector3 CameraRelative(float x, float z)
@@ -335,7 +368,7 @@ public class PlayerControlSpeed : MonoBehaviour
         UseStamina(dodgeCost);
         dodgeDir = movement.sqrMagnitude > 0.01f ? movement.normalized : -transform.forward;
         dodgeUntil = Time.time + dodgeTime;
-        if (myHealthScript != null) myHealthScript.InvulnerableUntil = Time.time + dodgeTime * 0.9f;
+        if (myHealthScript != null) myHealthScript.InvulnerableUntil = Mathf.Max(myHealthScript.InvulnerableUntil,Time.time + dodgeTime * 0.9f);
         if (IsDrawing) CancelDraw();
         AudioManager.PlayAt("dodge", transform.position, 0.8f);
         FX.Dust(transform.position, 0.6f, 8);
@@ -345,21 +378,21 @@ public class PlayerControlSpeed : MonoBehaviour
 
     void UpdateSword()
     {
-        if (!GameInput.AttackDown || Time.time - lastAttack < attackCooldown) return;
-
         if (isBlocking)
         {
-            ShieldBash();
+            if(GameInput.AttackDown)ShieldBash();
             return;
         }
-
-        ComboStep = Time.time - lastAttack < comboWindow ? (ComboStep + 1) % 3 : 0;
+        if(GameInput.AttackDown)swordBufferedUntil=Time.time+SwordMoves.InputBuffer;
+        if(Time.time>swordBufferedUntil)return;
+        float chainGate=SwordMoves.All[SwordVariant].chain*Mathf.Clamp(attackCooldown/.42f,.5f,1.5f);
+        if(Time.time-lastAttack<chainGate)return;
+        swordBufferedUntil=-99f;
+        ComboStep = Time.time - lastAttack < Mathf.Min(comboWindow,.70f) ? (ComboStep + 1) % 3 : 0;
         lastAttack = Time.time;
         StartSwordPose();
         if (myHealthScript != null) myHealthScript.ActivateParry();
-        AudioManager.PlayAt("sword_swing", transform.position, 0.8f, 0.12f);
-        FX.Swipe(transform, ComboStep);
-        pendingHits.Add((Time.time + (ComboStep == 2 ? 0.25f : 0.2f), ComboStep));
+        pendingHits.Add((Time.time + SwordMoves.All[SwordVariant].contact, ComboStep, SwordVariant));
         if (rb != null) rb.AddForce(transform.forward * 2.5f, ForceMode.VelocityChange); // small lunge
     }
 
@@ -392,12 +425,45 @@ public class PlayerControlSpeed : MonoBehaviour
         swordClip.SetApplyFootIK(false);
         swordClip.SetApplyPlayableIK(false);
         swordClip.SetSpeed(clip.length / 0.55f);
-        swordMixer = AnimationLayerMixerPlayable.Create(swordGraph, 2);
+        authoredStrikes = SwordMoves.Clip(0) != null && SwordMoves.Clip(SwordMoves.Count-1) != null;
+        if (authoredStrikes)
+        {
+            strikes = AnimationMixerPlayable.Create(swordGraph, SwordMoves.Count);
+            strikeClips = new AnimationClipPlayable[SwordMoves.Count];
+            for (int i=0;i<strikeClips.Length;i++)
+            {
+                strikeClips[i] = AnimationClipPlayable.Create(swordGraph, SwordMoves.Clip(i));
+                strikeClips[i].SetApplyFootIK(false); strikeClips[i].SetApplyPlayableIK(false);
+                swordGraph.Connect(strikeClips[i],0,strikes,i); strikes.SetInputWeight(i,0f);
+            }
+        }
+        swordMixer = AnimationLayerMixerPlayable.Create(swordGraph, 3);
         swordGraph.Connect(locomotionController, 0, swordMixer, 0);
-        swordGraph.Connect(swordClip, 0, swordMixer, 1);
+        var guardClip=Resources.Load<AnimationClip>("Animations/Sword/Guard");
+        if(guardClip!=null)
+        {
+            shieldGuard=AnimationClipPlayable.Create(swordGraph,guardClip);
+            shieldGuard.SetApplyFootIK(false);shieldGuard.SetApplyPlayableIK(false);
+            shieldGuardMask=new AvatarMask {name="Sword and shield ready guard",transformCount=bones.Length};
+            var guardRoot=System.Array.Find(bones,b=>b.name=="Bip001 L UpperArm");
+            var swordGuardRoot=System.Array.Find(bones,b=>b.name=="Bip001 R UpperArm");
+            for(int i=0;i<bones.Length;i++)
+            {
+                shieldGuardMask.SetTransformPath(i,swordMask.GetTransformPath(i));
+                shieldGuardMask.SetTransformActive(i,(guardRoot!=null&&(bones[i]==guardRoot||bones[i].IsChildOf(guardRoot)))||
+                    (swordGuardRoot!=null&&(bones[i]==swordGuardRoot||bones[i].IsChildOf(swordGuardRoot))));
+            }
+            for(int part=0;part<(int)AvatarMaskBodyPart.LastBodyPart;part++)
+                shieldGuardMask.SetHumanoidBodyPartActive((AvatarMaskBodyPart)part,part==(int)AvatarMaskBodyPart.LeftArm||part==(int)AvatarMaskBodyPart.RightArm);
+            swordGraph.Connect(shieldGuard,0,swordMixer,1);
+            swordMixer.SetLayerMaskFromAvatarMask(1,shieldGuardMask);
+        }
+        if (authoredStrikes) swordGraph.Connect(strikes, 0, swordMixer, 2);
+        else swordGraph.Connect(swordClip, 0, swordMixer, 2);
         swordMixer.SetInputWeight(0, 1f);
         swordMixer.SetInputWeight(1, 0f);
-        swordMixer.SetLayerMaskFromAvatarMask(1, swordMask);
+        swordMixer.SetInputWeight(2, 0f);
+        swordMixer.SetLayerMaskFromAvatarMask(2, swordMask);
         var output = AnimationPlayableOutput.Create(swordGraph, "Knight pose", animator);
         output.SetSourcePlayable(swordMixer);
         swordGraph.Play();
@@ -412,22 +478,49 @@ public class PlayerControlSpeed : MonoBehaviour
     void UpdateSwordLayer()
     {
         if (!swordGraph.IsValid()) return;
+        var appearance=MarchwardenVisual.Asset;
+        if(appearance!=null&&locomotionController.IsValid())
+        {
+            float speed=rb!=null?Vector3.ProjectOnPlane(rb.linearVelocity,Vector3.up).magnitude:desiredVelocity.magnitude;
+            float native=(locomotionRunning?appearance.nativeRunSpeed:appearance.nativeWalkSpeed)*Mathf.Abs(transform.lossyScale.z);
+            float playback=desiredVelocity.sqrMagnitude>.01f?Mathf.Clamp(speed/Mathf.Max(.6f,native),.55f,2.7f):1;
+            locomotionRate=Mathf.Lerp(locomotionRate,playback,1-Mathf.Exp(-12*Time.deltaTime));
+            locomotionController.SetSpeed(locomotionRate);
+        }
         float elapsed = Time.time - swordPoseStarted;
-        float weight = elapsed >= 0f && elapsed < 0.55f && CurrentWeapon == Weapon.Sword && !isBlocking && !Stunned && !Dodging
-            ? Mathf.SmoothStep(0f, 1f, elapsed / 0.06f) * (1f - Mathf.SmoothStep(0f, 1f, (elapsed - 0.42f) / 0.13f)) : 0f;
-        swordMixer.SetInputWeight(1, weight);
+        float duration = authoredStrikes ? SwordMoves.All[SwordVariant].duration : .55f;
+        bool swordReady=CurrentWeapon==Weapon.Sword&&!isBlocking&&!Stunned&&!Dodging;
+        float target=elapsed>=0&&elapsed<duration&&swordReady ?
+            Mathf.Lerp(swordEntryWeight,1,Mathf.SmoothStep(0,1,elapsed/SwordMoves.FadeIn))*
+            (1-Mathf.SmoothStep(0,1,(elapsed-duration+SwordMoves.RecoveryFade)/SwordMoves.RecoveryFade)):0;
+        swordLayerWeight=Mathf.MoveTowards(swordLayerWeight,target,Time.deltaTime/.035f);
+        swordMixer.SetInputWeight(2,swordLayerWeight);
+        bool guardReady=CurrentWeapon==Weapon.Sword&&!Stunned&&!Dodging;
+        shieldGuardWeight=Mathf.MoveTowards(shieldGuardWeight,guardReady?1:0,Time.deltaTime/.10f);
+        if(shieldGuard.IsValid())swordMixer.SetInputWeight(1,shieldGuardWeight);
+        if (authoredStrikes)
+        {
+            float blend = Mathf.SmoothStep(0,1,elapsed/SwordMoves.Crossfade);
+            for(int i=0;i<strikeClips.Length;i++)
+                strikes.SetInputWeight(i, i==SwordVariant ? (previousStrike==SwordVariant ? 1 : blend) : i==previousStrike ? 1-blend : 0);
+        }
     }
 
     void StartSwordPose(int variant = -1)
     {
+        swordEntryWeight=swordLayerWeight;
         swordPoseStarted = Time.time;
         if (variant < 0 && ComboStep == 0) attackSet++;
-        SwordVariant = variant >= 0 ? variant % 6 : ComboStep + Mathf.Max(0, attackSet % 2) * 3;
+        previousStrike = SwordVariant;
+        SwordVariant = variant >= 0 ? variant % SwordMoves.Count : ComboStep + Mathf.Max(0, attackSet % 4) * 3;
+        SwordSequence++;
+        pendingSwishes.Add((Time.time+SwordMoves.All[SwordVariant].windup,ComboStep));
         if (swordGraph.IsValid())
         {
             locomotionController.ResetTrigger("isAttacking");
             swordClip.SetTime(0d);
             swordClip.SetDone(false);
+            if (authoredStrikes) { strikeClips[SwordVariant].SetTime(0); strikeClips[SwordVariant].SetDone(false); }
             UpdateSwordLayer();
         }
         else animator.ResetTrigger("isAttacking");
@@ -460,15 +553,21 @@ public class PlayerControlSpeed : MonoBehaviour
 
     void ProcessPendingHits()
     {
+        for(int i=pendingSwishes.Count-1;i>=0;i--)
+        {
+            if(Time.time<pendingSwishes[i].time)continue;
+            AudioManager.PlayAt("sword_swing",transform.position,.8f,.08f);
+            FX.Swipe(transform,pendingSwishes[i].step);pendingSwishes.RemoveAt(i);
+        }
         for (int i = pendingHits.Count - 1; i >= 0; i--)
         {
             if (Time.time < pendingHits[i].time) continue;
-            CheckForHits(pendingHits[i].step);
+            CheckForHits(pendingHits[i].step, pendingHits[i].variant);
             pendingHits.RemoveAt(i);
         }
     }
 
-    void CheckForHits(int step)
+    void CheckForHits(int step, int variant)
     {
         Vector3 hitPosition = transform.position + transform.forward + Vector3.up;
         Collider[] hitColliders = Physics.OverlapSphere(hitPosition, attackRange);
@@ -483,7 +582,7 @@ public class PlayerControlSpeed : MonoBehaviour
             EnemyController enemy = hit.GetComponentInParent<EnemyController>();
             if (enemy == null || enemy.IsDead || hitEnemies.Contains(enemy)) continue;
             Vector3 dir = (enemy.transform.position - transform.position).normalized;
-            if (Vector3.Dot(transform.forward, dir) > 0.3f)
+            if (Vector3.Dot(transform.forward, dir) > (SwordMoves.All[variant].thrust ? .65f : .3f))
             {
                 Vector3 swordOrigin = swordHand != null ? swordHand.position : hitPosition;
                 Vector3 contact = hit.ClosestPoint(swordOrigin);
@@ -612,13 +711,17 @@ public class PlayerControlSpeed : MonoBehaviour
 
     // ---- hooks for the automated smoke test (no input devices in batch mode)
     bool debugAim;
+    bool debugBlock;
+    public void DebugBlock(bool value)=>debugBlock=value;
     Vector2? debugMovement;
     bool debugSprint;
     public void DebugMove(Vector2? move, bool sprint = false) { debugMovement = move; debugSprint = sprint; }
     public void DebugAim(bool on) => debugAim = on;
     public void DebugSwing() => DebugSwingStep(2);
-    public void DebugSwingStep(int step) { ComboStep = Mathf.Clamp(step, 0, 2); StartSwordPose(); pendingHits.Add((Time.time + (ComboStep == 2 ? 0.25f : 0.2f), ComboStep)); }
+    public void DebugSwingStep(int step) { ComboStep = Mathf.Clamp(step, 0, 2); StartSwordPose(); pendingHits.Add((Time.time + SwordMoves.All[SwordVariant].contact, ComboStep, SwordVariant)); }
     public void DebugSwingVariant(int variant) { ComboStep = variant % 3; StartSwordPose(variant); }
+    public void DebugAttackPress()=>swordBufferedUntil=Time.time+SwordMoves.InputBuffer;
+    public void DebugDodge()=>TryDodge(transform.forward);
     public void DebugFireAt(Vector3 target, float draw)
     {
         if (Arrows <= 0) return;
@@ -653,7 +756,7 @@ public class PlayerControlSpeed : MonoBehaviour
 
     void LateUpdate()
     {
-        PoseSwordCombo();
+        if (!authoredStrikes) PoseSwordCombo();
         float k = 1f - Mathf.Exp(-14f * Time.deltaTime);
         blockWeight = Mathf.Lerp(blockWeight, isBlocking ? 1f : 0f, k);
         aimWeight = Mathf.Lerp(aimWeight, CurrentWeapon == Weapon.Bow && (IsAiming || IsDrawing) ? 1f : 0f, k);
@@ -666,13 +769,19 @@ public class PlayerControlSpeed : MonoBehaviour
             spine.rotation = Quaternion.AngleAxis(32f * leanWeight, axis) * spine.rotation;
         }
 
-        // smoothly raise the shield arm (the archer stance is posed by ArcherRig)
+        // Heater defense owns the braced core, planted feet and constrained arm.
+        // Only legacy demo characters retain the old shoulder-only offset.
         if (shieldArmBone != null && blockWeight > 0.001f)
-            shieldArmBone.localRotation *= Quaternion.Slerp(Quaternion.identity, Quaternion.Euler(blockRotation), blockWeight);
+        {
+            if (shieldDefense != null)
+                shieldDefense.Apply(blockWeight);
+            else shieldArmBone.localRotation *= Quaternion.Slerp(Quaternion.identity, Quaternion.Euler(blockRotation), blockWeight);
+        }
     }
 
     void OnDisable()
     {
+        shieldDefense?.Restore();
         if (animator != null) { SetAnimationBool("isMoving", false); SetAnimationBool("isRunning", false); }
         isBlocking = false;
         if (myHealthScript != null) myHealthScript.isShieldBlocking = false;
@@ -683,5 +792,6 @@ public class PlayerControlSpeed : MonoBehaviour
     {
         if (swordGraph.IsValid()) swordGraph.Destroy();
         if (swordMask != null) Destroy(swordMask);
+        if (shieldGuardMask != null) Destroy(shieldGuardMask);
     }
 }

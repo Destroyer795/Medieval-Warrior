@@ -13,6 +13,7 @@ public class KnightGear : MonoBehaviour
     public string Report { get; private set; } = "not analysed";
 
     SkinnedMeshRenderer smr;
+    MarchwardenVisual replacement;
     Mesh original, withoutGear;
     Transform swordProp, shieldProp, pelvis, spine;
     float swordLength, shieldHeight;
@@ -23,6 +24,8 @@ public class KnightGear : MonoBehaviour
     int shownArrows = -1, quiverCapacity;
     float hipHalfWidth = 0.2f;
     public int VisibleArrowCount => Mathf.Max(0, shownArrows);
+    public Transform StowedShield=>shieldProp;
+    public QuiverSuspension QuiverMotion { get; private set; }
     Transform leftShoulder, rightShoulder, neck;
     float backDepth = 0.12f, shieldThickness;
     public Quaternion ChestRotation
@@ -53,13 +56,54 @@ public class KnightGear : MonoBehaviour
         rightShoulder = FindBone(transform, "Bip001 R UpperArm");
         neck = FindBone(transform, "Bip001 Neck");
         owner = GetComponent<PlayerControlSpeed>();
-        quiver = ProceduralModels.Spawn("Right Hip Quiver", ProceduralModels.HipQuiverMesh(), ProceduralModels.HipQuiverMaterials()).transform;
+        quiver = ProceduralModels.Spawn("Right Hip Quiver", MarchwardenVisual.Asset != null ? MarchwardenVisual.Asset.quiver : ProceduralModels.HipQuiverMesh(), ProceduralModels.HipQuiverMaterials()).transform;
+        if (GetComponent<MarchwardenVisual>() != null) quiver.GetComponent<MeshRenderer>().sharedMaterials = smr.sharedMaterials;
         quiver.SetParent(transform, false);
+        if(GetComponent<MarchwardenVisual>()!=null)QuiverMotion=QuiverSuspension.Attach(gameObject,quiver,smr,MarchwardenVisual.Asset);
         UpdateQuiver();
         if (smr == null || smr.sharedMesh == null) { Report = "no skinned mesh"; return; }
-        try { Analyse(); }
+        replacement = GetComponent<MarchwardenVisual>();
+        try { if (replacement != null) SetupReplacement(); else Analyse(); }
         catch (System.Exception e) { Report = "analysis failed: " + e.Message; Ready = false; }
         Debug.Log("[KnightGear] " + Report);
+    }
+
+    void SetupReplacement()
+    {
+        var asset = MarchwardenVisual.Asset;
+        Transform Make(string label, Mesh mesh)
+        {
+            var go = new GameObject(label);
+            go.transform.SetParent(transform, false);
+            go.AddComponent<MeshFilter>().sharedMesh = mesh;
+            go.AddComponent<MeshRenderer>().sharedMaterials = smr.sharedMaterials;
+            go.SetActive(false);
+            return go.transform;
+        }
+        swordProp = Make("Sheathed Sword", asset.sword);
+        shieldProp = Make("Slung Shield", asset.shield);
+        float scale=Mathf.Abs(transform.lossyScale.x);
+        swordLength = asset.sword.bounds.size.x*scale;
+        shieldHeight = asset.shield.bounds.size.x*scale;
+        shieldThickness = Mathf.Max(0, -asset.shield.bounds.min.z)*scale;
+        var verts = asset.body.vertices;
+        var weights = asset.body.boneWeights;
+        int pelvisIndex = System.Array.IndexOf(smr.bones, pelvis);
+        float rear = -.06f;
+        for (int i = 0; i < verts.Length; i++)
+        {
+            Vector3 world = smr.transform.TransformPoint(verts[i]);
+            Vector3 h = world - pelvis.position;
+            if (weights[i].boneIndex0 == pelvisIndex && Mathf.Abs(Vector3.Dot(h, transform.up)) < .15f)
+                hipHalfWidth = Mathf.Max(hipHalfWidth, Vector3.Dot(h, transform.right));
+            Vector3 d = world - spine.position;
+            if (Mathf.Abs(Vector3.Dot(d, transform.up)) < .18f && Mathf.Abs(Vector3.Dot(d, transform.right)) < .24f)
+                rear = Mathf.Min(rear, Vector3.Dot(d, transform.forward));
+        }
+        backDepth = Mathf.Clamp(-rear, .06f, .22f);
+        hipHalfWidth = Mathf.Clamp(hipHalfWidth, .18f, .35f);
+        Ready = true;
+        Report = "original Marchwarden sword and shield, explicit equipment mounts";
     }
 
     static Transform FindBone(Transform root, string name)
@@ -199,6 +243,7 @@ public class KnightGear : MonoBehaviour
         Vector3 boneOrigin = M.MultiplyPoint3x4(binds[isl.bone].inverse.MultiplyPoint3x4(Vector3.zero));
         if (tipAwayFromBone && Vector3.Dot(centre - boneOrigin, x) < 0f) x = -x;
         if (!tipAwayFromBone && Vector3.Dot(centre - boneOrigin, z) < 0f) z = -z;
+        if (!tipAwayFromBone && Vector3.Dot(x, Vector3.up) < 0f) x = -x;
         y = Vector3.Cross(z, x).normalized;
         var toCanon = Matrix4x4.identity;
         toCanon.SetRow(0, new Vector4(x.x, x.y, x.z, -Vector3.Dot(x, centre)));
@@ -228,6 +273,7 @@ public class KnightGear : MonoBehaviour
 
         var go = new GameObject(name);
         go.transform.SetParent(transform, false);
+        go.transform.SetPositionAndRotation(centre, Quaternion.LookRotation(z, y));
         go.AddComponent<MeshFilter>().sharedMesh = mesh;
         go.AddComponent<MeshRenderer>().sharedMaterial = smr.sharedMaterial;
         return go.transform;
@@ -264,7 +310,8 @@ public class KnightGear : MonoBehaviour
     {
         if (!Ready || stow == stowed) return;
         stowed = stow;
-        smr.sharedMesh = stow ? withoutGear : original;
+        if (replacement != null) replacement.SetStowed(stow);
+        else smr.sharedMesh = stow ? withoutGear : original;
         swordProp.gameObject.SetActive(stow);
         shieldProp.gameObject.SetActive(stow);
     }
@@ -274,9 +321,12 @@ public class KnightGear : MonoBehaviour
         UpdateQuiver();
         if (!Ready || !stowed) return;
         // keep the props wearing the same (customised) material as the knight
-        var mat = smr.sharedMaterial;
-        var sr = swordProp.GetComponent<MeshRenderer>();
-        if (sr.sharedMaterial != mat) { sr.sharedMaterial = mat; shieldProp.GetComponent<MeshRenderer>().sharedMaterial = mat; }
+        if (replacement == null)
+        {
+            var mat = smr.sharedMaterial;
+            var sr = swordProp.GetComponent<MeshRenderer>();
+            if (sr.sharedMaterial != mat) { sr.sharedMaterial = mat; shieldProp.GetComponent<MeshRenderer>().sharedMaterial = mat; }
+        }
 
         Vector3 fwd = transform.forward, right = transform.right, up = Vector3.up;
         Vector3 hip = (pelvis != null ? pelvis.position : transform.position + up) - right * 0.24f + fwd * 0.05f;
@@ -313,10 +363,11 @@ public class KnightGear : MonoBehaviour
             for (int i = 0; i < storedArrows.Count; i++)
             {
                 float angle = i * 2.399963f;
-                float radius = Mathf.Sqrt((i + 0.5f) / capacity) * 0.095f;
-                storedArrows[i].transform.localPosition = new Vector3(Mathf.Cos(angle) * radius, 0.73f + (i % 4) * 0.012f, Mathf.Sin(angle) * radius);
+                float radius = Mathf.Sqrt((i + 0.5f) / capacity) * (QuiverMotion!=null ? .038f : .095f);
+                float height=QuiverMotion!=null?MarchwardenVisual.Asset.quiver.bounds.max.y+.235f:.73f;
+                storedArrows[i].transform.localPosition = new Vector3(Mathf.Cos(angle) * radius, height + (i % 4) * 0.008f, Mathf.Sin(angle) * radius);
             }
-            quiver.localScale = new Vector3(Mathf.Max(1f, Mathf.Sqrt(capacity / 45f)), 1f, Mathf.Max(1f, Mathf.Sqrt(capacity / 45f)));
+            quiver.localScale = QuiverMotion!=null?Vector3.one:new Vector3(Mathf.Max(1f, Mathf.Sqrt(capacity / 45f)), 1f, Mathf.Max(1f, Mathf.Sqrt(capacity / 45f)));
             quiverCapacity = capacity;
             shownArrows = -1;
         }
@@ -325,9 +376,12 @@ public class KnightGear : MonoBehaviour
             shownArrows = owner.Arrows;
             for (int i = 0; i < storedArrows.Count; i++) storedArrows[i].SetActive(i < shownArrows);
         }
+        if(QuiverMotion!=null)return;
         Vector3 hip = pelvis != null ? pelvis.position : transform.position + Vector3.up * 0.9f;
-        float sideOffset = hipHalfWidth + 0.135f * quiver.localScale.x + 0.015f;
-        quiver.SetPositionAndRotation(hip + transform.right * sideOffset - transform.up * 0.4f - transform.forward * 0.04f,
+        float quiverRadius = quiver.GetComponent<MeshFilter>().sharedMesh.bounds.extents.x;
+        float stature=Mathf.Abs(transform.lossyScale.x);
+        float sideOffset = hipHalfWidth + quiverRadius * quiver.lossyScale.x + 0.015f*stature;
+        quiver.SetPositionAndRotation(hip + transform.right * sideOffset - transform.up * (.4f*stature) - transform.forward * (.17f*stature),
             transform.rotation * Quaternion.Euler(0f, 0f, -10f));
     }
 }

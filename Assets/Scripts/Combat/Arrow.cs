@@ -44,6 +44,8 @@ public class Arrow : MonoBehaviour
 
     public static GameObject Model()
     {
+        if (MarchwardenVisual.Asset != null)
+            return ProceduralModels.Spawn("Marchwarden Arrow", MarchwardenVisual.Asset.arrow, MarchwardenVisual.Asset.materials);
         if (template == null) template = Resources.Load<GameObject>("Prefabs/Arrow");
         if (template != null) return Instantiate(template);
         return ProceduralModels.Spawn("Arrow", ProceduralModels.ArrowMesh(), ProceduralModels.ArrowMaterials());

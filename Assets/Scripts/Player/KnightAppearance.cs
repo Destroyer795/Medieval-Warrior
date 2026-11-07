@@ -21,6 +21,8 @@ public class KnightAppearance : MonoBehaviour
 
     public void Apply(int tabard, int metal, int leather)
     {
+        var replacement = MarchwardenVisual.Ensure(gameObject);
+        if (replacement != null) { replacement.ApplyColors(tabard, metal, leather); return; }
         int key = tabard * 10000 + metal * 100 + leather;
         if (key == appliedKey && material != null) return;
         var tex = Build(tabard, metal, leather, key);

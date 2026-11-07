@@ -117,7 +117,7 @@ public static class ProceduralModels
     }
 
     // ------------------------------------------------------------ bow (limbs bend towards +Z, string at -Z)
-    public static Mesh HipQuiverMesh() => Cached("hip_quiver", () =>
+    public static Mesh HipQuiverMesh() => MarchwardenVisual.Asset != null ? MarchwardenVisual.Asset.quiver : Cached("hip_quiver", () =>
     {
         var k = new MeshKit(2);
         const int sides = 12;
@@ -137,13 +137,13 @@ public static class ProceduralModels
         return k.Build("Right hip quiver");
     });
 
-    public static Material[] HipQuiverMaterials() => new[]
+    public static Material[] HipQuiverMaterials() => MarchwardenVisual.Asset != null ? MarchwardenVisual.Asset.materials : new[]
     {
         Mat("hip_quiver_leather", new Color(0.22f, 0.1f, 0.045f), 0f),
         Mat("hip_quiver_rim", new Color(0.48f, 0.3f, 0.12f), 0.1f),
     };
 
-    public static Mesh BowMesh() => Cached("bow", () =>
+    public static Mesh BowMesh() => MarchwardenVisual.Asset != null ? MarchwardenVisual.Asset.bow : Cached("bow", () =>
     {
         var k = new MeshKit(2); // 0 wood, 1 trim/grip (the string is a live LineRenderer, see ArcherRig)
         const int segs = 10;
@@ -164,6 +164,19 @@ public static class ProceduralModels
     public static Material[] BowMaterials(int finish)
     {
         var f = GameSettings.BowFinishes[Mathf.Clamp(finish, 0, GameSettings.BowFinishes.Length - 1)];
+        if (MarchwardenVisual.Asset != null)
+        {
+            var palette = (Material[])MarchwardenVisual.Asset.materials.Clone();
+            Material Finish(string key,int slot,Color color)
+            {
+                if(!materials.TryGetValue(key,out var material)||material==null)
+                    materials[key]=material=new Material(palette[slot]){name=key,color=color};
+                return material;
+            }
+            palette[6] = Finish("marchwarden_bow_wood_"+finish,6,f.wood);
+            palette[1] = Finish("marchwarden_bow_trim_"+finish,1,f.trim);
+            return palette;
+        }
         return new[]
         {
             Mat("bow_wood_" + finish, f.wood, 0.35f),
@@ -172,7 +185,7 @@ public static class ProceduralModels
     }
 
     // ------------------------------------------------------------ arrow pointing +Z, origin at the tail
-    public static Mesh ArrowMesh() => Cached("arrow", () =>
+    public static Mesh ArrowMesh() => MarchwardenVisual.Asset != null ? MarchwardenVisual.Asset.arrow : Cached("arrow", () =>
     {
         var k = new MeshKit(3); // 0 shaft, 1 head, 2 fletching
         k.Tube(0, Vector3.zero, new Vector3(0, 0, 0.78f), 0.011f, 0.011f, 5);
@@ -185,7 +198,7 @@ public static class ProceduralModels
         return k.Build("Arrow");
     });
 
-    public static Material[] ArrowMaterials() => new[]
+    public static Material[] ArrowMaterials() => MarchwardenVisual.Asset != null ? MarchwardenVisual.Asset.materials : new[]
     {
         Mat("arrow_shaft", new Color(0.72f, 0.55f, 0.34f), 0.2f),
         Mat("arrow_head", new Color(0.78f, 0.8f, 0.85f), 0.7f, 0.8f),

@@ -11,13 +11,14 @@ using UnityEngine;
 [DefaultExecutionOrder(100)]
 public class ArcherRig : MonoBehaviour
 {
-    public float torsoTurn = 70f;          // degrees the chest opens towards the bow side
+    public float torsoTurn = 65f;          // chest opens side-on; the head keeps looking downrange
     public float fullDrawDistance = 0.62f; // string travel from brace to anchor
 
     PlayerControlSpeed pc;
     Transform cam;
     CameraFollow orbitCamera;
     Transform spine, neck, head, lUpper, lFore, lHand, rUpper, rFore, rHand;
+    Transform lClavicle, rClavicle;
     Transform bow, nocked;
     LineRenderer bowString;
     float weight, releaseKick, drawSmoothed;
@@ -27,11 +28,30 @@ public class ArcherRig : MonoBehaviour
     float aimYaw, aimPitch;
     bool targetsReady, aimReady;
     GameObject nockedFlame;
+    Quaternion leftGrip, rightGrip;
+    Vector3 leftPalm, rightPalm;
+    Vector3 stringHook;
+    SkinnedMeshRenderer bodySkin;
+    int drawShape=-1,releaseShape=-1;
+    Quaternion leftClavicleRest, rightClavicleRest;
+    Vector3 headForward, anchorPoint;
+    Mesh flexibleBow;
+    Vector3[] restVertices, bentVertices;
+    float bend;
+    float stowedBowDepth=.055f;
+    float Stature => Mathf.Abs(transform.lossyScale.x);
 
-    const float BowHalf = 0.62f, NockZ = -0.03f;
+    const float BowHalf = 0.62f, NockZ = -0.03f, ArrowRestY=.067f;
 
-    public Vector3 ArrowOrigin => bow != null ? bow.position : transform.position + Vector3.up * 1.4f;
+    public Vector3 ArrowOrigin => bow != null ? bow.TransformPoint(new Vector3(0,ArrowRestY,.2f)) : transform.position + Vector3.up * 1.4f;
     public bool Ready => lUpper != null && rUpper != null;
+    public Vector3 BowPalmPosition=>lHand!=null?lHand.TransformPoint(leftPalm):transform.position;
+    public Vector3 DrawPalmPosition=>rHand!=null?rHand.TransformPoint(rightPalm):transform.position;
+    public Vector3 StringContactPosition=>rHand!=null?rHand.TransformPoint(stringHook):transform.position;
+    public float GripError => bow == null || lHand == null ? 0 : Vector3.Distance(bow.TransformPoint(new Vector3(0,0,.2f)),BowPalmPosition);
+    public float AnchorError => rHand == null ? 0 : Vector3.Distance(StringContactPosition,anchorPoint);
+    public float DrawElbowAlignment => rFore == null || rHand == null || bow == null ? 0 : Vector3.Angle(rFore.position-rHand.position,-bow.forward);
+    public float ShaftAlignment => nocked == null || bow == null ? 0 : Vector3.Angle(nocked.forward,bow.forward);
 
     public void Init(PlayerControlSpeed owner)
     {
@@ -43,10 +63,34 @@ public class ArcherRig : MonoBehaviour
         head = Find("Bip001 Head");
         lUpper = Find("Bip001 L UpperArm"); lFore = Find("Bip001 L Forearm"); lHand = Find("Bip001 L Hand");
         rUpper = Find("Bip001 R UpperArm"); rFore = Find("Bip001 R Forearm"); rHand = Find("Bip001 R Hand");
+        lClavicle=Find("Bip001 L Clavicle"); rClavicle=Find("Bip001 R Clavicle");
+        if(lClavicle!=null) leftClavicleRest=lClavicle.localRotation;
+        if(rClavicle!=null) rightClavicleRest=rClavicle.localRotation;
+        if (Ready)
+        {
+            var asset=MarchwardenVisual.Asset;
+            leftGrip=asset!=null?asset.leftPalm.rotation:GripReference(lHand);
+            rightGrip=asset!=null?asset.rightPalm.rotation:GripReference(rHand);
+            if(asset!=null){leftPalm=asset.leftPalm.GetColumn(3);rightPalm=asset.rightPalm.GetColumn(3);}
+            // Nock between the index and middle finger, against the inner hook.
+            stringHook=asset!=null?asset.drawHook:rightPalm+rightGrip*new Vector3(.019f,.011f,0);
+            bodySkin=GetComponentInChildren<SkinnedMeshRenderer>();
+            drawShape=bodySkin.sharedMesh.GetBlendShapeIndex("BowDrawHand");
+            releaseShape=bodySkin.sharedMesh.GetBlendShapeIndex("BowReleaseHand");
+        }
+        if (head != null) headForward = head.InverseTransformDirection(transform.forward);
         BuildBow();
     }
 
     Transform Find(string name) => FindBone(transform, name);
+
+    Quaternion GripReference(Transform hand)
+    {
+        var skin=GetComponentInChildren<SkinnedMeshRenderer>();
+        int index=System.Array.IndexOf(skin.bones,hand);
+        Matrix4x4 toBone=skin.sharedMesh.bindposes[index]*skin.transform.worldToLocalMatrix;
+        return PoseMath.AlongBlade(toBone.MultiplyVector(transform.right),toBone.MultiplyVector(transform.forward));
+    }
 
     static Transform FindBone(Transform root, string name)
     {
@@ -64,14 +108,24 @@ public class ArcherRig : MonoBehaviour
         var t = Resources.Load<GameObject>("Prefabs/Bow");
         var go = t != null ? Instantiate(t) : ProceduralModels.Spawn("Bow", ProceduralModels.BowMesh(), ProceduralModels.BowMaterials(0));
         go.name = "Bow (equipment)";
+        if (MarchwardenVisual.Asset != null && go.TryGetComponent<MeshFilter>(out var bowFilter))
+            bowFilter.sharedMesh = MarchwardenVisual.Asset.bow;
         if (go.TryGetComponent(out MeshRenderer mr)) mr.sharedMaterials = ProceduralModels.BowMaterials(GameSettings.BowFinish);
         bow = go.transform;
         bow.SetParent(transform, true);
+        bow.localScale=Vector3.one;
+        if (go.TryGetComponent<MeshFilter>(out var filter))
+        {
+            flexibleBow = Instantiate(filter.sharedMesh); flexibleBow.name = "Bow bending with draw";
+            flexibleBow.MarkDynamic(); filter.sharedMesh = flexibleBow;
+            restVertices = flexibleBow.vertices; bentVertices = new Vector3[restVertices.Length];
+            stowedBowDepth=.012f-flexibleBow.bounds.min.x;
+        }
 
         bowString = new GameObject("Bowstring").AddComponent<LineRenderer>();
         bowString.transform.SetParent(bow, false);
         bowString.positionCount = 3;
-        bowString.widthMultiplier = 0.012f;
+        bowString.widthMultiplier = 0.004f;
         bowString.numCapVertices = 1;
         bowString.useWorldSpace = true;
         bowString.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
@@ -82,6 +136,7 @@ public class ArcherRig : MonoBehaviour
         nocked = Arrow.Model().transform;
         nocked.name = "Nocked Arrow";
         nocked.SetParent(transform, true);
+        nocked.localScale=Vector3.one;
         nocked.gameObject.SetActive(false);
     }
 
@@ -98,6 +153,11 @@ public class ArcherRig : MonoBehaviour
         float w = weight * weight * (3f - 2f * weight);
         drawSmoothed = Mathf.Lerp(drawSmoothed, pc.IsDrawing ? pc.DrawAmount : 0f, 1f - Mathf.Exp(-18f * dt));
         releaseKick = Mathf.MoveTowards(releaseKick, 0f, dt * 3.5f);
+        if(bodySkin!=null)
+        {
+            if(drawShape>=0)bodySkin.SetBlendShapeWeight(drawShape,bowOut?w*(1-releaseKick)*100:0);
+            if(releaseShape>=0)bodySkin.SetBlendShapeWeight(releaseShape,bowOut?w*releaseKick*100:0);
+        }
 
         Vector3 aim = transform.forward;
         if (cam != null && aiming) aim = orbitCamera != null ? orbitCamera.LookDirection : cam.forward;
@@ -121,45 +181,88 @@ public class ArcherRig : MonoBehaviour
 
     void Pose(Vector3 aim, float w)
     {
+        float stature=Stature;
+        // These source clips do not consistently key the clavicles. Start from
+        // their reference rotations so the additive shoulder lift cannot build
+        // up or retain a previous aim direction after a large camera turn.
+        if(lClavicle!=null) lClavicle.localRotation=leftClavicleRest;
+        if(rClavicle!=null) rClavicle.localRotation=rightClavicleRest;
         Vector3 flat = Vector3.ProjectOnPlane(aim, Vector3.up).normalized;
         if (flat.sqrMagnitude < 0.01f) flat = transform.forward;
         Vector3 right = Vector3.Cross(Vector3.up, flat).normalized;
         float pitch = Mathf.Clamp(Mathf.Asin(Mathf.Clamp(aim.y, -1f, 1f)) * Mathf.Rad2Deg, -45f, 45f);
 
-        // 1. side-on stance: open the chest away from the bow arm and lean with the shot
+        Vector3 up = Vector3.ProjectOnPlane(Vector3.up,aim).normalized;
+        // 1. Open the shoulders while keeping the head aimed at the target.
         if (spine != null)
         {
             // Let the physics root follow yaw; keep the additive chest twist modest.
-            Quaternion targetOffset = Quaternion.AngleAxis(-pitch * 0.35f, right) * Quaternion.AngleAxis(Mathf.Clamp(torsoTurn, -35f, 35f), Vector3.up);
+            Quaternion targetOffset = Quaternion.AngleAxis(-pitch * 0.55f, right) * Quaternion.AngleAxis(Mathf.Clamp(torsoTurn, 0f, 65f), Vector3.up);
             torsoOffset = Quaternion.Slerp(torsoOffset, targetOffset, 1f - Mathf.Exp(-18f * Time.deltaTime));
             spine.rotation = Quaternion.Slerp(Quaternion.identity, torsoOffset, w) * spine.rotation;
         }
+        if (head != null)
+            head.rotation = Quaternion.Slerp(Quaternion.identity,Quaternion.FromToRotation(head.TransformDirection(headForward),aim),w)*head.rotation;
+        // Set the shoulder girdle before solving the arms: a raised bow shoulder
+        // and retracted draw shoulder avoid a folded bow elbow at full draw.
+        if(lClavicle!=null)
+        {
+            Vector3 delta=lUpper.position-lClavicle.position;
+            // Protract the bow shoulder before solving the arm. The wider
+            // cheek-guard anchor must not leave the bow arm across the shot.
+            Vector3 shoulderTarget=delta+(up*.035f+right*.045f)*stature;
+            lClavicle.rotation=Quaternion.Slerp(Quaternion.identity,Quaternion.FromToRotation(delta,shoulderTarget),w)*lClavicle.rotation;
+        }
+        if(rClavicle!=null)
+        {
+            Vector3 delta=rUpper.position-rClavicle.position;
+            rClavicle.rotation=Quaternion.Slerp(Quaternion.identity,Quaternion.FromToRotation(delta,delta-aim*(.015f*stature)),w)*rClavicle.rotation;
+        }
 
-        // 2. bow arm straight down the line of the shot
+        // 2. Put the arrow rest on the same line as the facial anchor. The arm
+        // lengths constrain the grip distance; neither elbow is forced past reach.
         float lReach = Vector3.Distance(lUpper.position, lFore.position) + Vector3.Distance(lFore.position, lHand.position);
-        Vector3 bowTarget = lUpper.position + aim * lReach * 0.96f;
-        Vector3 bowHint = lUpper.position + aim * lReach * 0.5f - Vector3.up * 0.35f - right * 0.15f;
+        float rReach = Vector3.Distance(rUpper.position,rFore.position)+Vector3.Distance(rFore.position,rHand.position);
+        var appearance=MarchwardenVisual.Asset;
+        Vector3 face=head!=null&&appearance!=null?head.TransformPoint(appearance.headEyeLocal):
+            head!=null?head.position+up*(.08f*stature):neck.position+up*(.14f*stature);
+        // Anchor against the outside of the cheek guard, below the eye slit.
+        anchorPoint=face+right*(.114f*stature)-up*(.040f*stature)+aim*(.025f*stature);
+        Vector3 bowUp=Quaternion.AngleAxis(-12f*w,aim)*up;
+        Vector3 gripLine=anchorPoint-bowUp*(ArrowRestY*stature);
+        float leftLateral = Vector3.ProjectOnPlane(gripLine-lUpper.position,aim).sqrMagnitude;
+        float leftForward = Vector3.Dot(lUpper.position-gripLine,aim)+Mathf.Sqrt(Mathf.Max(.01f,lReach*lReach*.9801f-leftLateral));
+        float rightLateral = Vector3.ProjectOnPlane(anchorPoint-rUpper.position,aim).sqrMagnitude;
+        float rightForward = Vector3.Dot(rUpper.position-gripLine,aim)+Mathf.Sqrt(Mathf.Max(.01f,rReach*rReach*.94f-rightLateral))+.23f*stature;
+        float extend=Mathf.SmoothStep(0,1,drawSmoothed);
+        Vector3 bowTarget = gripLine+aim*Mathf.Lerp(Mathf.Min(leftForward,rightForward),leftForward,extend);
+        Vector3 bowHint = lUpper.position+(aim*.24f-up*.18f-right*.14f)*stature;
         // Smooth in player space so walking does not drag the hand behind the body.
         float blend = 1f - Mathf.Exp(-24f * Time.deltaTime);
         Vector3 localBow = transform.InverseTransformPoint(bowTarget);
         bowTargetLocal = targetsReady ? Vector3.Lerp(bowTargetLocal, localBow, blend) : localBow;
-        SolveTwoBone(lUpper, lFore, lHand, transform.TransformPoint(bowTargetLocal), bowHint, w);
+        Quaternion leftRotation=PoseMath.AlongBlade(bowUp,right)*Quaternion.Inverse(leftGrip);
+        Vector3 leftOffset=leftRotation*Vector3.Scale(leftPalm,lHand.lossyScale);
+        PoseMath.Arm(lUpper, lFore, lHand, transform.TransformPoint(bowTargetLocal)-leftOffset, bowHint, w);
+        PoseMath.SetWrist(lFore,lHand,Quaternion.Slerp(lHand.rotation,leftRotation,w),leftGrip*Vector3.up,appearance!=null?appearance.leftWristRest:Quaternion.identity);
 
         // 3. draw hand on the string: brace height -> anchor at the cheek -> follow-through
-        Vector3 grip = lHand.position;
-        Vector3 brace = grip - aim * 0.16f;
-        Vector3 anchorBase = head != null ? head.position : neck != null ? neck.position + Vector3.up * 0.12f : grip - aim * fullDrawDistance;
-        Vector3 anchor = anchorBase + right * 0.12f - Vector3.up * 0.1f + aim * 0.05f;
+        Vector3 grip = BowPalmPosition;
+        Vector3 brace = grip+(-aim*.23f+bowUp*ArrowRestY)*stature;
         float d = drawSmoothed * drawSmoothed * (3f - 2f * drawSmoothed);
-        Vector3 hand = Vector3.Lerp(brace, anchor, d);
-        if (releaseKick > 0f) hand += (-aim * 0.14f + right * 0.1f) * releaseKick;
-        Vector3 drawHint = rUpper.position - aim * 0.45f + Vector3.up * 0.3f + right * 0.3f;
+        d = Mathf.Max(d,releaseKick*.98f);
+        Vector3 hand = Vector3.Lerp(brace,anchorPoint,d)+up*(.018f*stature*Mathf.Sin(d*Mathf.PI));
+        if (releaseKick > 0f) hand += (-aim*.09f+right*.015f)*(releaseKick*stature);
+        Vector3 drawHint = Vector3.Lerp(rUpper.position+(right*.22f+aim*.05f)*stature,anchorPoint+(-aim*.32f+right*.10f+up*.025f)*stature,d);
         Vector3 localHand = transform.InverseTransformPoint(hand);
         drawTargetLocal = targetsReady ? Vector3.Lerp(drawTargetLocal, localHand, blend) : localHand;
         targetsReady = true;
-        SolveTwoBone(rUpper, rFore, rHand, transform.TransformPoint(drawTargetLocal), drawHint, w);
+        Quaternion rightRotation=PoseMath.AlongBlade(up,right)*Quaternion.Inverse(rightGrip);
+        Vector3 rightOffset=rightRotation*Vector3.Scale(stringHook,rHand.lossyScale);
+        PoseMath.Arm(rUpper, rFore, rHand, transform.TransformPoint(drawTargetLocal)-rightOffset, drawHint, w);
+        PoseMath.SetWrist(rFore,rHand,Quaternion.Slerp(rHand.rotation,rightRotation,w),rightGrip*Vector3.up,appearance!=null?appearance.rightWristRest:Quaternion.identity);
 
-        stringPoint = Vector3.Lerp(brace, rHand.position, w);
+        stringPoint = Vector3.Lerp(brace, StringContactPosition, w);
     }
 
     // Analytic two-bone IK, blended with the animated pose by weight.
@@ -198,7 +301,7 @@ public class ArcherRig : MonoBehaviour
             Vector3 up = Vector3.ProjectOnPlane(Vector3.up, dir);
             if (up.sqrMagnitude < 1e-4f) up = transform.up;
             up = Quaternion.AngleAxis(-12f * w, dir) * up.normalized;   // archer's cant
-            bow.SetPositionAndRotation(lHand.position + dir * 0.03f, Quaternion.LookRotation(dir, up));
+            bow.SetPositionAndRotation(BowPalmPosition-dir*(.2f*Stature), Quaternion.LookRotation(dir, up));
         }
         else
         {
@@ -208,13 +311,14 @@ public class ArcherRig : MonoBehaviour
             Vector3 back = gear != null && gear.Ready ? gear.BackSurface : transform.position + Vector3.up * 1.25f - transform.forward * 0.12f;
             // The bow and string occupy local YZ. Turn that entire plane onto
             // the back, then roll it diagonally within the chest plane.
-            bow.SetPositionAndRotation(back + chest * new Vector3(0f, 0.04f, -0.055f),
+            bow.SetPositionAndRotation(back + chest * (new Vector3(0f, 0.04f, -stowedBowDepth)*Stature),
                 chest * Quaternion.AngleAxis(32f, Vector3.forward) * Quaternion.AngleAxis(90f, Vector3.up));
             w = 0f;
         }
 
-        top = bow.TransformPoint(new Vector3(0, BowHalf, NockZ));
-        bottom = bow.TransformPoint(new Vector3(0, -BowHalf, NockZ));
+        FlexBow(inHand ? Mathf.Max(drawSmoothed,releaseKick*.9f) : 0f);
+        top = bow.TransformPoint(BendPoint(new Vector3(0, BowHalf, NockZ),bend));
+        bottom = bow.TransformPoint(BendPoint(new Vector3(0, -BowHalf, NockZ),bend));
         Vector3 mid = (top + bottom) * 0.5f;
         Vector3 pull = w > 0.01f ? Vector3.Lerp(mid, stringPoint, w) : mid;
         bowString.SetPosition(0, top);
@@ -225,7 +329,7 @@ public class ArcherRig : MonoBehaviour
         if (nocked.gameObject.activeSelf != showArrow) nocked.gameObject.SetActive(showArrow);
         if (showArrow)
         {
-            Vector3 shaft = (bow.position - pull).normalized;
+            Vector3 shaft = (ArrowOrigin - pull).normalized;
             if (shaft.sqrMagnitude < 0.01f) shaft = aim;
             nocked.SetPositionAndRotation(pull, Quaternion.LookRotation(shaft, bow.up));
         }
@@ -233,4 +337,22 @@ public class ArcherRig : MonoBehaviour
         if (burningNock && nockedFlame == null) nockedFlame = FX.AttachFlame(nocked, Vector3.forward * 0.9f, 0.5f);
         else if (!burningNock && nockedFlame != null) { FX.Extinguish(nockedFlame); nockedFlame = null; }
     }
+
+    static Vector3 BendPoint(Vector3 vertex,float amount)
+    {
+        float influence=Mathf.Pow(Mathf.Clamp01(Mathf.Abs(vertex.y)/BowHalf),2);
+        vertex.z-=.075f*amount*influence;
+        vertex.y-=Mathf.Sign(vertex.y)*.018f*amount*influence;
+        return vertex;
+    }
+
+    void FlexBow(float amount)
+    {
+        if(flexibleBow==null || Mathf.Abs(amount-bend)<.002f) return;
+        bend=amount;
+        for(int i=0;i<restVertices.Length;i++) bentVertices[i]=BendPoint(restVertices[i],bend);
+        flexibleBow.vertices=bentVertices; flexibleBow.RecalculateBounds();
+    }
+
+    void OnDestroy() { if (flexibleBow != null) Destroy(flexibleBow); }
 }

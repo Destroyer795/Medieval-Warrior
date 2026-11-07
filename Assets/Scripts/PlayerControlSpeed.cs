@@ -600,7 +600,6 @@ public class PlayerControlSpeed : MonoBehaviour
         if (hitEnemies.Count > 0)
         {
             AudioManager.PlayAt("sword_hit", hitPosition, 1f, 0.1f);
-            FX.HitStop(finisher ? 0.08f : 0.04f);
             FX.Shake(finisher ? 0.35f : 0.18f);
         }
     }
@@ -625,7 +624,7 @@ public class PlayerControlSpeed : MonoBehaviour
             e.TakeDamage(0.5f, dir, 11f);
             any = true;
         }
-        if (any) { FX.Sparks(transform.position + transform.forward + Vector3.up * 1.2f, transform.forward); FX.HitStop(0.05f); }
+        if (any) { FX.Sparks(transform.position + transform.forward + Vector3.up * 1.2f, transform.forward); }
     }
 
     // ------------------------------------------------------------ bow

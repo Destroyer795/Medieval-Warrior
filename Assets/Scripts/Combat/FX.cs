@@ -294,24 +294,6 @@ public static class FX
 
     // ------------------------------------------------------------ game feel
 
-    static Coroutine hitStop;
-
-    public static void HitStop(float seconds)
-    {
-        if (Time.timeScale < 0.5f) return; // paused or already frozen
-        EnsureRunner();
-        if (hitStop != null) runner.StopCoroutine(hitStop);
-        hitStop = runner.StartCoroutine(HitStopRoutine(seconds));
-    }
-
-    static IEnumerator HitStopRoutine(float seconds)
-    {
-        Time.timeScale = 0.06f;
-        yield return new WaitForSecondsRealtime(seconds);
-        if (Time.timeScale > 0f) Time.timeScale = 1f;
-        hitStop = null;
-    }
-
     public static void Shake(float amount)
     {
         if (!GameSettings.CameraShake) return;

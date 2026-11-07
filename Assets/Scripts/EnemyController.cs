@@ -5,8 +5,8 @@ using UnityEngine.AI;
 
 // Zombie brain. Every zombie hunts the knight, but they coordinate through ZombieDirector:
 // only a few get an "attack token" at a time, the rest circle and wait for an opening,
-// so fights feel like being surrounded rather than a conga line. They detour when stuck,
-// get knocked back by arrows and shield bashes, and each archetype has its own trick.
+// so fights feel like being surrounded rather than a conga line. They detour when stuck
+// and keep acting through nonlethal hits; each archetype has its own trick.
 public class EnemyController : MonoBehaviour
 {
     [Header("Stats")]
@@ -37,7 +37,7 @@ public class EnemyController : MonoBehaviour
     public float HealthFraction => MaxHealth > 0 ? Mathf.Clamp01(Health / MaxHealth) : 0f;
     public Vector3 HeadPosition => transform.position + Vector3.up * 1.9f * transform.localScale.y;
 
-    enum State { Emerging, Hunt, Circle, Attack, Stagger, Kite, Fuse, Charge, Dead }
+    enum State { Emerging, Hunt, Circle, Attack, Kite, Fuse, Charge, Dead }
     State state = State.Hunt;
 
     Animator animator;
@@ -51,9 +51,22 @@ public class EnemyController : MonoBehaviour
     float circleAngle, circleRadius;
     int groanIndex;
     bool hasToken, initialised, enraged, hitDealt;
-    Vector3 knockVelocity, lastPosition, detourTarget;
+    Vector3 lastPosition, detourTarget;
     float stuckTimer, detourTimer, unreachableTimer;
     Vector3 deathDirection;
+    Vector3 runnerGoal;
+    float runnerDecisionAt,runnerSideUntil,runnerRearOffset;
+    int runnerSide;
+    float runnerBurst=1.5f,runnerWithdrawUntil;
+    int runnerEvadedSwing=-1;
+    NavMeshPath runnerPath;
+
+    public static bool InRunnerRearArc(Vector3 position,Vector3 target,Vector3 facing)
+    {
+        Vector3 delta=Flat(position-target),forward=Flat(facing);
+        return delta.sqrMagnitude>.01f&&forward.sqrMagnitude>.01f&&Vector3.Dot(delta.normalized,forward.normalized)<=-.5f;
+    }
+    bool RunnerBehind=>player!=null&&InRunnerRearArc(transform.position,player.position,player.forward);
 
     // animator parameter hashes (only set when the controller has them)
     int hSpeed, hMoveMul, hAttack, hDie, hDieForward, hIsMoving, hAttackMul;
@@ -105,6 +118,7 @@ public class EnemyController : MonoBehaviour
     {
         initialised = true;
         type = t;
+        if(t==ZombieType.Runner&&runnerPath==null)runnerPath=new NavMeshPath();
         isBoss = boss;
         Stats = ZombieTypes.Get(t);
         var diff = GameSettings.Profile;
@@ -122,6 +136,7 @@ public class EnemyController : MonoBehaviour
             navAgent.speed = baseSpeed;
             navAgent.acceleration = 14f;
             navAgent.angularSpeed = 540f;
+            if(t==ZombieType.Runner){navAgent.acceleration=44f;navAgent.angularSpeed=900f;}
             navAgent.stoppingDistance = 0.2f;
             navAgent.autoBraking = false;
             navAgent.avoidancePriority = UnityEngine.Random.Range(30, 70);
@@ -131,7 +146,7 @@ public class EnemyController : MonoBehaviour
         if (animator != null)
         {
             if (pMoveMul) animator.SetFloat(hMoveMul, Stats.animSpeed);
-            if (pAttackMul) animator.SetFloat(hAttackMul, Mathf.Clamp(0.6f / Mathf.Max(0.2f, Stats.windup), 0.6f, 1.6f));
+            if (pAttackMul) animator.SetFloat(hAttackMul, Mathf.Clamp(0.6f / Mathf.Max(0.2f, Stats.windup), 0.6f, t==ZombieType.Runner?2.8f:1.6f));
         }
         ApplyTint(0f);
 
@@ -149,6 +164,7 @@ public class EnemyController : MonoBehaviour
         groanTimer = UnityEngine.Random.Range(1f, 6f);
         groanIndex = UnityEngine.Random.Range(0, 3);
         lastPosition = transform.position;
+        runnerDecisionAt=runnerSideUntil=runnerWithdrawUntil=0;runnerSide=0;runnerEvadedSwing=-1;
 
         if (emerge) StartEmerging();
         else SetState(type == ZombieType.Spitter ? State.Kite : State.Hunt);
@@ -187,7 +203,6 @@ public class EnemyController : MonoBehaviour
             case State.Hunt: UpdateHunt(); break;
             case State.Circle: UpdateCircle(); break;
             case State.Attack: UpdateAttack(); break;
-            case State.Stagger: UpdateStagger(); break;
             case State.Kite: UpdateKite(); break;
             case State.Fuse: UpdateFuse(); break;
             case State.Charge: UpdateCharge(); break;
@@ -202,7 +217,7 @@ public class EnemyController : MonoBehaviour
         state = s;
         stateTimer = 0f;
         hitDealt = false;
-        if (navAgent != null && navAgent.enabled && navAgent.isOnNavMesh) navAgent.isStopped = s == State.Attack || s == State.Stagger || s == State.Fuse || s == State.Charge;
+        if (navAgent != null && navAgent.enabled && navAgent.isOnNavMesh) navAgent.isStopped = s == State.Attack || s == State.Fuse || s == State.Charge;
     }
 
     void Idle()
@@ -214,6 +229,7 @@ public class EnemyController : MonoBehaviour
     void UpdateHunt()
     {
         float d = DistanceToPlayer;
+        if(type==ZombieType.Runner){UpdateRunner();return;}
 
         if (type == ZombieType.Bloater)
         {
@@ -233,25 +249,88 @@ public class EnemyController : MonoBehaviour
             return;
         }
 
-        float speed = baseSpeed;
-        if (type == ZombieType.Runner && hasToken && d < 7f && d > 2.5f) speed *= 1.35f;  // lunge
-
-        // Runners notice the bow aimed at them and zig-zag out of the line of fire
-        if (type == ZombieType.Runner && d > 4f && IsBeingAimedAt())
-        {
-            if (Time.time > zigTime) { zigSide = -zigSide; zigTime = Time.time + UnityEngine.Random.Range(0.45f, 0.75f); }
-            Vector3 toPlayer = Flat(player.position - transform.position).normalized;
-            Vector3 side = Vector3.Cross(Vector3.up, toPlayer) * zigSide;
-            Chase(transform.position + (toPlayer * 2f + side * 3f), speed * 1.15f);
-            return;
-        }
-        Chase(player.position, speed);
+        Chase(player.position, baseSpeed);
 
         if (hasToken && d <= attackRange && Time.time >= attackTimer) BeginAttack();
     }
 
+    void UpdateRunner()
+    {
+        float distance=DistanceToPlayer;
+        bool behind=RunnerBehind;
+        Vector3 radial=Flat(transform.position-player.position).normalized;
+        float facing=Vector3.Dot(radial,Flat(player.forward).normalized);
+        if(Time.time<runnerWithdrawUntil){Chase(runnerGoal,baseSpeed*1.55f);return;}
+        if(hasToken&&facing>.2f){ReleaseToken();runnerDecisionAt=0;}
+        // Sprint the final rear quarter instead of waiting for a perfect rear
+        // position before committing. Strike authorization still requires it.
+        if(facing<-.15f&&distance<5.5f&&Time.time>=attackTimer&&!hasToken)
+            hasToken=ZombieDirector.RequestToken(this);
+        if(hasToken)
+        {
+            if(behind&&distance<=attackRange&&Time.time>=attackTimer&&HasLineOfSight()){BeginAttack();return;}
+            Vector3 lead=playerHealth!=null?Vector3.ClampMagnitude(Flat(playerHealth.Velocity)*.20f,1.3f):Vector3.zero;
+            Chase(player.position+lead-player.forward*.6f+player.right*runnerRearOffset,baseSpeed*1.6f);
+            return;
+        }
+        // Respond once to the visible preparation of a nearby sword swing.
+        // This changes the route, never the Runner's damage eligibility.
+        if(playerControl!=null&&playerControl.CurrentWeapon==Weapon.Sword&&distance<4.5f&&facing>-.15f&&
+            playerControl.SwordAge>=0&&playerControl.SwordAge<.16f&&playerControl.SwordSequence!=runnerEvadedSwing)
+        {runnerEvadedSwing=playerControl.SwordSequence;runnerDecisionAt=0;}
+        bool reached=Flat(runnerGoal-transform.position).sqrMagnitude<.65f;
+        if(Time.time>=runnerDecisionAt||reached||Flat(runnerGoal-player.position).sqrMagnitude>100)
+            ChooseRunnerRoute();
+        Chase(runnerGoal,baseSpeed*Mathf.Max(runnerBurst,IsBeingAimedAt()?1.65f:1.45f));
+    }
+
+    void ChooseRunnerRoute()
+    {
+        // Commit toward the rear. Randomness varies the attack line and pace,
+        // rather than repeatedly sending the Runner back across the front.
+        Vector3 radial=Flat(transform.position-player.position).normalized;
+        if(radial.sqrMagnitude<.01f)radial=Flat(player.forward);
+        float bearing=Vector3.SignedAngle(Flat(player.forward),radial,Vector3.up);
+        if(runnerSide==0||Time.time>=runnerSideUntil&&Mathf.Abs(bearing)<20)
+        {
+            runnerSide=Mathf.Abs(bearing)>20?(bearing>0?1:-1):(UnityEngine.Random.value<.5f?-1:1);
+            runnerSideUntil=Time.time+UnityEngine.Random.Range(1.3f,2.3f);
+        }
+        runnerRearOffset=UnityEngine.Random.Range(-.4f,.4f);
+        runnerBurst=UnityEngine.Random.Range(1.45f,1.75f);
+        float radius=UnityEngine.Random.Range(3.7f,4.9f);
+        float step=UnityEngine.Random.Range(55f,80f)*runnerSide;
+        float angle=Mathf.Abs(bearing)>110?180+UnityEngine.Random.Range(-32f,32f):bearing+step;
+        bool accepted=false;
+        for(int attempt=0;attempt<5;attempt++)
+        {
+            Vector3 guess=player.position+Quaternion.AngleAxis(angle,Vector3.up)*Flat(player.forward).normalized*radius;
+            if(NavMesh.SamplePosition(guess,out var hit,1.5f,navAgent.areaMask)&&
+                navAgent.CalculatePath(hit.position,runnerPath)&&runnerPath.status==NavMeshPathStatus.PathComplete)
+            {
+                bool safe=true;var corners=runnerPath.corners;
+                for(int i=1;i<corners.Length;i++)
+                {
+                    Vector3 a=Flat(corners[i-1]-player.position),segment=Flat(corners[i]-corners[i-1]);
+                    float t=Mathf.Clamp01(-Vector3.Dot(a,segment)/Mathf.Max(.001f,segment.sqrMagnitude));
+                    // Close spawns may retreat out, but routes must not shortcut
+                    // through the warrior to reach a point on the far side.
+                    if((a+segment*t).sqrMagnitude<Mathf.Min(2.3f*2.3f,Flat(transform.position-player.position).sqrMagnitude*.85f)){safe=false;break;}
+                }
+                if(safe){runnerGoal=hit.position;accepted=true;break;}
+            }
+            // Obstructions can force the other flank; ordinary retargeting
+            // keeps making angular progress instead of wandering in place.
+            if(attempt==2)runnerSide=-runnerSide;
+            angle=bearing+runnerSide*UnityEngine.Random.Range(40f,65f);radius=UnityEngine.Random.Range(3.8f,5.2f);
+        }
+        if(!accepted)runnerGoal=transform.position+radial*2;
+        runnerDecisionAt=Time.time+UnityEngine.Random.Range(.22f,.42f);
+    }
+
     void UpdateCircle()
     {
+        if(type==ZombieType.Runner){UpdateRunner();return;}
         float d = DistanceToPlayer;
         if (d > 9f || ZombieDirector.RequestToken(this)) { hasToken = ZombieDirector.HasToken(this); SetState(State.Hunt); return; }
 
@@ -265,6 +344,7 @@ public class EnemyController : MonoBehaviour
 
     void BeginAttack()
     {
+        if(type==ZombieType.Runner&&!RunnerBehind)return;
         SetState(State.Attack);
         if (pAttack) animator.SetTrigger(hAttack);
         if (type == ZombieType.Spitter) AudioManager.PlayAt("spit", transform.position, 0.8f);
@@ -273,11 +353,30 @@ public class EnemyController : MonoBehaviour
 
     void UpdateAttack()
     {
+        if(type==ZombieType.Runner&&!hitDealt&&!RunnerBehind)
+        {
+            ReleaseToken();runnerDecisionAt=0;SetState(State.Hunt);return;
+        }
         FaceTowards(player.position, hitDealt ? 2f : 10f);
+        if(type==ZombieType.Runner)
+        {
+            if(!hitDealt&&stateTimer<Stats.windup-.065f)
+            {
+                Vector3 lead=playerHealth!=null?Vector3.ClampMagnitude(Flat(playerHealth.Velocity)*.16f,1.1f):Vector3.zero;
+                Chase(player.position+lead-player.forward*.45f,baseSpeed*1.45f);
+            }
+            else navAgent.isStopped=true;
+        }
         if (!hitDealt && stateTimer >= Stats.windup)
         {
             hitDealt = true;
             DealHit();
+        }
+        if(type==ZombieType.Runner&&stateTimer>=Stats.windup+.18f)
+        {
+            attackTimer=Time.time+timeBetweenAttacks*UnityEngine.Random.Range(.85f,1.1f);
+            ReleaseToken();runnerWithdrawUntil=Time.time+UnityEngine.Random.Range(.24f,.38f);
+            ChooseRunnerRoute();SetState(State.Hunt);return;
         }
         if (stateTimer >= Stats.windup + 0.55f)
         {
@@ -290,6 +389,7 @@ public class EnemyController : MonoBehaviour
 
     void DealHit()
     {
+        if(type==ZombieType.Runner&&!RunnerBehind)return;
         if (type == ZombieType.Spitter)
         {
             Vector3 lead = player.position + (playerHealth != null ? playerHealth.Velocity * 0.6f : Vector3.zero);
@@ -362,14 +462,6 @@ public class EnemyController : MonoBehaviour
     }
     bool exploded, explodePending;
 
-    void UpdateStagger()
-    {
-        knockVelocity = Vector3.Lerp(knockVelocity, Vector3.zero, 1f - Mathf.Exp(-7f * Time.deltaTime));
-        if (navAgent.isOnNavMesh) navAgent.Move(knockVelocity * Time.deltaTime);
-        if (stateTimer > 0.45f && knockVelocity.magnitude < 0.6f)
-            SetState(type == ZombieType.Spitter ? State.Kite : State.Hunt);
-    }
-
     // ------------------------------------------------------------ movement helpers
 
     void Chase(Vector3 target, float speed)
@@ -384,7 +476,7 @@ public class EnemyController : MonoBehaviour
         }
 
         repathTimer += Time.deltaTime;
-        if (repathTimer >= repathRate && !navAgent.pathPending)
+        if (repathTimer >= (type==ZombieType.Runner?.10f:repathRate) && !navAgent.pathPending)
         {
             repathTimer = 0f;
             navAgent.SetDestination(target);
@@ -443,7 +535,9 @@ public class EnemyController : MonoBehaviour
     {
         if (animator == null) return;
         float v = navAgent != null && navAgent.enabled ? navAgent.velocity.magnitude : 0f;
-        if (state == State.Stagger || state == State.Attack || state == State.Fuse || state == State.Charge) v = 0f;
+        if (state == State.Attack || state == State.Fuse || state == State.Charge) v = 0f;
+        if(type==ZombieType.Runner&&pMoveMul)
+            animator.SetFloat(hMoveMul,Stats.animSpeed*(v>.2f?Mathf.Clamp(v/Mathf.Max(.5f,baseSpeed),.85f,1.8f):1),.08f,Time.deltaTime);
         if (pSpeed) animator.SetFloat(hSpeed, v / Mathf.Max(0.5f, transform.localScale.y), 0.1f, Time.deltaTime);
         if (pIsMoving) animator.SetBool(hIsMoving, v > 0.2f);
     }
@@ -514,16 +608,9 @@ public class EnemyController : MonoBehaviour
             return;
         }
 
-        float resist = Stats.knockbackResist;
-        if (knockback > 0f && resist < 1f && state != State.Fuse)
-        {
-            knockVelocity = Flat(hitDirection).normalized * knockback * (1f - resist);
-            if (knockVelocity.magnitude > 1.2f)
-            {
-                if (state == State.Attack) ReleaseToken();
-                SetState(State.Stagger);
-            }
-        }
+        // Keep the current navigation, attack clock, token and animation intact.
+        // The knockback argument remains for existing weapon callers, but hits
+        // only affect health and feedback on surviving enemies.
     }
 
     // Bloaters keep ticking for a moment after a lethal hit so they can blow up their friends.
@@ -634,7 +721,7 @@ public class EnemyController : MonoBehaviour
     // ------------------------------------------------------------ smarter behaviours
 
     PlayerControlSpeed playerControl;
-    float zigTime, zigSide = 1f, nextCharge, nextSummon;
+    float nextCharge, nextSummon;
     Vector3 chargeDir;
     bool chargeHit;
     readonly System.Collections.Generic.List<EnemyController> summoned = new System.Collections.Generic.List<EnemyController>();
@@ -742,7 +829,7 @@ public class EnemyController : MonoBehaviour
         hasToken = false;
     }
 
-    // Legacy hook used by the old parry: reflect damage.
+    // Legacy parry hook: damage feedback without interrupting the enemy.
     public void Stagger(Vector3 from, float force)
     {
         TakeDamage(0.01f, (transform.position - from).normalized, force);

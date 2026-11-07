@@ -57,7 +57,7 @@ public static class SharedPanels
         {
             ("W A S D", "Move"), ("Mouse", "Look around"), ("Shift", "Sprint (uses stamina)"), ("Space", "Dodge roll - brief invulnerability"),
             ("Left click", "Sword combo / hold to draw the bow"), ("Right click / E", "Raise shield (sword) or aim (bow)"),
-            ("Block + click", "Shield bash - knocks zombies back"), ("Q  or  1 / 2", "Swap sword and bow"), ("Scroll", "Zoom camera"), ("Esc", "Pause"),
+            ("Block + click", "Shield bash - damages nearby zombies"), ("Q  or  1 / 2", "Swap sword and bow"), ("Scroll", "Zoom camera"), ("Esc", "Pause"),
         })
         {
             var row = UIKit.HList(left.transform, 12, TextAnchor.MiddleLeft);

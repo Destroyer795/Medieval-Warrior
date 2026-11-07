@@ -1,0 +1,20 @@
+[
+  {
+    "side": "L",
+    "vertices": 6894,
+    "components": 1,
+    "boundaryEdges": 0,
+    "nonmanifoldEdges": 0,
+    "inconsistentEdges": 0,
+    "volume": 0.0003187750084615814
+  },
+  {
+    "side": "R",
+    "vertices": 6894,
+    "components": 1,
+    "boundaryEdges": 0,
+    "nonmanifoldEdges": 0,
+    "inconsistentEdges": 0,
+    "volume": 0.00031877501189580274
+  }
+]

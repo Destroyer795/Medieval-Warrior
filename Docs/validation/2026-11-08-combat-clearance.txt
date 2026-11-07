@@ -1,0 +1,49 @@
+Conservative full-weapon capsule / shield bounds clearance, metres. Samples at 180 Hz.
+PASS neutral shield rim below eyes: 0.1088 m
+PASS neutral chest separation 0.0210 m; sightline True
+PASS heater block/transition clears chest armor and rear fittings: 0.0210 m
+PASS braced stance retains both foot contacts: 0.0000 m
+PASS both eyes retain forward line of sight through entire block transition
+PASS block transition joint continuity: 2.54 degrees per step, Bip001 L Forearm at 46/60
+PASS raised heater intercepts a forward strike toward the sternum: (0.121, 0.006, 0.045)
+PASS heater covers upper torso/head flank: rim 1.221, eyes 1.219
+PASS 00 Descending forehand: 0.2470 m at 0.222 s
+PASS 00 quaternion continuity: maximum 9.45 degrees per 180 Hz sample, Bip001 R UpperArm at 0.122s
+PASS 01 Returning backhand: 0.4236 m at 0.022 s
+PASS 01 quaternion continuity: maximum 9.38 degrees per 180 Hz sample, Bip001 L UpperArm at 0.022s
+PASS 02 High descending cut: 0.2568 m at 0.250 s
+PASS 02 quaternion continuity: maximum 6.47 degrees per 180 Hz sample, Bip001 R Hand at 0.378s
+PASS 03 Rising forehand: 0.4082 m at 0.211 s
+PASS 03 quaternion continuity: maximum 10.43 degrees per 180 Hz sample, Bip001 R UpperArm at 0.117s
+PASS 04 Horizontal cut: 0.3785 m at 0.222 s
+PASS 04 quaternion continuity: maximum 14.78 degrees per 180 Hz sample, Bip001 R Forearm at 0.033s
+PASS 05 Straight thrust: 0.3336 m at 0.206 s
+PASS 05 quaternion continuity: maximum 10.53 degrees per 180 Hz sample, Bip001 R Forearm at 0.117s
+PASS 06 Descending backhand: 0.4110 m at 0.150 s
+PASS 06 quaternion continuity: maximum 9.20 degrees per 180 Hz sample, Bip001 R Forearm at 0.133s
+PASS 07 Low rising return: 0.2614 m at 0.072 s
+PASS 07 quaternion continuity: maximum 11.86 degrees per 180 Hz sample, Bip001 R Forearm at 0.033s
+PASS 08 High-line thrust: 0.3937 m at 0.222 s
+PASS 08 quaternion continuity: maximum 9.40 degrees per 180 Hz sample, Bip001 R Forearm at 0.133s
+PASS 09 Short outside cut: 0.3461 m at 0.200 s
+PASS 09 quaternion continuity: maximum 12.91 degrees per 180 Hz sample, Bip001 R Forearm at 0.028s
+PASS 10 Inside returning cut: 0.4245 m at 0.022 s
+PASS 10 quaternion continuity: maximum 9.87 degrees per 180 Hz sample, Bip001 R Forearm at 0.033s
+PASS 11 High backhand finish: 0.3853 m at 0.161 s
+PASS 11 quaternion continuity: maximum 7.82 degrees per 180 Hz sample, Bip001 R Forearm at 0.150s
+PASS blend 00->01: 0.3613 m
+PASS blend 01->02: 0.4306 m
+PASS blend 02->03: 0.4309 m
+PASS blend 03->04: 0.4308 m
+PASS blend 04->05: 0.3863 m
+PASS blend 05->06: 0.4199 m
+PASS blend 06->07: 0.2609 m
+PASS blend 07->08: 0.4307 m
+PASS blend 08->09: 0.4308 m
+PASS blend 09->10: 0.3829 m
+PASS blend 10->11: 0.4114 m
+PASS blend 11->00: 0.4308 m
+PASS glove behind shield shell: 0.0272 m
+PASS sword hilt remains inside the right palm through all strikes and defense: 0.0000 m
+PASS heater handle remains inside the left palm through all strikes and defense: 0.0000 m
+PASS right wrist never folds backwards through strikes and defense: 54.9 degrees maximum

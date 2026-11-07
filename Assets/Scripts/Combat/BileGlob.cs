@@ -53,21 +53,33 @@ public class BileGlob : MonoBehaviour
 
 public class AcidPool : MonoBehaviour
 {
-    float radius, dps, life, age;
-    Material mat;
-    Color baseColor;
+    const int Sectors = 72, Rings = 7;
+    float dps, life, age;
+    readonly float[] outline = new float[Sectors];
+    Mesh surface;
+    MeshRenderer surfaceRenderer;
+    MaterialPropertyBlock properties;
+    static Material puddleMaterial;
+    static readonly int Fade = Shader.PropertyToID("_Fade"), Spread = Shader.PropertyToID("_Spread");
+    float Growth => Mathf.Lerp(.65f, 1f, Mathf.Clamp01(age * 4f));
 
-    public static void Create(Vector3 at, float radius, float dps, float life)
+    public static AcidPool Create(Vector3 at, float radius, float dps, float life)
     {
-        var go = ProceduralModels.Spawn("Acid Pool", DiscMesh(), new[] { Combat.ResourceMaterial("Acid", new Color(0.5f, 0.85f, 0.1f, 0.6f)) }, null, false);
         at = GroundBelow(at);
-        go.transform.position = at + Vector3.up * 0.04f;
-        go.transform.localScale = new Vector3(radius, 1f, radius);
+        if (puddleMaterial == null) puddleMaterial = Resources.Load<Material>("FX/AcidPuddle");
+        var go = new GameObject("Acid Pool");
+        go.transform.position = at;
         var p = go.AddComponent<AcidPool>();
-        p.radius = radius; p.dps = dps; p.life = life;
-        var mr = go.GetComponent<MeshRenderer>();
-        p.mat = mr.material;
-        p.baseColor = p.mat.color;
+        p.dps = dps; p.life = Mathf.Max(.1f, life);
+        p.surface = p.BuildSurface(Mathf.Max(.1f, radius));
+        go.AddComponent<MeshFilter>().sharedMesh = p.surface;
+        p.surfaceRenderer = go.AddComponent<MeshRenderer>();
+        p.surfaceRenderer.sharedMaterial = puddleMaterial;
+        p.surfaceRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        p.surfaceRenderer.receiveShadows = false;
+        p.properties = new MaterialPropertyBlock();
+        p.UpdateAppearance();
+        return p;
     }
 
     // the ground under a point, ignoring characters (otherwise the pool lands on someone's head)
@@ -83,30 +95,97 @@ public class AcidPool : MonoBehaviour
         return at;
     }
 
-    static Mesh disc;
-    static Mesh DiscMesh()
+    Mesh BuildSurface(float radius)
     {
-        if (disc != null) return disc;
-        var k = new ProceduralModels.MeshKit(1);
-        k.Tube(0, Vector3.zero, Vector3.up * 0.03f, 1f, 0.9f, 14);
-        return disc = k.Build("Disc");
+        float phase = Random.Range(0f, Mathf.PI * 2), phase2 = Random.Range(0f, Mathf.PI * 2);
+        float stretch = Random.Range(.76f, 1.24f), rotation = Random.Range(0f, Mathf.PI * 2), seed = Random.Range(0f, 500f);
+        // Smooth lobes and smaller shoreline variations, with no repeated disc.
+        for (int i = 0; i < Sectors; i++)
+        {
+            float a = i * Mathf.PI * 2 / Sectors;
+            float ellipse = 1 / Mathf.Sqrt(Mathf.Pow(Mathf.Cos(a - rotation) / stretch, 2) + Mathf.Pow(Mathf.Sin(a - rotation) * stretch, 2));
+            float lobes = 1 + .20f * Mathf.Sin(3*a + phase) + .12f * Mathf.Sin(5*a + phase2) + .065f * Mathf.Sin(9*a - phase);
+            float shore = .10f * (Mathf.PerlinNoise(seed + Mathf.Cos(a)*2, seed + Mathf.Sin(a)*2) - .5f);
+            outline[i] = radius * ellipse * (lobes + shore);
+        }
+        var vertices = new System.Collections.Generic.List<Vector3>();
+        var uv = new System.Collections.Generic.List<Vector2>();
+        var triangles = new System.Collections.Generic.List<int>();
+        Vector3 Project(float x, float z)
+        {
+            Vector3 ground = GroundBelow(transform.position + new Vector3(x, 0, z));
+            return new Vector3(x, ground.y - transform.position.y + .018f, z);
+        }
+        vertices.Add(Project(0, 0)); uv.Add(Vector2.zero);
+        for (int ring = 1; ring <= Rings; ring++)
+            for (int i = 0; i < Sectors; i++)
+            {
+                float a = i * Mathf.PI * 2 / Sectors, fraction = ring / (float)Rings;
+                vertices.Add(Project(Mathf.Cos(a)*outline[i]*fraction, Mathf.Sin(a)*outline[i]*fraction));
+                uv.Add(new Vector2(fraction, 0));
+            }
+        for (int i = 0; i < Sectors; i++)
+        {
+            int next = (i + 1) % Sectors;
+            triangles.AddRange(new[]{0, 1 + next, 1 + i});
+            for (int ring = 1; ring < Rings; ring++)
+            {
+                int a = 1 + (ring-1)*Sectors+i, b = 1 + (ring-1)*Sectors+next;
+                triangles.AddRange(new[]{a, b, a+Sectors, b, b+Sectors, a+Sectors});
+            }
+        }
+        // Small satellite splashes share the same draw call and lifetime.
+        for (int drop = 0; drop < 12; drop++)
+        {
+            int sector = Random.Range(0, Sectors); float a = sector*Mathf.PI*2/Sectors;
+            float distance = outline[sector]*Random.Range(1.08f, 1.27f), size = radius*Random.Range(.025f,.065f);
+            float x = Mathf.Cos(a)*distance, z = Mathf.Sin(a)*distance; int start = vertices.Count;
+            vertices.Add(Project(x,z)); uv.Add(Vector2.zero);
+            for(int j=0;j<10;j++)
+            {
+                float angle=j*Mathf.PI*2/10;
+                vertices.Add(Project(x+Mathf.Cos(angle)*size,z+Mathf.Sin(angle)*size*.7f)); uv.Add(new Vector2(1,1));
+            }
+            for(int j=0;j<10;j++)triangles.AddRange(new[]{start,start+1+(j+1)%10,start+1+j});
+        }
+        var mesh = new Mesh { name = "Unique ground-fitted acid splash" };
+        var coordinates=new System.Collections.Generic.List<Vector2>(vertices.Count);
+        foreach(var vertex in vertices)coordinates.Add(new Vector2(vertex.x,vertex.z));
+        mesh.SetVertices(vertices); mesh.SetUVs(0,coordinates); mesh.SetUVs(1,uv); mesh.SetTriangles(triangles,0);
+        mesh.RecalculateNormals(); mesh.RecalculateTangents(); mesh.RecalculateBounds();
+        return mesh;
+    }
+
+    // Match the damaging footprint to the visible lobed pool, including its spread.
+    public bool Contains(Vector3 position)
+    {
+        Vector3 delta = position-transform.position;
+        if(Mathf.Abs(delta.y)>1.2f)return false;
+        float angle = Mathf.Repeat(Mathf.Atan2(delta.z,delta.x),Mathf.PI*2)*Sectors/(Mathf.PI*2);
+        int i = Mathf.FloorToInt(angle); float limit = Mathf.Lerp(outline[i],outline[(i+1)%Sectors],angle-i)*Growth;
+        return delta.x*delta.x+delta.z*delta.z < limit*limit;
+    }
+
+    void UpdateAppearance()
+    {
+        properties.SetFloat(Fade,Mathf.Clamp01(life-age)); properties.SetFloat(Spread,Growth);
+        surfaceRenderer.SetPropertyBlock(properties);
     }
 
     void Update()
     {
         age += Time.deltaTime;
-        float fade = Mathf.Clamp01((life - age) / 1f);
-        if (mat != null) mat.color = new Color(baseColor.r, baseColor.g, baseColor.b, baseColor.a * fade);
-        transform.localScale = new Vector3(radius * (0.6f + 0.4f * Mathf.Clamp01(age * 4f)), 1f, radius * (0.6f + 0.4f * Mathf.Clamp01(age * 4f)));
         if (age >= life) { Destroy(gameObject); return; }
+        UpdateAppearance();
 
         var player = GameObject.FindWithTag("Player");
         if (player == null) return;
-        Vector3 d = player.transform.position - transform.position;
-        if (new Vector2(d.x, d.z).magnitude < radius && Mathf.Abs(d.y) < 1.2f)
+        if (Contains(player.transform.position))
         {
             var ph = player.GetComponent<PlayerHealth>();
             if (ph != null) ph.TakeBurn(dps * Time.deltaTime);
         }
     }
+
+    void OnDestroy() { if(surface != null) Destroy(surface); }
 }

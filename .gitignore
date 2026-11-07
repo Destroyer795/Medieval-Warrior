@@ -41,3 +41,8 @@ Thumbs.db
 # Local verification logs, screenshots, reports and working backups
 /*.log
 /Artifacts/
+
+# Blender autosave backups and reproducible intermediate mesh export
+/ArtSource/Marchwarden/*.blend[1-9]
+/Tools/ArtPipeline/Marchwarden/meshes.json
+/Tools/ArtPipeline/__pycache__/

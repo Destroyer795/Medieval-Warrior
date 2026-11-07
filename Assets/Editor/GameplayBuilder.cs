@@ -19,7 +19,8 @@ public static class GameplayBuilder
     const string PropsDir = "Assets/Environment/Generated/Props";
     const string ZombiePrefab = "Assets/Prefabs/Zombie1.prefab";
     const string ZombieController = "Assets/Animations/ZombieBrain.controller";
-    const string KnightModel = "Assets/Toon_RTS_demo/models/ToonRTS_demo_Knight.FBX";
+    static string KnightModel => File.Exists("Assets/Resources/Prefabs/Marchwarden.prefab")
+        ? "Assets/Resources/Prefabs/Marchwarden.prefab" : "Assets/Toon_RTS_demo/models/ToonRTS_demo_Knight.FBX";
     const string KnightController = "Assets/Animations/KnightController.controller";
     public const string MenuScene = "Assets/Scenes/MainMenu.unity";
 
@@ -388,7 +389,7 @@ public static class GameplayBuilder
         anim.runtimeAnimatorController = AssetDatabase.LoadAssetAtPath<RuntimeAnimatorController>(KnightController);
         anim.applyRootMotion = false;
         anim.updateMode = AnimatorUpdateMode.UnscaledTime;
-        knight.AddComponent<KnightAppearance>();
+        if (!knight.TryGetComponent<KnightAppearance>(out _)) knight.AddComponent<KnightAppearance>();
 
         var plinth = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
         plinth.name = "Plinth";

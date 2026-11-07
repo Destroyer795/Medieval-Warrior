@@ -25,7 +25,7 @@ public static class GameSettings
     public static string HeroName { get => PlayerPrefs.GetString("mw.hero", "Sir Galahad"); set => PlayerPrefs.SetString("mw.hero", string.IsNullOrWhiteSpace(value) ? "Nameless Knight" : value.Trim()); }
 
     // ---------------- knight customisation (indices into the palettes below)
-    public static int Tabard { get => PlayerPrefs.GetInt("mw.tabard", 1); set => PlayerPrefs.SetInt("mw.tabard", value); }
+    public static int Tabard { get => PlayerPrefs.GetInt("mw.tabard", 7); set => PlayerPrefs.SetInt("mw.tabard", value); }
     public static int Metal { get => PlayerPrefs.GetInt("mw.metal", 0); set => PlayerPrefs.SetInt("mw.metal", value); }
     public static int Leather { get => PlayerPrefs.GetInt("mw.leather", 0); set => PlayerPrefs.SetInt("mw.leather", value); }
     public static int BowFinish { get => PlayerPrefs.GetInt("mw.bow", 0); set => PlayerPrefs.SetInt("mw.bow", value); }
@@ -33,14 +33,14 @@ public static class GameSettings
 
     public static readonly (string name, Color color)[] TabardColors =
     {
-        ("Weathered Tan", new Color(0.72f, 0.48f, 0.24f)),
-        ("Royal Blue", new Color(0.12f, 0.27f, 0.72f)),
-        ("Crimson", new Color(0.72f, 0.08f, 0.1f)),
-        ("Forest Green", new Color(0.12f, 0.48f, 0.2f)),
-        ("Royal Purple", new Color(0.42f, 0.16f, 0.6f)),
-        ("Sun Gold", new Color(0.9f, 0.66f, 0.12f)),
+        ("Weathered Tan", new Color(0.46f, 0.32f, 0.20f)),
+        ("Storm Blue", new Color(0.17f, 0.27f, 0.43f)),
+        ("Oxblood", new Color(0.40f, 0.11f, 0.10f)),
+        ("Verdigris Teal", new Color(0.16f, 0.32f, 0.30f)),
+        ("Heather", new Color(0.30f, 0.20f, 0.32f)),
+        ("Old Gold", new Color(0.55f, 0.40f, 0.16f)),
         ("Raven Black", new Color(0.12f, 0.12f, 0.14f)),
-        ("Ivory", new Color(0.9f, 0.86f, 0.76f)),
+        ("Weathered Linen", new Color(0.55f, 0.51f, 0.42f)),
     };
     public static readonly (string name, Color tint)[] MetalTints =
     {
@@ -117,6 +117,13 @@ public static class GameSettings
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
     static void ApplyOnBoot()
     {
+        // Select the new coordinated outfit once; subsequent customization is
+        // preserved. This replaces the earlier demo/plate-harness color preset.
+        if(!PlayerPrefs.HasKey("mw.cinematic.palette"))
+        {
+            Tabard=7;Metal=3;Leather=1;BowFinish=1;
+            PlayerPrefs.SetInt("mw.cinematic.palette",1);PlayerPrefs.Save();
+        }
         AudioListener.volume = MasterVolume;
         if (PlayerPrefs.HasKey("mw.quality")) QualitySettings.SetQualityLevel(Mathf.Clamp(Quality, 0, QualitySettings.names.Length - 1), true);
     }

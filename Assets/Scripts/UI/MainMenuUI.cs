@@ -280,7 +280,8 @@ public class MainMenuUI : MonoBehaviour
             "A game by the Medieval Warrior team\n\n" +
             "<color=#F5CB73>Art</color>\n" +
             "Medieval Castle - Advance Studios\n" +
-            "Toon RTS knight - Polygon Blacksmith\n" +
+            "Marchwarden warrior & equipment - original project art\n" +
+            "Knight animation rig & clips - Toon RTS / Polygon Blacksmith\n" +
             "Free Zombie pack\n" +
             "Terrain textures & sky - Poly Haven (CC0)\n\n" +
             "<color=#F5CB73>Fonts</color>\n" +

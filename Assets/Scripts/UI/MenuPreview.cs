@@ -20,10 +20,15 @@ public class MenuPreview : MonoBehaviour
     void Init()
     {
         if (texture != null) return;
-        texture = new RenderTexture(900, 1200, 24, RenderTextureFormat.ARGB32) { name = "Knight Preview", antiAliasing = 4 };
+        texture = new RenderTexture(1350, 1800, 24, RenderTextureFormat.ARGB32) {
+            name = "Knight Preview", antiAliasing = 8, filterMode = FilterMode.Trilinear,
+            useMipMap = true, autoGenerateMips = true
+        };
         if (previewCamera != null)
         {
             previewCamera.targetTexture = texture;
+            previewCamera.allowMSAA = true;
+            previewCamera.renderingPath = RenderingPath.Forward;
             previewCamera.clearFlags = CameraClearFlags.SolidColor;
             previewCamera.backgroundColor = new Color(0, 0, 0, 0);
             previewCamera.enabled = false;

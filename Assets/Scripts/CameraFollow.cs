@@ -2,7 +2,7 @@ using UnityEngine;
 
 // Third-person orbit camera: mouse look, scroll zoom, over-the-shoulder aim for the bow,
 // wall collision and trauma-based screen shake.
-[DefaultExecutionOrder(50)]
+[DefaultExecutionOrder(-50)]
 public class CameraFollow : MonoBehaviour
 {
     [Header("Target")]
@@ -39,6 +39,7 @@ public class CameraFollow : MonoBehaviour
     private Camera cam;
     float orbitYaw, orbitPitch, yawVelocity, pitchVelocity, boomDistance, boomVelocity;
     Vector3 followPoint;
+    RaycastHit[] collisionHits=new RaycastHit[32];
 
     // Input heading is independent of camera follow lag and trauma shake.
     public Vector3 LookDirection => Quaternion.Euler(orbitPitch, orbitYaw, 0f) * Vector3.forward;
@@ -60,7 +61,7 @@ public class CameraFollow : MonoBehaviour
 
     public void AddShake(float amount) => trauma = Mathf.Clamp01(trauma + amount);
 
-    void LateUpdate()
+    void Update()
     {
         if (target == null) return;
         bool paused = Time.timeScale < 0.01f;
@@ -85,17 +86,27 @@ public class CameraFollow : MonoBehaviour
         bool aiming = player != null && player.CurrentWeapon == Weapon.Bow && (player.IsAiming || player.IsDrawing);
         aimBlend = Mathf.MoveTowards(aimBlend, aiming ? 1f : 0f, dt * 4f);
         float e = aimBlend * aimBlend * (3f - 2f * aimBlend);
-
-        // CALCULATE POSITION
+        // Mouse delta is already a per-frame displacement. Do not add another
+        // spring between the mouse and view; retain filtering for analog sticks.
         float angularSmooth = Mathf.Lerp(0.055f, 0.035f, e);
-        orbitYaw = Mathf.SmoothDampAngle(orbitYaw, currentYaw, ref yawVelocity, angularSmooth, Mathf.Infinity, dt);
-        orbitPitch = Mathf.SmoothDampAngle(orbitPitch, currentPitch, ref pitchVelocity, angularSmooth, Mathf.Infinity, dt);
+        if(GameInput.UsingGamepad)
+        {
+            orbitYaw = Mathf.SmoothDampAngle(orbitYaw, currentYaw, ref yawVelocity, angularSmooth, Mathf.Infinity, dt);
+            orbitPitch = Mathf.SmoothDampAngle(orbitPitch, currentPitch, ref pitchVelocity, angularSmooth, Mathf.Infinity, dt);
+        }
+        else{orbitYaw=currentYaw;orbitPitch=currentPitch;yawVelocity=pitchVelocity=0;}
+    }
+
+    void LateUpdate()
+    {
+        if(target==null||Time.timeScale<.01f)return;
+        float dt=Mathf.Min(Time.unscaledDeltaTime,.05f),e=aimBlend*aimBlend*(3-2*aimBlend);
         Quaternion rotation = Quaternion.Euler(orbitPitch, orbitYaw, 0);
         Vector3 targetPoint = target.position + Vector3.up * 1.5f;
         if ((targetPoint - followPoint).sqrMagnitude > 100f)
         { followPoint = targetPoint; currentVelocity = Vector3.zero; }
         followPoint = Vector3.SmoothDamp(followPoint, targetPoint, ref currentVelocity,
-            Mathf.Lerp(Mathf.Clamp(smoothSpeed, 0.03f, 0.12f), 0.045f, e), Mathf.Infinity, dt);
+            Mathf.Lerp(Mathf.Clamp(smoothSpeed, 0.015f, 0.04f), 0.025f, e), Mathf.Infinity, dt);
         // Resolve the shoulder offset first, so aiming beside a wall cannot place
         // the boom's origin on the other side of it.
         Vector3 shoulder = rotation * (aimShoulder * e);
@@ -114,7 +125,7 @@ public class CameraFollow : MonoBehaviour
         transform.rotation = rotation;
 
         // SHAKE
-        if (trauma > 0f && !paused)
+        if (trauma > 0f)
         {
             float s = trauma * trauma;
             float t = Time.unscaledTime * 25f;
@@ -128,8 +139,12 @@ public class CameraFollow : MonoBehaviour
     float ClearDistance(Vector3 origin, Vector3 direction, float distance)
     {
         float clear = distance;
-        foreach (var hit in Physics.SphereCastAll(origin, collisionRadius, direction, distance, ~0, QueryTriggerInteraction.Ignore))
+        int count;
+        while((count=Physics.SphereCastNonAlloc(origin,collisionRadius,direction,collisionHits,distance,~0,QueryTriggerInteraction.Ignore))==collisionHits.Length)
+            System.Array.Resize(ref collisionHits,collisionHits.Length*2);
+        for(int i=0;i<count;i++)
         {
+            var hit=collisionHits[i];
             if (hit.collider.transform.IsChildOf(target) || hit.collider.GetComponentInParent<EnemyController>() != null) continue;
             clear = Mathf.Min(clear, Mathf.Max(0f, hit.distance - 0.04f));
         }

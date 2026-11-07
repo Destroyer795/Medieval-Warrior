@@ -54,7 +54,7 @@ public static class GameInput
     {
         get
         {
-            var v = new Vector2(Input.GetAxis("Mouse X"), Input.GetAxis("Mouse Y"));
+            var v = new Vector2(Input.GetAxisRaw("Mouse X"), Input.GetAxisRaw("Mouse Y"));
             NoteMouseKeyboard(v.sqrMagnitude > 0.5f);
 #if ENABLE_INPUT_SYSTEM
             if (Pad != null)

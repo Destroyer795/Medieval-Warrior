@@ -6,6 +6,38 @@ regenerate.
 
 Requirements: Python 3.10+, `pip install numpy scipy pillow`. Run from the repository root.
 
+The Marchwarden warrior and equipment use Blender 4.5 LTS instead of
+these Python dependencies. See [the editable art source](../../ArtSource/Marchwarden/README.md)
+and `marchwarden.py`. Unity's **Marchwarden > Import Blender exports** menu imports
+its meshes and PBR surfaces. The outfit evolves from the user's s.jpg study to
+the cinematic warrior reference; the head and hands use adapted MakeHuman CC0
+anatomy. The demo skeleton and locomotion
+clips remain in use, with new upper-body sword clips and a procedural bow rig.
+
+The current [cinematic revision](../../ArtSource/Marchwarden/Cinematic.md) follows
+the newer generated warrior reference. `marchwarden_cinematic.py` adds continuous
+anatomical garments, overlapping blackened armor, linked mail and the refined
+heater. The export retains four skin influences and sparse garment motion shapes;
+Unity imports those into its existing character skeleton.
+
+`marchwarden_gladiator.py` replaces the conical helmet with a forged gladiator
+helmet and exports the coordinated 1.10 stature multiplier. See the
+[helmet and stature notes](../../ArtSource/Marchwarden/Gladiator.md).
+
+`marchwarden_cloth.py` now exports separate linen panels for native runtime cloth.
+The [combat and cloth notes](../../ArtSource/Marchwarden/CombatCloth.md) cover the
+rapid sword timings, collision fitting, rendering and stress review. The tunic
+uses live physics instead of the earlier garment motion shapes.
+
+`marchwarden_structure.py` refines the upper body, creates the 60-joint rigid
+hip armor assembly and reduces the quiver. See the [structure and equipment
+notes](../../ArtSource/Marchwarden/Structure.md) for runtime contact and suspension.
+
+`marchwarden_hands.py` builds continuous anatomical hands and exports explicit
+palm frames for the sword, heater handle and bow. See the [hand and grip notes](../../ArtSource/Marchwarden/Hands.md).
+The pipeline saves compressed `.blend` files; intermediate mesh JSON and Blender
+backups remain local and are ignored by Git.
+
 | Script | Writes | What it does |
 |--------|--------|--------------|
 | `download_sources.py <dir>` | `<dir>/*_diff.jpg`, `*_nor.jpg`, `sky.hdr` | Downloads the CC0 source textures and sky HDRI from Poly Haven. |

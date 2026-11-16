@@ -1,6 +1,6 @@
 using UnityEngine;
 
-// Ballistic arrow: drops a little, sticks into whatever it hits, knocks zombies back.
+// Ballistic arrow: drops, pierces exposed targets and sticks to animated bodies or shields.
 public class Arrow : MonoBehaviour
 {
     Vector3 velocity;
@@ -68,14 +68,16 @@ public class Arrow : MonoBehaviour
         Vector3 tip = transform.position + transform.forward * Length;
         Vector3 step = velocity * Time.deltaTime;
 
-        var hits = Physics.RaycastAll(tip, step.normalized, step.magnitude + 0.05f, ~0, QueryTriggerInteraction.Ignore);
+        var hits = Physics.RaycastAll(tip, step.normalized, step.magnitude + 0.05f, ~0, QueryTriggerInteraction.Collide);
         System.Array.Sort(hits, (x, y) => x.distance.CompareTo(y.distance));
         foreach (var hit in hits)
         {
+            if(hit.collider.isTrigger&&hit.collider.GetComponent<RevenantHitZone>()==null)continue;
             if (owner != null && hit.transform.IsChildOf(owner)) continue;
             var e = hit.collider.GetComponentInParent<EnemyController>();
+            if(e!=null&&e.IsDead)continue;
             if (e != null && pierced.Contains(e)) continue;
-            if (e != null && !e.IsDead && pierce > 0)
+            if (e != null && !e.IsDead && pierce > 0&&!e.GuardsContact(velocity.normalized,hit.point))
             {
                 // punch straight through and keep flying
                 pierce--;
@@ -100,9 +102,21 @@ public class Arrow : MonoBehaviour
         var enemy = hit.collider.GetComponentInParent<EnemyController>();
         if (enemy != null && !enemy.IsDead)
         {
-            HitEnemy(enemy, hit.point);
+            bool landed=HitEnemy(enemy, hit.point);
             // stick to the nearest bone so the arrow moves with the body, not the upright root collider
-            transform.SetParent(NearestBone(enemy, hit.point), true);
+            var visual=enemy.GetComponent<RevenantVisual>();
+            if(!landed&&visual!=null)
+            {
+                Transform hand=visual.ShieldHand;Vector3 normal=hand.TransformDirection(visual.Form.left.normal).normalized;
+                Vector3 plane=hand.TransformPoint(visual.Form.left.position)+normal*.07f;float dot=Vector3.Dot(velocity.normalized,normal);
+                if(Mathf.Abs(dot)>.1f)
+                {
+                    float along=Vector3.Dot(plane-hit.point,normal)/dot;
+                    if(Mathf.Abs(along)<1)transform.position=hit.point+velocity.normalized*along-transform.forward*(Length-.18f);
+                }
+                transform.SetParent(hand,true);
+            }
+            else transform.SetParent(NearestBone(enemy, hit.point), true);
             stuckIn = enemy;
             stuckInEnemy = true;
             if (enemy.IsDead) BeginFall();
@@ -181,11 +195,11 @@ public class Arrow : MonoBehaviour
         flame = null;
     }
 
-    void HitEnemy(EnemyController enemy, Vector3 point)
+    bool HitEnemy(EnemyController enemy, Vector3 point)
     {
         bool headshot = point.y > enemy.transform.position.y + 1.45f * enemy.transform.localScale.y;
         float dmg = damage * (headshot ? 2f : 1f);
-        enemy.TakeDamage(dmg, velocity.normalized, knockback);
+        if(!enemy.ReceiveWeaponHit(dmg, velocity.normalized, knockback,point))return false;
         if (fire)
         {
             FX.Embers(point, 12);
@@ -201,5 +215,6 @@ public class Arrow : MonoBehaviour
         AudioManager.PlayAt("arrow_flesh", point, 0.9f);
         if (GameManager.instance != null) GameManager.instance.RegisterArrowHit(enemy, headshot);
         GameHUD.HitMarker(headshot);
+        return true;
     }
 }

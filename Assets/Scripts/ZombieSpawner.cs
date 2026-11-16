@@ -18,7 +18,12 @@ public class ZombieSpawner : MonoBehaviour
 
     private float timer;
 
-    void Awake() => Instance = this;
+    void Awake()
+    {
+        Instance=this;
+        var revenant=Resources.Load<GameObject>("Revenants/Revenant");
+        if(revenant!=null)zombiePrefab=revenant;
+    }
 
     void Update()
     {

@@ -237,12 +237,16 @@ public class GameManager : MonoBehaviour
         float spitter = progress > 0.2f ? 0.14f : 0f;
         float bloater = progress > 0.32f ? 0.12f : 0f;
         float brute = progress > 0.5f ? 0.05f : 0f;
+        float swordsman = progress > .14f ? .20f : 0f;
+        float bulwark = progress > .35f ? .12f : 0f;
         float walker = 1f;
-        float roll = UnityEngine.Random.value * (walker + runner + spitter + bloater + brute);
+        float roll = UnityEngine.Random.value * (walker + runner + spitter + bloater + brute + swordsman + bulwark);
         if ((roll -= walker) < 0) return ZombieType.Walker;
         if ((roll -= runner) < 0) return ZombieType.Runner;
         if ((roll -= spitter) < 0) return ZombieType.Spitter;
         if ((roll -= bloater) < 0) return ZombieType.Bloater;
+        if ((roll -= swordsman) < 0) return ZombieType.Swordsman;
+        if ((roll -= bulwark) < 0) return ZombieType.Bulwark;
         return ZombieType.Brute;
     }
 

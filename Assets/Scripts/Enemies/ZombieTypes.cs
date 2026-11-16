@@ -1,6 +1,6 @@
 using UnityEngine;
 
-public enum ZombieType { Walker, Runner, Brute, Spitter, Bloater, Warlord }
+public enum ZombieType { Walker, Runner, Brute, Spitter, Bloater, Warlord, Swordsman, Bulwark }
 
 public class ZombieStats
 {
@@ -29,7 +29,9 @@ public static class ZombieTypes
         new ZombieStats { name = "Brute", description = "A walking siege engine. Charges from range; its slam throws knights across the yard.", health = 14, speed = 2.1f, damage = 26, attackRange = 2.4f, windup = 0.85f, cooldown = 2.2f, scale = 1.45f, tint = new Color(0.7f, 0.66f, 0.72f), glow = new Color(0.25f, 0f, 0.35f), points = 500, knockbackResist = 0.75f, animSpeed = 0.8f },
         new ZombieStats { name = "Spitter", description = "Keeps its distance and hurls burning bile. Close in fast.", health = 3, speed = 3.0f, damage = 9, attackRange = 13f, windup = 0.6f, cooldown = 3.2f, scale = 0.98f, tint = new Color(0.72f, 1f, 0.55f), glow = new Color(0.15f, 0.45f, 0f), points = 200, knockbackResist = 0f },
         new ZombieStats { name = "Bloater", description = "Swollen with rot. Bursts when close - or when slain. Use it.", health = 4, speed = 2.2f, damage = 34, attackRange = 2.4f, windup = 1.1f, cooldown = 99f, scale = 1.18f, tint = new Color(0.85f, 0.95f, 0.45f), glow = new Color(0.35f, 0.4f, 0f), points = 250, knockbackResist = 0.3f, animSpeed = 0.85f },
-        new ZombieStats { name = "Warlord", description = "The crowned dead. Charges, and when wounded enrages and raises the dead around it.", health = 45, speed = 2.5f, damage = 32, attackRange = 2.8f, windup = 0.8f, cooldown = 1.8f, scale = 1.85f, tint = new Color(0.55f, 0.35f, 0.35f), glow = new Color(0.7f, 0.08f, 0f), points = 2500, knockbackResist = 0.92f, animSpeed = 0.8f },
+        new ZombieStats { name = "Warlord", description = "The crowned dead. Charges, and when wounded enrages and raises the dead around it.", health = 45, speed = 2.5f, damage = 32, attackRange = 1.9f, windup = 0.8f, cooldown = 1.8f, scale = 1.85f, tint = new Color(0.55f, 0.35f, 0.35f), glow = new Color(0.7f, 0.08f, 0f), points = 2500, knockbackResist = 0.92f, animSpeed = 0.8f },
+        new ZombieStats { name = "Grave swordsman", description = "A fallen soldier. Watch the raised blade, then dodge the fast cut or thrust.", health = 6, speed = 2.9f, damage = 17, attackRange = 1.65f, windup = .48f, cooldown = 1.15f, scale = 1.06f, tint = Color.white, glow = Color.black, points = 300 },
+        new ZombieStats { name = "Grave bulwark", description = "Guards frontal weapon hits. Flank it, strike during its attack, aim above the shield or bash its guard open.", health = 8, speed = 2.3f, damage = 19, attackRange = 1.65f, windup = .62f, cooldown = 1.65f, scale = 1.08f, tint = Color.white, glow = Color.black, points = 400 },
     };
 
     public static ZombieStats Get(ZombieType t) => table[(int)t];

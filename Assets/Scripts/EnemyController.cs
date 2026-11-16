@@ -44,13 +44,23 @@ public class EnemyController : MonoBehaviour
     CapsuleCollider myCollider;
     NavMeshAgent navAgent;
     PlayerHealth playerHealth;
+    CapsuleCollider playerCapsule;
     Renderer[] renderers;
     MaterialPropertyBlock mpb;
+    RevenantVisual revenant;
+    float guardBrokenUntil;
+    Vector3? weaponImpact;
+    public bool IsAttacking=>state==State.Attack;
+    public float AttackElapsed=>stateTimer;
+    public int AttackStyle {get;private set;}
+    public bool GuardRaised=>type==ZombieType.Bulwark&&!IsDead&&Time.time>=guardBrokenUntil&&
+        (state==State.Hunt||state==State.Circle||state==State.Attack&&stateTimer<Stats.windup-.18f);
 
     float baseSpeed, damage, attackTimer, stateTimer, repathTimer, groanTimer, flashTimer;
     float circleAngle, circleRadius;
     int groanIndex;
     bool hasToken, initialised, enraged, hitDealt;
+    float weaponScanTime;
     Vector3 lastPosition, detourTarget;
     float stuckTimer, detourTimer, unreachableTimer;
     Vector3 deathDirection;
@@ -121,6 +131,8 @@ public class EnemyController : MonoBehaviour
         if(t==ZombieType.Runner&&runnerPath==null)runnerPath=new NavMeshPath();
         isBoss = boss;
         Stats = ZombieTypes.Get(t);
+        revenant=RevenantVisual.Install(gameObject,t);
+        renderers=new Renderer[]{revenant.Body};
         var diff = GameSettings.Profile;
 
         MaxHealth = Health = Stats.health * diff.enemyHealth * (boss && t != ZombieType.Warlord ? 2.5f : 1f);
@@ -146,7 +158,7 @@ public class EnemyController : MonoBehaviour
         if (animator != null)
         {
             if (pMoveMul) animator.SetFloat(hMoveMul, Stats.animSpeed);
-            if (pAttackMul) animator.SetFloat(hAttackMul, Mathf.Clamp(0.6f / Mathf.Max(0.2f, Stats.windup), 0.6f, t==ZombieType.Runner?2.8f:1.6f));
+            if (pAttackMul) animator.SetFloat(hAttackMul, 1f); // authored clips use each type's actual contact time
         }
         ApplyTint(0f);
 
@@ -155,6 +167,7 @@ public class EnemyController : MonoBehaviour
         {
             player = playerObj.transform;
             playerHealth = playerObj.GetComponent<PlayerHealth>();
+            playerCapsule = playerObj.GetComponent<CapsuleCollider>();
             playerControl = playerObj.GetComponent<PlayerControlSpeed>();
         }
         nextCharge = Time.time + UnityEngine.Random.Range(4f, 9f);
@@ -214,9 +227,12 @@ public class EnemyController : MonoBehaviour
 
     void SetState(State s)
     {
+        if(state==State.Attack&&(s==State.Hunt||s==State.Circle||s==State.Kite)&&animator!=null&&animator.isInitialized)
+            animator.CrossFadeInFixedTime("Locomotion",.07f);
         state = s;
         stateTimer = 0f;
         hitDealt = false;
+        weaponScanTime = 0;
         if (navAgent != null && navAgent.enabled && navAgent.isOnNavMesh) navAgent.isStopped = s == State.Attack || s == State.Fuse || s == State.Charge;
     }
 
@@ -346,7 +362,9 @@ public class EnemyController : MonoBehaviour
     {
         if(type==ZombieType.Runner&&!RunnerBehind)return;
         SetState(State.Attack);
-        if (pAttack) animator.SetTrigger(hAttack);
+        AttackStyle=UnityEngine.Random.Range(0,2);
+        animator.SetFloat("AttackStyle",AttackStyle);
+        if (pAttack) animator.Play("Attack",0,0f);
         if (type == ZombieType.Spitter) AudioManager.PlayAt("spit", transform.position, 0.8f);
         else AudioManager.PlayZombieVoice("zombie_attack", transform.position, type);
     }
@@ -357,7 +375,10 @@ public class EnemyController : MonoBehaviour
         {
             ReleaseToken();runnerDecisionAt=0;SetState(State.Hunt);return;
         }
-        FaceTowards(player.position, hitDealt ? 2f : 10f);
+        // Armed enemies commit to their line before release; dodging the visible
+        // blade works instead of being tracked through the impact frame.
+        bool committed=RevenantVisual.Armed(type)&&stateTimer>Stats.windup-.16f;
+        if(!committed)FaceTowards(player.position, hitDealt ? 2f : 10f);
         if(type==ZombieType.Runner)
         {
             if(!hitDealt&&stateTimer<Stats.windup-.065f)
@@ -369,8 +390,24 @@ public class EnemyController : MonoBehaviour
         }
         if (!hitDealt && stateTimer >= Stats.windup)
         {
-            hitDealt = true;
-            DealHit();
+            if(RevenantVisual.Armed(type))
+            {
+                // Sweep the baked blade through its short active interval.
+                // Frame skips cannot tunnel past contact or resample the live rig.
+                float end=Mathf.Min(stateTimer,Stats.windup+.12f);
+                float start=Mathf.Max(weaponScanTime,Stats.windup);
+                int samples=Mathf.Max(1,Mathf.CeilToInt((end-start)/.015f));
+                for(int i=0;i<=samples&&!hitDealt;i++)
+                    if(WeaponConnects(Mathf.Lerp(start,end,(float)i/samples)))
+                    {
+                        playerHealth.TakeDamage(damage,transform,type==ZombieType.Warlord?9f:0);
+                        hitDealt=true;
+                    }
+                weaponScanTime=end;
+                if(stateTimer>=Stats.windup+.12f)hitDealt=true;
+                if(hitDealt&&type==ZombieType.Warlord)HeavyImpact();
+            }
+            else{hitDealt=true;DealHit();}
         }
         if(type==ZombieType.Runner&&stateTimer>=Stats.windup+.18f)
         {
@@ -397,7 +434,7 @@ public class EnemyController : MonoBehaviour
             return;
         }
         Vector3 toPlayer = player.position - transform.position;
-        float reach = attackRange + 0.7f;
+        float reach = attackRange+.7f;
         bool inFront = Vector3.Angle(transform.forward, Flat(toPlayer)) < 75f;
         if (toPlayer.magnitude <= reach && inFront && playerHealth != null)
         {
@@ -405,11 +442,28 @@ public class EnemyController : MonoBehaviour
             playerHealth.TakeDamage(damage, transform, knock);
         }
         if (type == ZombieType.Brute || type == ZombieType.Warlord)
+            HeavyImpact();
+    }
+
+    bool WeaponConnects(float time)
+    {
+        if(playerHealth==null||DistanceToPlayer>attackRange+.18f)return false;
+        revenant.SampleBlade(AttackStyle,time,out var a,out var b);
+        Vector3 center=player.position+Vector3.up*.9f,axis=Vector3.up;float radius=.34f,half=.56f;
+        if(playerCapsule!=null)
         {
-            FX.Dust(transform.position + transform.forward * 1.5f, 1.6f, 18);
-            FX.Shake(0.5f);
-            AudioManager.PlayAt("explosion", transform.position, 0.35f, 0.2f);
+            center=player.TransformPoint(playerCapsule.center);
+            axis=player.TransformDirection(playerCapsule.direction==0?Vector3.right:playerCapsule.direction==2?Vector3.forward:Vector3.up);
+            float scale=Mathf.Max(Mathf.Abs(player.lossyScale.x),Mathf.Abs(player.lossyScale.y),Mathf.Abs(player.lossyScale.z));
+            radius=playerCapsule.radius*scale;half=Mathf.Max(0,playerCapsule.height*.5f*scale-radius);
         }
+        return RevenantVisual.SegmentDistanceSquared(a,b,center-axis*half,center+axis*half)<(radius+.12f)*(radius+.12f);
+    }
+
+    void HeavyImpact()
+    {
+        FX.Dust(transform.position+transform.forward*1.5f,1.6f,18);
+        FX.Shake(.5f);AudioManager.PlayAt("explosion",transform.position,.35f,.2f);
     }
 
     // Spitters hang back at range, retreat when the knight closes in, and lob bile.
@@ -536,9 +590,10 @@ public class EnemyController : MonoBehaviour
         if (animator == null) return;
         float v = navAgent != null && navAgent.enabled ? navAgent.velocity.magnitude : 0f;
         if (state == State.Attack || state == State.Fuse || state == State.Charge) v = 0f;
-        if(type==ZombieType.Runner&&pMoveMul)
-            animator.SetFloat(hMoveMul,Stats.animSpeed*(v>.2f?Mathf.Clamp(v/Mathf.Max(.5f,baseSpeed),.85f,1.8f):1),.08f,Time.deltaTime);
-        if (pSpeed) animator.SetFloat(hSpeed, v / Mathf.Max(0.5f, transform.localScale.y), 0.1f, Time.deltaTime);
+        float localSpeed=v/Mathf.Max(.5f,transform.localScale.y);
+        float cadence=Mathf.Max(Stats.animSpeed,localSpeed/Mathf.Max(.5f,revenant.Form.runSpeed));
+        if(pMoveMul)animator.SetFloat(hMoveMul,cadence,.08f,Time.deltaTime);
+        if(pSpeed)animator.SetFloat(hSpeed,localSpeed/cadence,.08f,Time.deltaTime);
         if (pIsMoving) animator.SetBool(hIsMoving, v > 0.2f);
     }
 
@@ -581,16 +636,41 @@ public class EnemyController : MonoBehaviour
     // Legacy entry point (sword/parry code used ints).
     public void TakeDamage(int damageAmount) => TakeDamage(damageAmount, -transform.forward, 0f);
 
+    // Environmental damage and nonlethal hits continue the brain uninterrupted.
+    // Only weapon contacts go through the physical guard rules.
+    public bool ReceiveWeaponHit(float amount,Vector3 direction,float knockback,Vector3 point,bool bash=false)
+    {
+        if(IsDead||amount<=0||state==State.Emerging&&stateTimer<.4f)return false;
+        bool frontal=Vector3.Dot(transform.forward,-Flat(direction).normalized)>.40f;
+        if(bash&&type==ZombieType.Bulwark&&frontal)guardBrokenUntil=Time.time+1.25f;
+        if(!bash&&GuardsContact(direction,point))
+        {
+            FX.Sparks(point,-direction);AudioManager.PlayAt("shield_block",point,.85f);
+            return false;
+        }
+        if(!IsDead&&amount>0&&revenant!=null)revenant.Injuries.AddHit(point,direction);
+        weaponImpact=revenant!=null?revenant.Injuries.LastBloodPoint:point;
+        try{TakeDamage(amount,direction,knockback);}finally{weaponImpact=null;}
+        return true;
+    }
+    public bool GuardsContact(Vector3 direction,Vector3 point)
+    {
+        float height=(point.y-transform.position.y)/transform.localScale.y;
+        float lateral=transform.InverseTransformPoint(point).x;
+        return GuardRaised&&Vector3.Dot(transform.forward,-Flat(direction).normalized)>.40f&&height>.42f&&height<1.52f&&lateral<.16f&&lateral>-.72f;
+    }
+
     public void TakeDamage(float amount, Vector3 hitDirection, float knockback)
     {
         if (IsDead || state == State.Emerging && stateTimer < 0.4f) return;
 
         Health -= amount;
+        if(Health>0&&revenant!=null)revenant.React(hitDirection);
         health = Mathf.CeilToInt(Health);
         LastHitTime = Time.time;
         flashTimer = 1f;
         Damaged?.Invoke(this, amount, HeadPosition);
-        FX.Blood(transform.position + Vector3.up * 1.2f * transform.localScale.y, hitDirection + Vector3.up * 0.3f, Mathf.Clamp(amount, 0.6f, 2.5f));
+        FX.Blood(weaponImpact??transform.position+Vector3.up*1.2f*transform.localScale.y,hitDirection+Vector3.up*.3f,Mathf.Clamp(amount,.6f,2.5f));
 
         if (Health <= 0f)
         {
@@ -617,6 +697,7 @@ public class EnemyController : MonoBehaviour
     void IsDeadPending()
     {
         if (myCollider != null) myCollider.enabled = false;
+        if(revenant!=null)revenant.Injuries.DisableHitZones();
         ReleaseToken();
     }
 
@@ -624,6 +705,7 @@ public class EnemyController : MonoBehaviour
     {
         if (IsDead) return;
         IsDead = true;
+        if(revenant!=null)revenant.Injuries.DisableHitZones();
         if (burningFlames != null) { FX.Extinguish(burningFlames); burningFlames = null; }
         state = State.Dead;
         All.Remove(this);   // corpses don't count towards caps or wave progress
@@ -801,9 +883,9 @@ public class EnemyController : MonoBehaviour
     {
         if (renderers == null) return;
         // the zombie albedo is very dark; lift it so they read against the grass, flash red-white when hit
-        Color baseTint = (Stats != null ? Stats.tint : Color.white) * 1.7f;
-        Color c = Color.Lerp(baseTint, new Color(3f, 1.6f, 1.5f), flash);
-        Color glow = (Stats != null ? Stats.glow : Color.black) + new Color(0.9f, 0.25f, 0.2f) * flash;
+        Color baseTint = revenant!=null?Color.white:(Stats != null ? Stats.tint : Color.white) * 1.7f;
+        Color c = Color.Lerp(baseTint, revenant!=null?new Color(.78f,.42f,.38f):new Color(3f,1.6f,1.5f),flash);
+        Color glow = revenant!=null?Color.black:(Stats != null ? Stats.glow : Color.black)+new Color(.9f,.25f,.2f)*flash;
         foreach (var r in renderers)
         {
             if (r == null) continue;

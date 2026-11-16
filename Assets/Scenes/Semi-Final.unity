@@ -5588,7 +5588,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 267d37812a3436b4bb150c1150f86bb0, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ZombieSpawner
-  zombiePrefab: {fileID: 5022296251313604464, guid: 788730ddfea7acf4a99e657ef86da4f2, type: 3}
+  zombiePrefab: {fileID: 196461605621549653, guid: 84520049ad1ecad45a3c463f727413a8, type: 3}
   spawnPoint: {fileID: 1474666081}
   extraSpawnPoints: []
   maxZombies: 3

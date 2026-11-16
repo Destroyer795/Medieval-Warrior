@@ -590,10 +590,10 @@ public class PlayerControlSpeed : MonoBehaviour
                 if (toCollider.sqrMagnitude > 0.0001f && hit.Raycast(new Ray(swordOrigin, toCollider.normalized), out var swordHit, toCollider.magnitude))
                     contact = swordHit.point;
                 FX.Sparks(contact, -dir + Vector3.up * 0.15f);
-                enemy.TakeDamage(damage, dir, knock);
+                bool landed=enemy.ReceiveWeaponHit(damage, dir, knock,contact);
                 hitEnemies.Add(enemy); // one hit per enemy
                 if (enemy.IsDead && Boons.LifeSteal > 0f && myHealthScript != null) myHealthScript.Heal(Boons.LifeSteal);
-                if (GameManager.instance != null) GameManager.instance.RegisterMeleeHit(enemy);
+                if (landed&&GameManager.instance != null) GameManager.instance.RegisterMeleeHit(enemy);
             }
         }
 
@@ -621,7 +621,7 @@ public class PlayerControlSpeed : MonoBehaviour
             if (e == null || e.IsDead) continue;
             Vector3 dir = (e.transform.position - transform.position).normalized;
             if (Vector3.Dot(transform.forward, dir) < 0.2f) continue;
-            e.TakeDamage(0.5f, dir, 11f);
+            e.ReceiveWeaponHit(0.5f, dir, 11f,e.transform.position+Vector3.up*1.15f,true);
             any = true;
         }
         if (any) { FX.Sparks(transform.position + transform.forward + Vector3.up * 1.2f, transform.forward); }

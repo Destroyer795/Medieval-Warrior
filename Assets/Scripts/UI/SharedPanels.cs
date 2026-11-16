@@ -75,13 +75,13 @@ public static class SharedPanels
         {
             var s = ZombieTypes.Get((ZombieType)i);
             var row = UIKit.HList(right.transform, 14, TextAnchor.MiddleLeft);
-            row.Layout(78);
+            row.Layout(62);
             var sw = UIKit.Icon(row.transform, "skull", 52, Color.Lerp(s.tint, s.glow * 3f, 0.35f));
             sw.Layout(56, 56);
             var col = UIKit.VList(row.transform, 0, null, TextAnchor.MiddleLeft);
             col.Layout(-1, 600);
-            UIKit.Text(col.transform, s.name, 26, UIKit.Gold, TextAlignmentOptions.MidlineLeft, true).Layout(32);
-            UIKit.Text(col.transform, s.description, 20, UIKit.Parchment, TextAlignmentOptions.MidlineLeft).Layout(44);
+            UIKit.Text(col.transform, s.name, 23, UIKit.Gold, TextAlignmentOptions.MidlineLeft, true).Layout(26);
+            UIKit.Text(col.transform, s.description, 17, UIKit.Parchment, TextAlignmentOptions.MidlineLeft).Layout(36);
         }
 
         BackButton(page.transform, onBack);

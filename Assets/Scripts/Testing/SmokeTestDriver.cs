@@ -195,6 +195,7 @@ public class SmokeTestDriver : MonoBehaviour
         foreach (var z in EnemyController.All.ToArray()) Destroy(z.gameObject);
         yield return null;
         health.InvulnerableUntil = float.PositiveInfinity;
+        yield return ReviewRevenants(player,health);
         yield return ReviewDamageContinuity(player);
         if(File.Exists("Artifacts/DamageReviewOnly.txt")){Finish(savedMode,savedDiff);yield break;}
         yield return ReviewRunner(player,health);
@@ -254,6 +255,12 @@ public class SmokeTestDriver : MonoBehaviour
         Vector3 movementStart = player.transform.position;
         Quaternion movementRotation = player.transform.rotation;
         Check(!player.GetComponent<Animator>().applyRootMotion, "player root motion disabled");
+        // This fixture measures cardinal input, not pushes from the live horde.
+        // The longer roster review gives real enemies time to reach the player.
+        var movementColliders=EnemyController.All.SelectMany(e=>e.GetComponentsInChildren<Collider>()).Where(c=>c.enabled).ToArray();
+        foreach(var collider in movementColliders)collider.enabled=false;
+        try
+        {
         foreach (var moveCase in new[] { Vector2.left, Vector2.right, Vector2.down })
         {
             playerBody.position = movementStart;
@@ -266,10 +273,13 @@ public class SmokeTestDriver : MonoBehaviour
             string key = moveCase == Vector2.left ? "A" : moveCase == Vector2.right ? "D" : "S";
             Check(Vector3.Angle(playerBody.rotation * Vector3.forward, expected) < 3f, key + " faces the requested cardinal direction");
             Check(Vector3.Dot(travelled, expected) > 0.25f, key + " moves in the requested direction");
-            Check(Mathf.Abs(Vector3.Dot(travelled, Vector3.Cross(Vector3.up, expected))) < 0.12f, key + " does not walk diagonally while pivoting");
+            float lateral=Mathf.Abs(Vector3.Dot(travelled,Vector3.Cross(Vector3.up,expected)));
+            Check(lateral<.12f,key+" does not walk diagonally while pivoting ("+lateral.ToString("F3")+"m lateral)");
             player.DebugMove(Vector2.zero);
             yield return Wait(0.1f);
         }
+        }
+        finally{foreach(var collider in movementColliders)if(collider!=null)collider.enabled=true;}
         player.DebugMove(null);
         playerBody.position = movementStart;
         playerBody.rotation = movementRotation;
@@ -890,6 +900,121 @@ public class SmokeTestDriver : MonoBehaviour
         }
         yield return null;
         Check(meshes.All(mesh=>mesh==null),"expired acid objects release their unique surface meshes");
+    }
+
+    IEnumerator ReviewRevenants(PlayerControlSpeed player,PlayerHealth health)
+    {
+        var flags=System.Reflection.BindingFlags.Instance|System.Reflection.BindingFlags.NonPublic;
+        var spawner=ZombieSpawner.Instance;var type=typeof(EnemyController);
+        void Call(EnemyController e,string name)=>type.GetMethod(name,flags).Invoke(e,null);
+        void Clock(EnemyController e,float t)=>type.GetField("stateTimer",flags).SetValue(e,t);
+        void Hunt(EnemyController e)=>type.GetMethod("SetState",flags).Invoke(e,new[]{System.Enum.Parse(type.GetField("state",flags).FieldType,"Hunt")});
+        float savedHealth=health.currentHealth,savedImmune=health.InvulnerableUntil;
+        var parryField=typeof(PlayerHealth).GetField("isParrying",flags);
+        bool savedBlock=health.isShieldBlocking,savedParry=(bool)parryField.GetValue(health);
+        var body=player.GetComponent<Rigidbody>();var constraints=body.constraints;var velocity=body.linearVelocity;body.constraints=RigidbodyConstraints.FreezeAll;
+        bool playerEnabled=player.enabled;player.enabled=false;
+        try
+        {
+            health.InvulnerableUntil=0;health.isShieldBlocking=false;parryField.SetValue(health,false);health.currentHealth=1000;
+            Check(spawner.zombiePrefab.GetComponentsInChildren<Renderer>().Length==0,"crowd spawn prefab contains no demo zombie surfaces");
+            foreach(ZombieType kind in System.Enum.GetValues(typeof(ZombieType)))
+            {
+                Vector3 position=player.transform.position+player.transform.forward*(RevenantVisual.Armed(kind)?ZombieTypes.Get(kind).attackRange*.90f:1.1f);
+                if(!UnityEngine.AI.NavMesh.SamplePosition(position,out var spawn,1,UnityEngine.AI.NavMesh.AllAreas)){Check(false,"reachable Revenant fixture");continue;}
+                var e=Instantiate(spawner.zombiePrefab,spawn.position,Quaternion.LookRotation(Vector3.ProjectOnPlane(player.transform.position-spawn.position,Vector3.up))).GetComponent<EnemyController>();
+                e.Init(kind,false,false);e.enabled=false;e.GetComponent<UnityEngine.AI.NavMeshAgent>().isStopped=true;
+                try
+                {
+                    var visual=e.GetComponent<RevenantVisual>();
+                    Check(visual!=null&&visual.Form.type==kind&&visual.Body.sharedMesh==RevenantVisual.Roster.Get(kind).mesh&&visual.Body.sharedMaterials.Length==1,
+                        kind+" spawns its distinct Blender anatomy and shared PBR surface");
+                    Check(e.GetComponent<Animator>().avatar!=null&&!e.GetComponent<Animator>().avatar.isHuman&&e.GetComponent<Animator>().runtimeAnimatorController==visual.Form.controller,
+                        kind+" uses the new generic skeletal clips without humanoid retarget conflicts");
+                    var anim=e.GetComponent<Animator>();anim.cullingMode=AnimatorCullingMode.AlwaysAnimate;
+                    var foot=visual.Body.bones.First(b=>b.name=="Base HumanRFoot");var arm=visual.SwordHand;var pelvis=visual.Body.bones.First(b=>b.name=="Base HumanPelvis");
+                    anim.SetFloat("Speed",3.8f);anim.SetFloat("MoveMul",1);anim.Play("Locomotion",0,0);anim.Update(0);
+                    var footBefore=e.transform.InverseTransformPoint(foot.position);float footTravel=0;
+                    for(int sample=0;sample<4;sample++){yield return Wait(.08f);footTravel=Mathf.Max(footTravel,Vector3.Distance(footBefore,e.transform.InverseTransformPoint(foot.position)));}
+                    Check(footTravel>.04f,kind+" walk/run actually moves leg bones in Play mode");
+                    anim.SetFloat("AttackStyle",0);anim.SetTrigger("attack");anim.Update(0);var armBefore=e.transform.InverseTransformPoint(arm.position);float armTravel=0;
+                    for(int sample=0;sample<4;sample++){yield return Wait(.06f);armTravel=Mathf.Max(armTravel,Vector3.Distance(armBefore,e.transform.InverseTransformPoint(arm.position)));}
+                    Check(armTravel>.015f,kind+" attack actually moves arm bones in Play mode");
+                    float pelvisBefore=pelvis.position.y;anim.SetBool("dieForward",false);anim.SetTrigger("die");yield return Wait(.48f);
+                    Check(Mathf.Abs(pelvis.position.y-pelvisBefore)>.04f,kind+" death actually lowers the animated body in Play mode");
+                    anim.Rebind();anim.Update(0);Hunt(e);yield return Wait(.12f);
+                    var skin=visual.Body.sharedMesh;var points=skin.vertices;var weights=skin.boneWeights;
+                    var matrices=visual.Body.bones.Select((b,i)=>b.localToWorldMatrix*skin.bindposes[i]).ToArray();float soleY=float.PositiveInfinity;
+                    for(int i=0;i<points.Length;i++)
+                    {
+                        var w=weights[i];string boneName=RevenantVisual.Roster.bones[w.boneIndex0];
+                        if(points[i].y>=.11f||!(boneName.Contains("Foot")||boneName.EndsWith("Digit11")))continue;
+                        var p=points[i];var q=matrices[w.boneIndex0].MultiplyPoint3x4(p)*w.weight0+matrices[w.boneIndex1].MultiplyPoint3x4(p)*w.weight1+matrices[w.boneIndex2].MultiplyPoint3x4(p)*w.weight2+matrices[w.boneIndex3].MultiplyPoint3x4(p)*w.weight3;
+                        soleY=Mathf.Min(soleY,q.y);
+                    }
+                    float clearance=soleY-(e.transform.position.y+visual.Grounding.BodyOffset);
+                    Check(visual.Grounding.HasGround&&Mathf.Abs(clearance)<.06f*e.transform.localScale.y,
+                        kind+" standing soles reach the physical floor (clearance "+clearance.ToString("F3")+"m)");
+                    var zones=e.GetComponentsInChildren<RevenantHitZone>();
+                    Check(zones.Length==9&&zones.All(z=>z.GetComponent<Collider>().isTrigger),kind+" has query-only arm, leg and head hit volumes");
+                    var armZone=zones.First(z=>z.name=="Hit zone RArmForearm").GetComponent<Collider>();Physics.SyncTransforms();
+                    Vector3 armContact=armZone.bounds.center;
+                    Check(Physics.RaycastAll(armContact+e.transform.forward*2,-e.transform.forward,2.1f,~0,QueryTriggerInteraction.Collide).Any(h=>h.collider==armZone),kind+" exposed forearm can be struck outside its torso capsule");
+                    float limbHealth=e.Health;bool limbLanded=e.ReceiveWeaponHit(.1f,-e.transform.forward,0,armContact);
+                    Check(limbLanded&&e.Health<limbHealth&&visual.Injuries.BloodCount==1,kind+" a limb hit deals damage and records blood at the struck surface");
+                    Check(Vector3.Distance(visual.Injuries.LastBloodPoint,armContact)<.22f*e.transform.localScale.y,kind+" blood projects to nearby posed anatomy instead of the root capsule");
+                    if(kind==ZombieType.Walker)
+                    {
+                        bool wasAnimating=anim.enabled;anim.enabled=false;Physics.SyncTransforms();
+                        float beforeArrow=e.Health;
+                        var limbArrow=Arrow.Fire(armContact+e.transform.forward*2.1f,-e.transform.forward,25,.15f,0,player.transform);
+                        yield return Wait(.18f);
+                        Check(e.Health<beforeArrow&&visual.Injuries.BloodCount==2,"a real arrow can wound an exposed arm through the anatomical hit volume");
+                        if(limbArrow!=null)Destroy(limbArrow.gameObject);anim.enabled=wasAnimating;
+                    }
+                    if(kind==ZombieType.Bulwark)
+                    {
+                        Hunt(e);Vector3 direction=e.transform.position-player.transform.position;
+                        Vector3 contact=e.transform.position+Vector3.up*e.transform.localScale.y*1.1f;
+                        float before=e.Health;bool landed=e.ReceiveWeaponHit(.25f,direction,0,contact);
+                        Check(!landed&&e.Health==before&&e.GuardRaised,"Bulwark intercepts a frontal torso weapon hit");
+                        e.ReceiveWeaponHit(.25f,-direction,0,contact);
+                        Check(e.Health<before,"Bulwark can be damaged from behind its shield");
+                        before=e.Health;e.ReceiveWeaponHit(.25f,direction,0,e.transform.position+Vector3.up*e.transform.localScale.y*1.68f);
+                        Check(e.Health<before,"an arrow above the Bulwark shield can reach its head");
+                        e.ReceiveWeaponHit(.25f,direction,11,contact,true);before=e.Health;e.ReceiveWeaponHit(.25f,direction,0,contact);
+                        Check(!e.GuardRaised&&e.Health<before,"shield bash opens the Bulwark guard without freezing its brain");
+                    }
+                    if(RevenantVisual.Armed(kind))
+                    {
+                      for(int style=0;style<2;style++)
+                      {
+                        Call(e,"BeginAttack");Clock(e,e.Stats.windup-.01f);float before=health.currentHealth;Call(e,"UpdateAttack");
+                        type.GetField("<AttackStyle>k__BackingField",flags).SetValue(e,style);e.GetComponent<Animator>().SetFloat("AttackStyle",style);
+                        Check(health.currentHealth==before,kind+" telegraph cannot damage before blade contact");
+                        var wristBefore=visual.SwordHand.position;var wristRotation=visual.SwordHand.rotation;
+                        Clock(e,e.Stats.windup+.12f);Call(e,"UpdateAttack");
+                        Check(health.currentHealth<before,kind+" baked blade contact lands at normal melee reach, style "+style+" (distance "+Vector3.Distance(e.transform.position,player.transform.position).ToString("F2")+"m)");
+                        Check(Vector3.Distance(wristBefore,visual.SwordHand.position)<.0001f&&Quaternion.Angle(wristRotation,visual.SwordHand.rotation)<.01f,
+                            kind+" contact detection leaves the live animation pose untouched, style "+style);
+                        float after=health.currentHealth;Clock(e,e.Stats.windup+.2f);Call(e,"UpdateAttack");
+                        Check(health.currentHealth==after,kind+" sword sweep damages at most once per attack, style "+style);
+                        if(kind==ZombieType.Bulwark)Check(!e.GuardRaised,"Bulwark exposes its torso during attack follow-through");
+                      }
+                        Call(e,"BeginAttack");e.transform.rotation*=Quaternion.Euler(0,100,0);Clock(e,e.Stats.windup+.12f);float missBefore=health.currentHealth;Call(e,"UpdateAttack");
+                        Check(health.currentHealth==missBefore,kind+" misses when its committed blade passes beside the warrior");
+                    }
+                }
+                finally{ZombieDirector.ReleaseToken(e);Destroy(e.gameObject);}
+                yield return null;
+            }
+        }
+        finally
+        {
+            health.currentHealth=savedHealth;health.InvulnerableUntil=savedImmune;health.isShieldBlocking=savedBlock;parryField.SetValue(health,savedParry);
+            body.constraints=constraints;body.linearVelocity=velocity;
+            player.enabled=playerEnabled;
+        }
     }
 
     IEnumerator ReviewDamageContinuity(PlayerControlSpeed player)

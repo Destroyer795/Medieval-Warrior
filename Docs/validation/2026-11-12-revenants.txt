@@ -1,0 +1,105 @@
+PASS Eight Blender archetypes imported
+PASS Walker: continuous anatomy within crowd triangle budget
+PASS Walker: one shared PBR body draw
+PASS Walker: three fitted hair/beard options
+PASS Walker: four detailed anatomical UV skin maps
+PASS Walker: normalized four-influence skin
+PASS Walker: two reduced distance meshes preserve crowd performance
+PASS Walker: legacy zombie surfaces hidden, optional fitted hair
+PASS Walker: two baked combat clips and controller
+PASS Walker: clip contact/recovery timing matches brain
+PASS Hair meshes retain separate strand and scalp surface coordinates
+PASS Walker: walking soles remain on the authored floor (max 0.0000m)
+PASS Walker: finite posed mesh, strike 0
+PASS Walker: finite posed mesh, strike 1
+PASS Runner: continuous anatomy within crowd triangle budget
+PASS Runner: one shared PBR body draw
+PASS Runner: three fitted hair/beard options
+PASS Runner: four detailed anatomical UV skin maps
+PASS Runner: normalized four-influence skin
+PASS Runner: two reduced distance meshes preserve crowd performance
+PASS Runner: legacy zombie surfaces hidden, optional fitted hair
+PASS Runner: two baked combat clips and controller
+PASS Runner: clip contact/recovery timing matches brain
+PASS Runner: walking soles remain on the authored floor (max 0.0000m)
+PASS Runner: finite posed mesh, strike 0
+PASS Runner: finite posed mesh, strike 1
+PASS Brute: continuous anatomy within crowd triangle budget
+PASS Brute: one shared PBR body draw
+PASS Brute: three fitted hair/beard options
+PASS Brute: four detailed anatomical UV skin maps
+PASS Brute: normalized four-influence skin
+PASS Brute: two reduced distance meshes preserve crowd performance
+PASS Brute: legacy zombie surfaces hidden, optional fitted hair
+PASS Brute: two baked combat clips and controller
+PASS Brute: clip contact/recovery timing matches brain
+PASS Brute: walking soles remain on the authored floor (max 0.0000m)
+PASS Brute: finite posed mesh, strike 0
+PASS Brute: finite posed mesh, strike 1
+PASS Spitter: continuous anatomy within crowd triangle budget
+PASS Spitter: one shared PBR body draw
+PASS Spitter: three fitted hair/beard options
+PASS Spitter: four detailed anatomical UV skin maps
+PASS Spitter: normalized four-influence skin
+PASS Spitter: two reduced distance meshes preserve crowd performance
+PASS Spitter: legacy zombie surfaces hidden, optional fitted hair
+PASS Spitter: two baked combat clips and controller
+PASS Spitter: clip contact/recovery timing matches brain
+PASS Spitter: walking soles remain on the authored floor (max 0.0000m)
+PASS Spitter: finite posed mesh, strike 0
+PASS Spitter: finite posed mesh, strike 1
+PASS Bloater: continuous anatomy within crowd triangle budget
+PASS Bloater: one shared PBR body draw
+PASS Bloater: three fitted hair/beard options
+PASS Bloater: four detailed anatomical UV skin maps
+PASS Bloater: normalized four-influence skin
+PASS Bloater: two reduced distance meshes preserve crowd performance
+PASS Bloater: legacy zombie surfaces hidden, optional fitted hair
+PASS Bloater: two baked combat clips and controller
+PASS Bloater: clip contact/recovery timing matches brain
+PASS Bloater: walking soles remain on the authored floor (max 0.0000m)
+PASS Bloater: finite posed mesh, strike 0
+PASS Bloater: finite posed mesh, strike 1
+PASS Warlord: continuous anatomy within crowd triangle budget
+PASS Warlord: one shared PBR body draw
+PASS Warlord: three fitted hair/beard options
+PASS Warlord: four detailed anatomical UV skin maps
+PASS Warlord: normalized four-influence skin
+PASS Warlord: two reduced distance meshes preserve crowd performance
+PASS Warlord: legacy zombie surfaces hidden, optional fitted hair
+PASS Warlord: two baked combat clips and controller
+PASS Warlord: clip contact/recovery timing matches brain
+PASS Warlord: walking soles remain on the authored floor (max 0.0000m)
+PASS Warlord: finite posed mesh, strike 0
+PASS Warlord: blade passes through melee contact corridor at gameplay scale, strike 0 (0.171m)
+PASS Warlord: finite posed mesh, strike 1
+PASS Warlord: blade passes through melee contact corridor at gameplay scale, strike 1 (0.171m)
+PASS Swordsman: continuous anatomy within crowd triangle budget
+PASS Swordsman: one shared PBR body draw
+PASS Swordsman: three fitted hair/beard options
+PASS Swordsman: four detailed anatomical UV skin maps
+PASS Swordsman: normalized four-influence skin
+PASS Swordsman: two reduced distance meshes preserve crowd performance
+PASS Swordsman: legacy zombie surfaces hidden, optional fitted hair
+PASS Swordsman: two baked combat clips and controller
+PASS Swordsman: clip contact/recovery timing matches brain
+PASS Swordsman: walking soles remain on the authored floor (max 0.0000m)
+PASS Swordsman: finite posed mesh, strike 0
+PASS Swordsman: blade passes through melee contact corridor at gameplay scale, strike 0 (0.488m)
+PASS Swordsman: finite posed mesh, strike 1
+PASS Swordsman: blade passes through melee contact corridor at gameplay scale, strike 1 (0.491m)
+PASS Bulwark: continuous anatomy within crowd triangle budget
+PASS Bulwark: one shared PBR body draw
+PASS Bulwark: three fitted hair/beard options
+PASS Bulwark: four detailed anatomical UV skin maps
+PASS Bulwark: normalized four-influence skin
+PASS Bulwark: two reduced distance meshes preserve crowd performance
+PASS Bulwark: legacy zombie surfaces hidden, optional fitted hair
+PASS Bulwark: two baked combat clips and controller
+PASS Bulwark: clip contact/recovery timing matches brain
+PASS Bulwark: walking soles remain on the authored floor (max 0.0000m)
+PASS Bulwark: finite posed mesh, strike 0
+PASS Bulwark: blade passes through melee contact corridor at gameplay scale, strike 0 (0.415m)
+PASS Bulwark: finite posed mesh, strike 1
+PASS Bulwark: blade passes through melee contact corridor at gameplay scale, strike 1 (0.501m)
+Failures: 0

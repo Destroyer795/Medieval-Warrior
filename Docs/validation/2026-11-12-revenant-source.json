@@ -1,0 +1,82 @@
+{
+  "rigs": 8,
+  "actions": 56,
+  "samples": [
+    {
+      "rig": "Walker",
+      "action": "Walker_Guard",
+      "max_matrix_error": 2.3543834686279297e-06
+    },
+    {
+      "rig": "Walker",
+      "action": "Walker_Walk",
+      "max_matrix_error": 4.649162292480469e-06
+    },
+    {
+      "rig": "Walker",
+      "action": "Walker_Run",
+      "max_matrix_error": 6.943941116333008e-06
+    },
+    {
+      "rig": "Walker",
+      "action": "Walker_Cut",
+      "max_matrix_error": 2.376735210418701e-06
+    },
+    {
+      "rig": "Walker",
+      "action": "Revenant_DeathBack",
+      "max_matrix_error": 3.1739473342895508e-06
+    },
+    {
+      "rig": "Swordsman",
+      "action": "Swordsman_Guard",
+      "max_matrix_error": 2.3543834686279297e-06
+    },
+    {
+      "rig": "Swordsman",
+      "action": "Swordsman_Walk",
+      "max_matrix_error": 4.649162292480469e-06
+    },
+    {
+      "rig": "Swordsman",
+      "action": "Swordsman_Run",
+      "max_matrix_error": 6.943941116333008e-06
+    },
+    {
+      "rig": "Swordsman",
+      "action": "Swordsman_Cut",
+      "max_matrix_error": 2.376735210418701e-06
+    },
+    {
+      "rig": "Swordsman",
+      "action": "Revenant_DeathBack",
+      "max_matrix_error": 3.1739473342895508e-06
+    },
+    {
+      "rig": "Warlord",
+      "action": "Warlord_Guard",
+      "max_matrix_error": 2.3543834686279297e-06
+    },
+    {
+      "rig": "Warlord",
+      "action": "Warlord_Walk",
+      "max_matrix_error": 4.649162292480469e-06
+    },
+    {
+      "rig": "Warlord",
+      "action": "Warlord_Run",
+      "max_matrix_error": 6.943941116333008e-06
+    },
+    {
+      "rig": "Warlord",
+      "action": "Warlord_Cut",
+      "max_matrix_error": 2.5033950805664062e-06
+    },
+    {
+      "rig": "Warlord",
+      "action": "Revenant_DeathBack",
+      "max_matrix_error": 3.1739473342895508e-06
+    }
+  ],
+  "passed": true
+}

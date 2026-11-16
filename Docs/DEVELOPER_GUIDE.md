@@ -57,6 +57,32 @@ a 1D blend tree of the **in-place** idle/walk/run clips driven by the agent's re
 the zombie and the animation only animates. (The old controller used the root-motion run clip
 with root motion on, so the agent and the animation fought each other.)
 
+### Current Revenants roster
+
+The shipped enemies use `Resources/Revenants/Revenant.prefab`, installed by
+`RevenantVisual` during `EnemyController.Init`. The original prefab is an authoring
+reference. Eight forms share a 55-bone rig, four skin materials, optional hair,
+and two reduced distance meshes. The models and 56 editable rig actions live in
+`ArtSource/Revenants/Revenants.blend`.
+
+`RevenantMotionCapture` evaluates source humanoid motion offline.
+`RevenantAnimationBuilder` writes 42 generic clips and updates controllers in place
+to preserve GUIDs. Playback cadence follows measured stance velocity and agent
+speed. `RevenantGrounding` corrects the visible rig against physical floors.
+
+Armed attacks use cached blade trajectories during a short active window; contact
+detection never samples the live skeleton. `ReceiveWeaponHit` applies Bulwark
+guard rules before damage. Surviving hits preserve movement, attack clocks and
+navigation. Nine query-only anatomical volumes allow exposed limb/head hits;
+`RevenantInjuries` places up to three bone-following blood stains at posed surface
+contacts. Dead enemies disable those volumes.
+
+Rebuild with Blender's `Tools/ArtPipeline/revenants.py`, then Unity's
+`RevenantBuilder.BuildAndSmoke`, then Blender's `revenant_actions.py`. See
+[the source notes](../ArtSource/Revenants/README.md) for commands, material behavior,
+hand-frame conventions and validation. The shader uses matte diffuse lighting;
+the body does not emit a glowing damage flash.
+
 ## Common tasks
 
 ### Add a zombie type

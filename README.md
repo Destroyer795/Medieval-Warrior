@@ -1,7 +1,7 @@
 # Medieval Warrior
 
 Fight the undead to save your castle. A third-person medieval action game made in Unity 6
-(built-in render pipeline): sword and shield, a bow you can sling on your back, six kinds of
+(built-in render pipeline): sword and shield, a bow you can sling on your back, eight kinds of
 zombie, three game modes, and a fully customisable knight.
 
 ## Latest character and gameplay changes
@@ -20,7 +20,8 @@ The game continues to use Unity's built-in render pipeline.
 | Equipment | An upward-arched, battle-worn steel heater and a smaller right-hip quiver with spring suspension, arm/torso collision checks and physical arrows that follow the ammunition count. |
 | Camera and performance | Raw mouse look updates before movement, with responsive follow and reusable obstruction-query buffers. Cached collision geometry, bind transforms and cloth contact data reduce garment-simulation work. Gamepad look retains smoothing. |
 | Runner AI | Random left/right flanks, varied routes and sprint bursts, rear-quarter interception, a short committed strike and immediate breakaway. Runners strike only from the rear; turning to face a winding-up Runner cancels its attack. |
-| Damage reactions | All six zombie types continue their current movement, attack, charge or fuse after nonlethal damage. Forced stagger, knockback and global melee hit-stop have been removed; damage feedback and death behavior remain. |
+| Damage reactions | All eight zombie types continue their current movement, attack, charge or fuse after nonlethal damage. Forced stagger, knockback and global melee hit-stop have been removed; damage feedback and death behavior remain. |
+| Zombie roster | Eight Blender forms with distinct gaunt, muscular and bloated builds. Curved cuirasses, corrected palm/knuckle frames, continuous trousers, matte surfaces, anatomical wounds and blood at actual hits. Nine bone-driven hit volumes support strikes to exposed limbs and heads. The roster has 42 generic clips and two distance meshes per form. |
 | Spitter acid | Each impact creates an irregular, ground-following puddle with wet shading, surface bubbles and satellite splashes. The damaging area follows the visible main puddle's outline and spread. |
 | Customization and preview | Coordinated linen/metal/leather presets, preserved saved customization, a sharper antialiased character preview and updated art credits. |
 
@@ -30,6 +31,9 @@ Details: [character and Blender pipeline](ArtSource/Marchwarden/README.md),
 [armor and quiver](ArtSource/Marchwarden/Structure.md),
 [Runner behavior](Docs/RunnerBehavior.md), [damage continuity](Docs/DamageContinuity.md),
 [acid and grips](Docs/AcidAndGrips.md).
+
+The [Revenants Blender source and combat pipeline](ArtSource/Revenants/README.md)
+documents the new undead models, rig, attack timing, shield counterplay and rebuild steps.
 
 The focused 240-frame editor sample during the performance pass reduced mean frame
 time from **24.82 ms to 14.65 ms**. See the measured conditions and component timings
@@ -76,7 +80,7 @@ in [Performance.md](ArtSource/Marchwarden/Performance.md).
 - Continuous combat through damage, screen shake, blood/sparks, damage numbers, kill streak score multiplier.
 - War drums swell in as the horde closes in and fade when the field is clear.
 
-**Enemies** – all built from the same zombie art so they look like one horde:
+**Enemies** – eight distinct Blender forms with a shared rig and matte material palette:
 
 | Zombie  | What it does |
 |---------|--------------|
@@ -86,6 +90,8 @@ in [Performance.md](ArtSource/Marchwarden/Performance.md).
 | Spitter | Keeps its distance and lobs bile that leaves irregular, ground-following acid puddles. |
 | Bloater | Swells up and bursts when close or when killed – it hurts other zombies too. |
 | Warlord | Boss. Lots of health, enrages at half health. |
+| Grave swordsman | Armored cuts and thrusts; commits its blade direction before impact. |
+| Grave bulwark | Sword and heater shield. Flank it, strike its attack opening, aim above the shield or bash its guard open. |
 
 The zombie AI takes turns: only a few may attack at once while the others **circle and wait
 for an opening**. They **rise out of the ground** at random reachable spots all over the map,
@@ -210,21 +216,27 @@ how to add a zombie type / weapon / UI screen, and how to regenerate the world o
 - **Medieval Warrior → Marchwarden → Export animation rig reference** / **Import Blender exports** – exchange the shared rig and generated character meshes with Blender.
 - **Medieval Warrior → Rebuild sword animations** – regenerates the twelve strikes and ready guard from the shared combat timings.
 - **Medieval Warrior → Review sword and shield clearance** – samples strikes, combo blends, defense, palm attachments and wrist bend.
+- **Medieval Warrior → Revenants** – exports the zombie skeleton, imports the Blender roster, rebuilds its animations and renders the art/pose review.
 
 ## Validation and art regeneration
 
-The latest complete run passed **240 gameplay checks** and **48 combat/pose checks**,
-with no gameplay errors or exceptions. Both hand/forearm meshes also passed the
-closed-topology and face-orientation audit. Committed reports:
+The latest complete run passed **365 gameplay checks**, with no gameplay errors or
+exceptions. The Revenants review also checks all eight meshes, walking sole
+contacts, live surface streams and sword trajectories. The earlier warrior review
+passed 48 combat/pose checks and its hand topology audit. Saved reports:
 
-- [Gameplay regression](Docs/validation/2026-11-08-gameplay.txt)
+- [Gameplay regression](Docs/validation/2026-11-16-gameplay.txt)
+- [Revenant mesh and pose review](Docs/validation/2026-11-16-revenants.txt)
+- [Editable Blender action validation](Docs/validation/2026-11-16-revenant-source.json)
 - [Combat, defense and wrist clearance](Docs/validation/2026-11-08-combat-clearance.txt)
 - [Hand topology audit](Docs/validation/2026-11-08-hand-topology.json)
 
 The gameplay suite covers the menus and modes, all zombie types, damage continuity,
 Runner rear attacks, movement and combos, cloth/armor/quiver contacts, bow aiming,
-ammunition, fire arrows and acid footprints. The authoring review samples animations
-at 180 Hz and checks combo transitions, shield fit, foot contacts and wrist limits.
+ammunition, fire arrows and acid footprints. It checks actual zombie arm, leg and
+death motion in Play mode, grounded soles, blade hits/misses and Bulwark defense.
+The warrior authoring review samples animations at 180 Hz and checks combo
+transitions, shield fit, foot contacts and wrist limits.
 
 Playing or building uses the committed Unity assets and does not require Blender.
 To change the model, use **Blender 4.5 LTS** and follow the
@@ -246,5 +258,6 @@ remain ignored; selected screenshots and verification reports are kept under `Do
 - UI art, sound effects, music, trees, rocks and props: generated for this project.
 - Warrior and equipment: **Marchwarden** armor and kit, authored in Blender from the user's references; anatomical head and hands adapted from MakeHuman's CC0 base, with the source and license retained in [Anatomy](ArtSource/Marchwarden/Anatomy/README.md).
   Editable source and regeneration: [ArtSource/Marchwarden](ArtSource/Marchwarden/README.md).
+- Zombie models and equipment: **Revenants**, authored in Blender using that CC0 anatomical base, with generic animation clips, anatomical skin maps and a shared equipment PBR atlas. [Source and rebuild instructions](ArtSource/Revenants/README.md). The original Free Zombie pack supplies the skeleton and source body motions, captured and adapted offline.
 
 Project code is MIT licensed – see `LICENSE`. Third-party assets retain their own licences.

@@ -38,6 +38,12 @@ palm frames for the sword, heater handle and bow. See the [hand and grip notes](
 The pipeline saves compressed `.blend` files; intermediate mesh JSON and Blender
 backups remain local and are ignored by Git.
 
+The [Revenants pipeline](../../ArtSource/Revenants/README.md) uses `revenants.py`
+and its anatomy, hand, hair and skin modules to build eight undead forms.
+`RevenantBuilder.BuildAndSmoke` imports them and validates actual gameplay bone
+motion, weapon contacts, guard rules and body-part hits. `revenant_actions.py`
+transfers the reviewed generic motion back to the editable Blender rigs.
+
 | Script | Writes | What it does |
 |--------|--------|--------------|
 | `download_sources.py <dir>` | `<dir>/*_diff.jpg`, `*_nor.jpg`, `sky.hdr` | Downloads the CC0 source textures and sky HDRI from Poly Haven. |

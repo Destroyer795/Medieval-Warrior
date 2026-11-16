@@ -46,3 +46,6 @@ Thumbs.db
 /ArtSource/Marchwarden/*.blend[1-9]
 /Tools/ArtPipeline/Marchwarden/meshes.json
 /Tools/ArtPipeline/__pycache__/
+/ArtSource/Revenants/*.blend[1-9]
+/Tools/ArtPipeline/Revenants/meshes.json
+/Tools/ArtPipeline/Revenants/actions.json

@@ -1,0 +1,13 @@
+{
+    "checks": 8055,
+    "prefabRoots": 120,
+    "meshNodes": 330,
+    "navSamples": 260,
+    "reachableSpawns": 1,
+    "result": "PASS",
+    "messages": [
+        "Deck rays, camera spheres and CharacterController movement checked on all bridge bays and the wall walk.",
+        "House structural entrances, interior floors, side-wall arrows and camera spheres checked with live physics.",
+        "NavMesh rebaked from custom physics hulls, preserving data GUID and all player/spawn transforms."
+    ]
+}

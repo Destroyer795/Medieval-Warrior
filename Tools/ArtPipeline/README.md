@@ -6,6 +6,14 @@ regenerate.
 
 Requirements: Python 3.10+, `pip install numpy scipy pillow`. Run from the repository root.
 
+The custom architectural kit uses Blender 4.5 LTS and `buildings.py`. It reads the
+committed measured reference, saves `ArtSource/Buildings/Buildings.blend` with
+compression, generates three LODs/collision shells and a 4K Standard PBR atlas.
+Run **Medieval Warrior → Buildings → Import Blender kit and review** followed by
+**Rebake navigation and verify routes**. The importer keeps original prefab GUIDs,
+mesh-local pivots/bounds and placed transforms. See the [building source guide](../../ArtSource/Buildings/README.md)
+for exact commands, grid conventions, budgets, UV layouts and verification evidence.
+
 The Marchwarden warrior and equipment use Blender 4.5 LTS instead of
 these Python dependencies. See [the editable art source](../../ArtSource/Marchwarden/README.md)
 and `marchwarden.py`. Unity's **Marchwarden > Import Blender exports** menu imports

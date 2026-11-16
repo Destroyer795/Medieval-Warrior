@@ -1,0 +1,492 @@
+{
+  "seed": 317,
+  "atlasSize": 4096,
+  "parts": [
+    {
+      "key": "a18e05c3226dd274caeb4a43212e40c8_n6623636414208535075",
+      "name": "BridgeEnd",
+      "lods": [
+        {
+          "nonManifoldEdges": 0,
+          "faces": 4888,
+          "quadRatio": 0.9992,
+          "vertices": 19548,
+          "triangles": 9772
+        },
+        {
+          "nonManifoldEdges": 0,
+          "faces": 1106,
+          "quadRatio": 0.689,
+          "vertices": 4080,
+          "triangles": 1868
+        },
+        {
+          "nonManifoldEdges": 0,
+          "faces": 256,
+          "quadRatio": 0.9844,
+          "vertices": 1020,
+          "triangles": 508
+        }
+      ]
+    },
+    {
+      "key": "a18e05c3226dd274caeb4a43212e40c8_1815251945203946248",
+      "name": "BridgeMiddle",
+      "lods": [
+        {
+          "nonManifoldEdges": 0,
+          "faces": 4698,
+          "quadRatio": 1.0,
+          "vertices": 18792,
+          "triangles": 9396
+        },
+        {
+          "nonManifoldEdges": 0,
+          "faces": 1014,
+          "quadRatio": 0.6923,
+          "vertices": 3744,
+          "triangles": 1716
+        },
+        {
+          "nonManifoldEdges": 0,
+          "faces": 234,
+          "quadRatio": 1.0,
+          "vertices": 936,
+          "triangles": 468
+        }
+      ]
+    },
+    {
+      "key": "a18e05c3226dd274caeb4a43212e40c8_4982261723046905864",
+      "name": "BridgeStart",
+      "lods": [
+        {
+          "nonManifoldEdges": 0,
+          "faces": 4888,
+          "quadRatio": 0.9992,
+          "vertices": 19548,
+          "triangles": 9772
+        },
+        {
+          "nonManifoldEdges": 0,
+          "faces": 1106,
+          "quadRatio": 0.689,
+          "vertices": 4080,
+          "triangles": 1868
+        },
+        {
+          "nonManifoldEdges": 0,
+          "faces": 256,
+          "quadRatio": 0.9844,
+          "vertices": 1020,
+          "triangles": 508
+        }
+      ]
+    },
+    {
+      "key": "d8d157ebfb23cdf4ba94e99d8458f7d2_4872299236319445139",
+      "name": "CastleTop",
+      "lods": [
+        {
+          "nonManifoldEdges": 0,
+          "faces": 148,
+          "quadRatio": 0.9865,
+          "vertices": 876,
+          "triangles": 580
+        },
+        {
+          "nonManifoldEdges": 0,
+          "faces": 76,
+          "quadRatio": 0.9737,
+          "vertices": 444,
+          "triangles": 292
+        },
+        {
+          "nonManifoldEdges": 0,
+          "faces": 76,
+          "quadRatio": 0.9737,
+          "vertices": 444,
+          "triangles": 292
+        }
+      ]
+    },
+    {
+      "key": "d8d157ebfb23cdf4ba94e99d8458f7d2_8104117749616084085",
+      "name": "Castle",
+      "lods": [
+        {
+          "nonManifoldEdges": 0,
+          "faces": 133157,
+          "quadRatio": 0.9999,
+          "vertices": 532982,
+          "triangles": 266668
+        },
+        {
+          "nonManifoldEdges": 0,
+          "faces": 43384,
+          "quadRatio": 0.7535,
+          "vertices": 163012,
+          "triangles": 76244
+        },
+        {
+          "nonManifoldEdges": 0,
+          "faces": 4505,
+          "quadRatio": 0.9978,
+          "vertices": 18182,
+          "triangles": 9172
+        }
+      ]
+    },
+    {
+      "key": "d05fa8828be199048bb709f826cc3c53_n837091336493386933",
+      "name": "Simple Door Frame",
+      "lods": [
+        {
+          "nonManifoldEdges": 0,
+          "faces": 1134,
+          "quadRatio": 1.0,
+          "vertices": 4536,
+          "triangles": 2268
+        },
+        {
+          "nonManifoldEdges": 0,
+          "faces": 546,
+          "quadRatio": 0.6923,
+          "vertices": 2016,
+          "triangles": 924
+        },
+        {
+          "nonManifoldEdges": 0,
+          "faces": 30,
+          "quadRatio": 1.0,
+          "vertices": 120,
+          "triangles": 60
+        }
+      ]
+    },
+    {
+      "key": "d05fa8828be199048bb709f826cc3c53_1049928748687988745",
+      "name": "Window",
+      "lods": [
+        {
+          "nonManifoldEdges": 0,
+          "faces": 2268,
+          "quadRatio": 1.0,
+          "vertices": 9072,
+          "triangles": 4536
+        },
+        {
+          "nonManifoldEdges": 0,
+          "faces": 1092,
+          "quadRatio": 0.6923,
+          "vertices": 4032,
+          "triangles": 1848
+        },
+        {
+          "nonManifoldEdges": 0,
+          "faces": 102,
+          "quadRatio": 1.0,
+          "vertices": 408,
+          "triangles": 204
+        }
+      ]
+    },
+    {
+      "key": "d05fa8828be199048bb709f826cc3c53_2562013259454298222",
+      "name": "Big Window",
+      "lods": [
+        {
+          "nonManifoldEdges": 0,
+          "faces": 2268,
+          "quadRatio": 1.0,
+          "vertices": 9072,
+          "triangles": 4536
+        },
+        {
+          "nonManifoldEdges": 0,
+          "faces": 1092,
+          "quadRatio": 0.6923,
+          "vertices": 4032,
+          "triangles": 1848
+        },
+        {
+          "nonManifoldEdges": 0,
+          "faces": 102,
+          "quadRatio": 1.0,
+          "vertices": 408,
+          "triangles": 204
+        }
+      ]
+    },
+    {
+      "key": "d05fa8828be199048bb709f826cc3c53_2619086233303812490",
+      "name": "Door",
+      "lods": [
+        {
+          "nonManifoldEdges": 0,
+          "faces": 1508,
+          "quadRatio": 1.0,
+          "vertices": 6032,
+          "triangles": 3016
+        },
+        {
+          "nonManifoldEdges": 0,
+          "faces": 742,
+          "quadRatio": 0.7143,
+          "vertices": 2756,
+          "triangles": 1272
+        },
+        {
+          "nonManifoldEdges": 0,
+          "faces": 116,
+          "quadRatio": 1.0,
+          "vertices": 464,
+          "triangles": 232
+        }
+      ]
+    },
+    {
+      "key": "d05fa8828be199048bb709f826cc3c53_3454997402486955451",
+      "name": "Double Door Frame",
+      "lods": [
+        {
+          "nonManifoldEdges": 0,
+          "faces": 1674,
+          "quadRatio": 1.0,
+          "vertices": 6696,
+          "triangles": 3348
+        },
+        {
+          "nonManifoldEdges": 0,
+          "faces": 806,
+          "quadRatio": 0.6923,
+          "vertices": 2976,
+          "triangles": 1364
+        },
+        {
+          "nonManifoldEdges": 0,
+          "faces": 90,
+          "quadRatio": 1.0,
+          "vertices": 360,
+          "triangles": 180
+        }
+      ]
+    },
+    {
+      "key": "d05fa8828be199048bb709f826cc3c53_5194340702381293203",
+      "name": "Double Door",
+      "lods": [
+        {
+          "nonManifoldEdges": 0,
+          "faces": 1508,
+          "quadRatio": 1.0,
+          "vertices": 6032,
+          "triangles": 3016
+        },
+        {
+          "nonManifoldEdges": 0,
+          "faces": 742,
+          "quadRatio": 0.7143,
+          "vertices": 2756,
+          "triangles": 1272
+        },
+        {
+          "nonManifoldEdges": 0,
+          "faces": 116,
+          "quadRatio": 1.0,
+          "vertices": 464,
+          "triangles": 232
+        }
+      ]
+    },
+    {
+      "key": "d05fa8828be199048bb709f826cc3c53_5916065699126462724",
+      "name": "Small Window",
+      "lods": [
+        {
+          "nonManifoldEdges": 0,
+          "faces": 1728,
+          "quadRatio": 1.0,
+          "vertices": 6912,
+          "triangles": 3456
+        },
+        {
+          "nonManifoldEdges": 0,
+          "faces": 832,
+          "quadRatio": 0.6923,
+          "vertices": 3072,
+          "triangles": 1408
+        },
+        {
+          "nonManifoldEdges": 0,
+          "faces": 42,
+          "quadRatio": 1.0,
+          "vertices": 168,
+          "triangles": 84
+        }
+      ]
+    },
+    {
+      "key": "4537ab35a0f3c5d4491b0986d90893da_458433370814715639",
+      "name": "HouseB",
+      "lods": [
+        {
+          "nonManifoldEdges": 0,
+          "faces": 29296,
+          "quadRatio": 0.9999,
+          "vertices": 117180,
+          "triangles": 58588
+        },
+        {
+          "nonManifoldEdges": 0,
+          "faces": 8152,
+          "quadRatio": 0.6919,
+          "vertices": 30096,
+          "triangles": 13792
+        },
+        {
+          "nonManifoldEdges": 0,
+          "faces": 496,
+          "quadRatio": 0.9919,
+          "vertices": 1980,
+          "triangles": 988
+        }
+      ]
+    },
+    {
+      "key": "4537ab35a0f3c5d4491b0986d90893da_4887216478360415443",
+      "name": "House",
+      "lods": [
+        {
+          "nonManifoldEdges": 0,
+          "faces": 27838,
+          "quadRatio": 0.9999,
+          "vertices": 111348,
+          "triangles": 55672
+        },
+        {
+          "nonManifoldEdges": 0,
+          "faces": 7450,
+          "quadRatio": 0.6918,
+          "vertices": 27504,
+          "triangles": 12604
+        },
+        {
+          "nonManifoldEdges": 0,
+          "faces": 496,
+          "quadRatio": 0.9919,
+          "vertices": 1980,
+          "triangles": 988
+        }
+      ]
+    },
+    {
+      "key": "57a04a7dff8956f4299182fd6145b5b5_n1277366460620338370",
+      "name": "Tower",
+      "lods": [
+        {
+          "nonManifoldEdges": 0,
+          "faces": 42228,
+          "quadRatio": 1.0,
+          "vertices": 168912,
+          "triangles": 84456
+        },
+        {
+          "nonManifoldEdges": 0,
+          "faces": 18876,
+          "quadRatio": 0.6923,
+          "vertices": 69696,
+          "triangles": 31944
+        },
+        {
+          "nonManifoldEdges": 0,
+          "faces": 780,
+          "quadRatio": 1.0,
+          "vertices": 3120,
+          "triangles": 1560
+        }
+      ]
+    },
+    {
+      "key": "64f4be06a92a5dd4a99c31e59ac47d42_8243879411280590840",
+      "name": "TowerB",
+      "lods": [
+        {
+          "nonManifoldEdges": 0,
+          "faces": 53276,
+          "quadRatio": 1.0,
+          "vertices": 213192,
+          "triangles": 106640
+        },
+        {
+          "nonManifoldEdges": 0,
+          "faces": 12236,
+          "quadRatio": 0.7638,
+          "vertices": 46096,
+          "triangles": 21624
+        },
+        {
+          "nonManifoldEdges": 0,
+          "faces": 1172,
+          "quadRatio": 0.9983,
+          "vertices": 4728,
+          "triangles": 2384
+        }
+      ]
+    },
+    {
+      "key": "38b797ba6cc77df40a51cd3200365644_n1674268716328342803",
+      "name": "Column",
+      "lods": [
+        {
+          "nonManifoldEdges": 0,
+          "faces": 2538,
+          "quadRatio": 1.0,
+          "vertices": 10152,
+          "triangles": 5076
+        },
+        {
+          "nonManifoldEdges": 0,
+          "faces": 1222,
+          "quadRatio": 0.6923,
+          "vertices": 4512,
+          "triangles": 2068
+        },
+        {
+          "nonManifoldEdges": 0,
+          "faces": 36,
+          "quadRatio": 1.0,
+          "vertices": 144,
+          "triangles": 72
+        }
+      ]
+    },
+    {
+      "key": "38b797ba6cc77df40a51cd3200365644_8733429697405204941",
+      "name": "Wall",
+      "lods": [
+        {
+          "nonManifoldEdges": 0,
+          "faces": 12774,
+          "quadRatio": 0.9991,
+          "vertices": 51084,
+          "triangles": 25536
+        },
+        {
+          "nonManifoldEdges": 0,
+          "faces": 6152,
+          "quadRatio": 0.6905,
+          "vertices": 22704,
+          "triangles": 10400
+        },
+        {
+          "nonManifoldEdges": 0,
+          "faces": 174,
+          "quadRatio": 0.931,
+          "vertices": 684,
+          "triangles": 336
+        }
+      ]
+    }
+  ]
+}

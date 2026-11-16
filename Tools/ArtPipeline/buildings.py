@@ -1,0 +1,570 @@
+"""Custom, measured castle kit. Blender 4.5+: --background --python this_file.
+
+Reference contains dimensions/transforms only; no vendor vertices or images are used.
+Run BuildingBuilder.ExportReference ONCE before replacing the pack's prefab meshes.
+"""
+import bpy, bmesh, json, math, random, struct, sys
+import numpy as np
+from pathlib import Path
+from mathutils import Vector
+
+ROOT=Path(__file__).resolve().parents[2]
+DATA=ROOT/'Tools/ArtPipeline/Buildings'
+SOURCE=ROOT/'ArtSource/Buildings'
+TEXTURES=ROOT/'Assets/Resources/Buildings/Textures'
+for p in (DATA,SOURCE,TEXTURES):p.mkdir(parents=True,exist_ok=True)
+reference=json.loads((DATA/'reference.json').read_text())
+extra=sys.argv[sys.argv.index('--')+1:] if '--' in sys.argv else []
+only=extra[extra.index('--only')+1] if '--only' in extra else None
+if only:bpy.ops.wm.open_mainfile(filepath=str(SOURCE/'Buildings.blend'))
+else:bpy.ops.object.select_all(action='SELECT');bpy.ops.object.delete(use_global=False)
+random.seed(317)
+PALETTE=[('Ashlar limestone',(.48,.44,.36),0,.83),('Foundation rubble',(.32,.31,.27),0,.91),
+ ('Oiled dark oak',(.16,.085,.038),0,.80),('Warm lime plaster',(.68,.61,.46),0,.96),
+ ('Oxblood clay tiles',(.31,.095,.047),0,.78),('Blue grey slate',(.19,.24,.27),0,.75),
+ ('Forged iron',(.13,.14,.14),.82,.55),('Old oak planks',(.30,.185,.085),0,.86),
+ ('Smoky leaded glass',(.11,.18,.18),.15,.32),('Recessed mortar',(.24,.225,.19),0,.98),
+ ('Carved pale limestone',(.62,.57,.46),0,.80),('Deep openings',(.038,.035,.029),0,.99)]
+materials=[];authored=[]
+def textures():
+    """Deterministic 4K atlas, a material per tile, edge padding, Standard R/G/A masks."""
+    tile=1024;size=tile*4;rng=np.random.default_rng(317)
+    albedo=np.ones((size,size,4),np.float32);normal=np.ones_like(albedo);normal[:,:,:3]=(.5,.5,1)
+    masks=np.zeros_like(albedo);masks[:,:,1]=1;masks[:,:,3]=.1
+    y,x=np.mgrid[0:tile,0:tile].astype(np.float32)/tile
+    for i,(name,col,metal,rough) in enumerate(PALETTE):
+        noise=rng.normal(0,1,(tile,tile)).astype(np.float32)
+        cloud=np.sin(x*19+np.sin(y*17))*np.sin(y*23+x*7)
+        height=noise*.009+cloud*.02;tone=.91+noise*.025+cloud*.065
+        if i in (0,1,10):
+            chisels=np.maximum(0,np.sin(x*440+np.sin(y*80)*2)-.72)*np.maximum(0,np.cos(y*321+x*40))
+            pits=np.maximum(0,noise-1.25)
+            height-=chisels*.035+pits*.022;tone-=pits*.055+chisels*.10
+            weather=(np.sin(x*31+np.sin(y*13))*np.cos(y*18)+1)*.5
+            tone-=weather*.08
+        elif i in (2,7):
+            # Face charts are packed with their long axis along U. Grain therefore
+            # varies across V and runs along U, following beams/planks rather than crossing them.
+            grain=np.sin(y*295+np.sin(x*12)*3+np.sin(x*43)*.4)
+            pores=np.maximum(0,np.sin(y*803+np.sin(x*23)*6)-.80)
+            height=grain*.045-pores*.07+noise*.003;tone+=grain*.10-pores*.24
+            knot=np.sqrt(((y-.43)*3)**2+((x-.42)*.8)**2)
+            rings=np.sin(knot*120)*np.exp(-knot*5);height+=rings*.03;tone+=rings*.09
+        elif i in (4,5):
+            strata=np.sin(x*190+np.sin(y*25)*2)*.014
+            height+=strata;tone+=strata*2
+        elif i==6:
+            pits=np.maximum(0,noise-1.4);height=noise*.007-pits*.025;tone-=pits*.1
+        elif i==3:height=noise*.003+cloud*.009
+        dx=(np.roll(height,-1,1)-np.roll(height,1,1))*3
+        dy=(np.roll(height,-1,0)-np.roll(height,1,0))*3
+        n=np.stack((-dx,-dy,np.ones_like(dx)),-1);n/=np.linalg.norm(n,axis=-1,keepdims=True)
+        yy=(i//4)*tile;xx=(i%4)*tile
+        albedo[yy:yy+tile,xx:xx+tile,:3]=np.clip(tone[:,:,None]*np.array(col),0,1)
+        normal[yy:yy+tile,xx:xx+tile,:3]=n*.5+.5
+        masks[yy:yy+tile,xx:xx+tile,0]=metal
+        masks[yy:yy+tile,xx:xx+tile,1]=np.clip(.93+cloud*.06,0,1)
+        masks[yy:yy+tile,xx:xx+tile,2]=np.clip(height+.5,0,1)
+        masks[yy:yy+tile,xx:xx+tile,3]=np.clip(1-rough+cloud*.025,.015,.8)
+    for name,array in [('Albedo',albedo),('Normal',normal),('Masks',masks)]:
+        im=bpy.data.images.get('Buildings '+name) or bpy.data.images.new('Buildings '+name,width=size,height=size,alpha=True)
+        im.colorspace_settings.name='sRGB' if name=='Albedo' else 'Non-Color'
+        im.pixels.foreach_set(array.ravel());im.filepath_raw=str(TEXTURES/(name+'.png'));im.file_format='PNG';im.save();im.pack()
+    for i,(name,col,metal,rough) in enumerate(PALETTE):
+        mat=bpy.data.materials.get(name) or bpy.data.materials.new(name);mat.diffuse_color=(*col,1);mat.use_nodes=True
+        nt=mat.node_tree;nt.nodes.clear();bs=nt.nodes.new('ShaderNodeBsdfPrincipled');output=nt.nodes.new('ShaderNodeOutputMaterial');nt.links.new(bs.outputs['BSDF'],output.inputs['Surface'])
+        bs.inputs['Metallic'].default_value=metal;bs.inputs['Roughness'].default_value=rough
+        for label in ('Albedo','Normal','Masks'):
+            node=nt.nodes.new('ShaderNodeTexImage');node.image=bpy.data.images['Buildings '+label]
+            if label=='Albedo':nt.links.new(node.outputs['Color'],bs.inputs['Base Color'])
+            elif label=='Normal':
+                normal_node=nt.nodes.new('ShaderNodeNormalMap');nt.links.new(node.outputs['Color'],normal_node.inputs['Color']);nt.links.new(normal_node.outputs['Normal'],bs.inputs['Normal'])
+        materials.append(mat)
+
+class Kit:
+    def __init__(self,lod):self.v=[];self.f=[];self.mat=[];self.lod=lod
+    def poly(self,vertices,faces,mat=0):
+        start=len(self.v);self.v.extend(vertices);self.f.extend([tuple(start+j for j in f) for f in faces]);self.mat.extend([mat]*len(faces))
+    def box(self,c,s,mat=0):
+        x,y,z=c;a,b,d=(max(.000001,k)*.5 for k in s)
+        self.poly([(x+i*a,y+j*b,z+k*d) for i,j,k in [(-1,-1,-1),(-1,-1,1),(-1,1,-1),(-1,1,1),(1,-1,-1),(1,-1,1),(1,1,-1),(1,1,1)]],
+                  [(0,4,6,2),(1,3,7,5),(0,1,5,4),(2,6,7,3),(0,2,3,1),(4,5,7,6)],mat)
+    def prism(self,points,depth,axis='z',mat=0,offset=0):
+        n=len(points)
+        def p(a,b,c):return (a,b,c) if axis=='z' else (c,b,a)
+        verts=[p(a,b,offset+d*depth/2) for d in (-1,1) for a,b in points]
+        faces=[tuple(range(n-1,-1,-1)),tuple(range(n,2*n))]+[(i,(i+1)%n,(i+1)%n+n,i+n) for i in range(n)]
+        self.poly(verts,faces,mat)
+    def beam(self,a,b,width,depth,mat=2):
+        a,b=Vector(a),Vector(b);axis=(b-a).normalized();cross=axis.cross(Vector((0,0,1)))
+        if cross.length<.01:cross=axis.cross(Vector((0,1,0)))
+        cross.normalize();other=axis.cross(cross).normalized();verts=[]
+        for p in (a,b):
+            for j,k in [(-1,-1),(-1,1),(1,1),(1,-1)]:verts.append(tuple(p+cross*j*width/2+other*k*depth/2))
+        self.poly(verts,[(3,2,1,0),(4,5,6,7),(0,1,5,4),(1,2,6,5),(2,3,7,6),(3,0,4,7)],mat)
+    def ring(self,cx,cz,r0,r1,y0,y1,n=24,mat=0,start=0,end=math.tau):
+        if r0==0 and abs(end-start-math.tau)<.00001:
+            points=[(cx+r1*math.cos(start+math.tau*i/n),cz+r1*math.sin(start+math.tau*i/n)) for i in range(n)]
+            verts=[(x,y,z) for y in (y0,y1) for x,z in points]
+            self.poly(verts,[tuple(range(n-1,-1,-1)),tuple(range(n,2*n))]+[(i,(i+1)%n,(i+1)%n+n,i+n) for i in range(n)],mat);return
+        verts=[]
+        for y,r in [(y0,r0),(y0,r1),(y1,r0),(y1,r1)]:
+            verts.extend([(cx+r*math.cos(start+(end-start)*i/n),y,cz+r*math.sin(start+(end-start)*i/n)) for i in range(n+1)])
+        s=n+1;faces=[]
+        for i in range(n):faces.extend([(i,i+1,s+i+1,s+i),(2*s+i,3*s+i,3*s+i+1,2*s+i+1),(i,2*s+i,2*s+i+1,i+1),(s+i,s+i+1,3*s+i+1,3*s+i)])
+        faces.extend([(0,s,3*s,2*s),(n,2*s+n,3*s+n,s+n)])
+        self.poly(verts,faces,mat)
+    def arch(self,cx,spring,ri,ro,depth,z,mat=10,n=13):
+        for i in range(n):
+            a=i*math.pi/n+.007;b=(i+1)*math.pi/n-.007
+            self.prism([(cx+ri*math.cos(a),spring+ri*math.sin(a)),(cx+ro*math.cos(a),spring+ro*math.sin(a)),(cx+ro*math.cos(b),spring+ro*math.sin(b)),(cx+ri*math.cos(b),spring+ri*math.sin(b))],depth,mat=mat,offset=z)
+    def wall(self,x0,x1,y0,y1,z,thick,mat=0,course=.12,block=.25,axis='z'):
+        if self.lod==2:
+            self.box(((x0+x1)/2,(y0+y1)/2,z) if axis=='z' else (z,(y0+y1)/2,(x0+x1)/2),
+                     (x1-x0,y1-y0,thick) if axis=='z' else (thick,y1-y0,x1-x0),mat);return
+        rows=max(1,round((y1-y0)/course));cols=max(1,round((x1-x0)/block));gap=.003
+        for row in range(rows):
+            cuts=[x0]+[x0+(j+(.5 if row%2 else 0))*(x1-x0)/cols for j in range(1 if row%2==0 else 0,cols)]+[x1]
+            for a,b in zip(cuts,cuts[1:]):
+                if b-a<gap*2:continue
+                c=((a+b)/2,y0+(row+.5)*(y1-y0)/rows,z)
+                s=(b-a-gap,(y1-y0)/rows-gap,thick)
+                if axis!='z':c=(c[2],c[1],c[0]);s=(s[2],s[1],s[0])
+                self.box(c,s,mat)
+
+def house(k,tall=False):
+    # Gable ridge follows long Z axis; every retained door/window remains on its original node.
+    h=2.02 if tall else 1.62;w=1.2534;d=2;top=h*.68
+    door_x=.2815;door_half=.145;door_h=.612
+    # Hollow interior, with a real entrance behind the unchanged, open hinged leaf.
+    for x in (-w*.445,w*.445):k.box((x,top/2,0),(w*.05,top,d*.96),3)
+    k.box((0,top/2,.94),(w*.94,top,.08),3)
+    for a,b in ((-w*.47,door_x-door_half),(door_x+door_half,w*.47)):
+        k.box(((a+b)/2,top/2,-.94),(b-a,top,.08),3)
+        k.box(((a+b)/2,.06,-.97),(b-a,.12,.06),1)
+    k.box((door_x,(top+door_h)/2,-.94),(door_half*2,top-door_h,.08),3)
+    for x in (-w*.47,w*.47):k.box((x,.06,0),(.075,.12,d),1)
+    k.box((0,.06,.97),(w,.12,.06),1)
+    for i in range(16):k.box((0,.015,-.94+(i+.5)*1.88/16),(w*.88,.03,1.88/16-.003),7)
+    for a,b in ((-w*.48,door_x-door_half),(door_x+door_half,w*.48)):k.wall(a,b,.10,h*.29,-d*.48,.055,1,course=.105,block=.22)
+    k.wall(-w*.48,w*.48,.10,h*.29,d*.48,.055,1,course=.105,block=.22)
+    for x in (-w*.47,w*.47):k.wall(-d*.48,d*.48,.10,h*.29,x,.055,1,course=.105,block=.23,axis='x')
+    for y in (h*.29,h*.53,top):
+        for z in (-.97,.97):
+            if z<0 and y<door_h:
+                for a,b in ((-w*.495,door_x-door_half),(door_x+door_half,w*.495)):k.box(((a+b)/2,y,z),(b-a,.05,.055),2)
+            else:k.box((0,y,z),(w*.99,.05,.055),2)
+        for x in (-w*.48,w*.48):k.box((x,y,0),(.055,.05,1.94),2)
+    for z in (-.97,.97):
+        for x in (-w*.46,0,w*.46):k.box((x,(top+h*.29)/2,z),(.046,top-h*.29,.055),2)
+        k.prism([(-w/2,top),(w/2,top),(0,h*.96)],.035,mat=3,offset=math.copysign(.9425,z))
+        for x in (-w*.48,w*.48):k.beam((x,top,z),(0,h*.96,z),.048,.065)
+        k.beam((0,top,z),(0,h*.96,z),.046,.065)
+        for x in (-1,1):
+            if not(z<0 and x>0):k.beam((x*w*.04,h*.32,z),(x*w*.42,h*.51,z),.037,.045)
+    k.box((door_x,door_h+.025,-.97),(door_half*2+.06,.05,.06),2)
+    for x in (-w*.48,w*.48):
+        for z in (-.94,-.47,0,.47,.94):k.box((x,(top+h*.29)/2,z),(.055,top-h*.29,.045),2)
+        for z in (-.94,0):k.beam((x,h*.32,z),(x,h*.52,z+.42),.038,.045)
+    # Solid pitched roof underneath individual overlapping slate/clay tiles.
+    for side in (-1,1):k.prism([(side*w*.515,top-.025),(0,h*.98),(0,h*.98-.03),(side*w*.515,top-.055)],d,mat=5 if tall else 4)
+    rows=8 if k.lod==0 else 4;cols=18 if k.lod==0 else 9
+    if k.lod<2:
+        for side in (-1,1):
+            for row in range(rows):
+                x0=side*w*.515*(1-row/rows);x1=side*w*.515*(1-(row+1.15)/rows)
+                y0=top+(h*.98-top)*row/rows;y1=top+(h*.98-top)*(row+1.15)/rows
+                cuts=[-1]+[-1+(j+(.5 if row%2 else 0))*2/cols for j in range(0 if row%2 else 1,cols)]+[1]
+                for za,zb in zip(cuts,cuts[1:]):
+                    k.prism([(x0,y0+.006),(x1,y1+.006),(x1,y1+.022),(x0,y0+.022)],zb-za-.005,mat=5 if tall else 4,offset=(za+zb)/2)
+        for col in range(cols):k.box((0,h*.985,-1+(col+.5)*2/cols),(.075,.032,2/cols-.004),5 if tall else 4)
+    # Corbelled, stone chimney with recessed soot cap. Within the old bounding envelope.
+    cx=w*.29;cz=.48
+    k.box((cx,h*.85,cz),(.17,h*.27,.19),1)
+    k.wall(cx-.095,cx+.095,h*.77,h*.98,cz,.21,10,course=.06,block=.09)
+    k.box((cx,h*.99,cz),(.23,.025,.24),10);k.box((cx,h*.999,cz),(.13,.003,.14),11)
+    collision=Kit(2)
+    for x in (-w*.46,w*.46):collision.box((x,top/2,0),(.08,top,d))
+    collision.box((0,top/2,.96),(w,top,.08));collision.box((0,.015,0),(w,.03,d))
+    for a,b in ((-w/2,door_x-door_half),(door_x+door_half,w/2)):collision.box(((a+b)/2,top/2,-.96),(b-a,top,.08))
+    collision.box((door_x,(top+door_h)/2,-.96),(door_half*2,top-door_h,.08))
+    collision.prism([(-w*.515,top),(w*.515,top),(0,h*.98)],d)
+    collision.box((cx,h*.85,cz),(.23,h*.30,.24))
+    return collision
+
+def wall(k,column=False):
+    if column:
+        h=1.756;k.box((0,h/2,0),(.27,h,.22),9)
+        k.wall(-.14,.14,0,h,0,.24,0,course=.105,block=.18)
+        for y in (0,.20,h*.64,h-.035):k.box((0,y+.025,0),(.35,.05,.275),10)
+        c=Kit(2);c.box((0,h/2,0),(.35,h,.275));return c
+    h=2.127554;walk=1.739447;w=2;zmin=-.23029375;zmax=.53567123
+    k.box((0,walk/2,-.10),(w,walk,.23),9)
+    for z in (-.215,.015):k.wall(-1,1,0,walk,z,.035,course=.125,block=.27)
+    # One-sided parapet, retaining the original asymmetric wall walk.
+    k.box((0,walk+.042,-.14),(w,.084,.18),10)
+    for i in range(6):k.box((-1+(i+.5)/3,h-.17,-.14),(.19,.34,.18),0)
+    for i in range(12):
+        x=-1+(i+.5)/6
+        k.box((x,walk-.035,.27),(1/6-.004,.07,.53),7)
+        if i%2==0:k.prism([(-.02,walk-.35),(.45,walk-.12),(.45,walk)],.07,axis='x',mat=10,offset=x)
+    for y in (.08,walk-.18):k.box((0,y,-.12),(w,.055,.25),10)
+    c=Kit(2);c.box((0,walk/2,-.1025),(w,walk,.255));c.box((0,walk-.045,.267),(w,.09,.537))
+    c.box((0,walk+.042,-.14),(w,.084,.18))
+    for i in range(6):c.box((-1+(i+.5)/3,h-.17,-.14),(.19,.34,.18))
+    return c
+
+def tower(k,round_tower=False):
+    h=3.33077 if round_tower else 5.3;r=1.11 if round_tower else .532;walk=h-(.46323 if round_tower else .46892)
+    c=Kit(2)
+    if round_tower:
+        sides=48 if k.lod==0 else 24
+        k.ring(0,0,0,r*.92,0,walk,sides,9);c.ring(0,0,0,r,0,walk,24)
+        rows=24 if k.lod==0 else 12
+        if k.lod<2:
+            for row in range(rows):
+                for i in range(24 if k.lod==0 else 16):
+                    count=24 if k.lod==0 else 16;a=(i+(row%2)*.5)*math.tau/count
+                    k.ring(0,0,r*.90,r*.97,row*walk/rows+.002,(row+1)*walk/rows-.002,2,0,a+.004,a+math.tau/count-.004)
+        for y,rr in [(0,r),(h*.15,r*.99),(walk-.12,r),(walk-.04,r)]:k.ring(0,0,r*.85,rr,y,y+.06,sides,10)
+        k.ring(0,0,r*.86,r,walk,walk+.10,sides,0);c.ring(0,0,r*.86,r,walk,walk+.10,24)
+        for i in range(20):
+            a=i*math.tau/20;k.ring(0,0,r*.84,r,walk+.08,h,2,0,a+.04,a+.17);c.ring(0,0,r*.84,r,walk+.08,h,2,0,a+.04,a+.17)
+            if k.lod<2:k.ring(0,0,r*.87,r,walk-.25,walk,2,10,a+.03,a+.11)
+        roof_r=r*.72
+    else:
+        k.box((0,walk/2,0),(r*1.76,walk,r*1.76),9);c.box((0,walk/2,0),(r*2,walk,r*2))
+        for z in (-r*.9,r*.9):k.wall(-r*.92,r*.92,0,walk,z,.06,course=.15,block=.25)
+        for x in (-r*.9,r*.9):k.wall(-r*.92,r*.92,0,walk,x,.06,course=.15,block=.25,axis='x')
+        for x in (-r*.88,r*.88):
+            for z in (-r*.88,r*.88):
+                for row in range(24 if k.lod==0 else 12):k.box((x,(row+.5)*walk/(24 if k.lod==0 else 12),z),(.12,walk/(24 if k.lod==0 else 12)-.004,.12),10)
+        k.box((0,.06,0),(r*2,.12,r*2),10)
+        for side in (-1,1):
+            k.box((0,walk+.04,side*r*.90),(r*2,.08,r*.20),10);k.box((side*r*.90,walk+.04,0),(r*.20,.08,r*2),10)
+            for i in range(4):
+                a=-r+(i+.5)*r*.5
+                for swap in (False,True):
+                    pos=(a,h-.15,side*r*.90) if not swap else (side*r*.90,h-.15,a)
+                    size=(.13,.30,.11) if not swap else (.11,.30,.13)
+                    k.box(pos,size,0);c.box(pos,size)
+                    if k.lod<2:k.box((pos[0],walk-.09,pos[2]),(.10,.20,.10),10)
+        roof_r=r*.69
+    # Shallow tiled watch roof leaves the outer fighting platform unobstructed.
+    roofbase=walk+.06;tip=h-.025
+    n=24 if round_tower else 4
+    roofverts=[(roof_r*math.cos(i*math.tau/n+(math.pi/4 if not round_tower else 0)),roofbase,roof_r*math.sin(i*math.tau/n+(math.pi/4 if not round_tower else 0))) for i in range(n)]
+    c.poly(roofverts+[(0,tip,0)],[tuple(range(n-1,-1,-1))]+[(i,(i+1)%n,n) for i in range(n)])
+    rows=5 if k.lod==0 else 3
+    for row in range(rows if k.lod<2 else 1):
+        rr=roof_r*(1-row/rows) if k.lod<2 else roof_r
+        yy=roofbase+(tip-roofbase)*row/rows if k.lod<2 else roofbase
+        for i in range(n):
+            a=i*math.tau/n+(math.pi/4 if not round_tower else 0);b=(i+1)*math.tau/n+(math.pi/4 if not round_tower else 0)
+            rin=max(.002,rr-roof_r/rows*1.1) if k.lod<2 else .002;y2=yy+(tip-roofbase)/rows*1.1 if k.lod<2 else tip
+            verts=[(rr*math.cos(a),yy,rr*math.sin(a)),(rr*math.cos(b),yy,rr*math.sin(b)),(rin*math.cos(b),y2,rin*math.sin(b)),(rin*math.cos(a),y2,rin*math.sin(a))]
+            k.poly(verts+[(x,y-.012,z) for x,y,z in verts],[(0,1,2,3),(7,6,5,4),(0,4,5,1),(1,5,6,2),(2,6,7,3),(3,7,4,0)],5)
+    # Arched arrow-slit surrounds with recessed dark reveals, on all principal faces.
+    for y in (h*.44,h*.70):
+        for angle in range(4):
+            a=angle*math.pi/2;cx=math.sin(a)*r*.98;cz=math.cos(a)*r*.98
+            if angle%2==0:
+                k.box((0,y,cz),(.065,.27,.025),11);k.arch(0,y+.11,.035,.068,.035,cz,10,n=7)
+                for x in (-.055,.055):k.box((x,y-.015,cz),(.025,.25,.035),10)
+            else:
+                k.box((cx,y,0),(.025,.27,.065),11)
+                for z in (-.055,.055):k.box((cx,y-.015,z),(.035,.25,.025),10)
+    return c
+
+def keep(k):
+    w=5.15422;d=4.1544;h=4.3;walk=3.9;r=1.04;cx=w/2-r;cz=d/2-r
+    bodytop=walk-.012
+    c=Kit(2)
+    # A rounded four-bastion footprint matches the original keep connections.
+    # The original is a clover keep, with gates recessed between four round bastions.
+    # Keep that concave footprint; a rounded rectangle would fill the gate recesses.
+    for sign in (-1,1):
+        position=(sign*(cx+.31)/2,bodytop/2,0);size=(cx-.31,bodytop,2*cz)
+        k.box(position,size,9);c.box(position,size)
+    for i in range(12):
+        x0=-.31+i*.62/12;x1=x0+.62/12
+        y0=.67+math.sqrt(max(0,.31**2-x0*x0));y1=.67+math.sqrt(max(0,.31**2-x1*x1))
+        polygon=[(x0,y0),(x1,y1),(x1,bodytop),(x0,bodytop)]
+        k.prism(polygon,2*cz,mat=9);c.prism(polygon,2*cz)
+    k.box((0,.025,0),(.62,.05,2*cz),0);c.box((0,.025,0),(.62,.05,2*cz))
+    k.box((0,bodytop/2,cz-.04),(.62,bodytop,.08),9);c.box((0,bodytop/2,cz-.04),(.62,bodytop,.08))
+    for x in (-cx,cx):
+        for z in (-cz,cz):
+            k.ring(x,z,0,r*.97,0,bodytop,48 if k.lod==0 else 24,9);c.ring(x,z,0,r,0,bodytop,24)
+            # Three exposed quadrants surround each bastion; the inward quadrant joins the core.
+            start=(math.pi*1.5 if x>0 and z>0 else 0 if x<0 and z>0 else math.pi*.5 if x<0 else math.pi)
+            arc=math.pi*1.5;rows=18 if k.lod==0 else 9
+            for row in range(rows if k.lod<2 else 1):
+                count=14 if k.lod==0 else 8
+                for i in range(count if k.lod<2 else 1):
+                    n=count if k.lod<2 else 1;a=start+i*arc/n;b=start+(i+1)*arc/n
+                    k.ring(x,z,r*.94,r,row*bodytop/rows if k.lod<2 else 0,(row+1)*bodytop/rows-.003 if k.lod<2 else bodytop,2 if k.lod<2 else 24,0,a+.001,b-.001)
+            for y in (.12,1.06,2.47,walk-.12):k.ring(x,z,r*.94,r*1.01,y,y+.065,36,10,start,start+arc)
+            k.ring(x,z,r*.82,r*1.01,walk,walk+.12,36,0,start,start+arc)
+            for i in range(14):
+                a=start+(i+.18)*arc/14;b=start+(i+.70)*arc/14
+                k.ring(x,z,r*.80,r*1.01,walk+.10,h,2,0,a,b);c.ring(x,z,r*.80,r*1.01,walk+.10,h,2,0,a,b)
+    for z in (-cz,cz):
+        # Gate opening is a real void, including in its collision proxy.
+        for a,b in ((-cx,-.31),(.31,cx)):k.wall(a,b,0,bodytop,z,.06,course=.16,block=.29)
+        k.wall(-.31,.31,1.11,bodytop,z,.06,course=.16,block=.29)
+        k.box((0,walk+.06,z),(2*cx,.12,.20),10)
+        c.box((0,walk+.06,z),(2*cx,.12,.20))
+        for i in range(8):
+            pos=(-cx+(i+.5)*2*cx/8,h-.14,z)
+            k.box(pos,(.16,.28,.20),0);c.box(pos,(.16,.28,.20))
+        for x in (-.95,.95):
+            k.box((x,1.7,z),(.14,3.4,.15),10)
+            for y in (1.1,2.5):k.box((x,y,z),(.22,.07,.21),10)
+    for x in (-cx,cx):k.wall(-cz,cz,0,bodytop,x,.06,course=.16,block=.29,axis='x')
+    # Arched royal gateway and iron portcullis, at the existing door's recessed front.
+    front=-cz-.002
+    k.arch(0,.67,.31,.44,.09,front-.025,10,n=15)
+    for x in (-.375,.375):k.wall(x-.065,x+.065,0,.67,front,.09,10,course=.11,block=.15)
+    for i in range(7):k.box((-.26+i*.086,.43,front-.045),(.012,.84,.012),6)
+    for y in (.24,.56,.76):k.box((0,y,front-.05),(.55,.017,.016),6)
+    # Carved shield crest, raised chevron and crown. Closed relief shells.
+    k.prism([(-.19,1.65),(.19,1.65),(.17,1.40),(0,1.25),(-.17,1.40)],.055,mat=10,offset=front-.04)
+    k.beam((-.12,1.43,front-.08),(0,1.53,front-.08),.035,.02,0);k.beam((0,1.53,front-.08),(.12,1.43,front-.08),.035,.02,0)
+    k.box((0,1.71,front-.05),(.28,.04,.055),10)
+    for x in (-.10,0,.10):k.box((x,1.76,front-.05),(.045,.08,.055),10)
+    return c
+
+def bridge(k,name,source):
+    lo=source['bounds']['min'];hi=source['bounds']['max'];w=hi['x']-lo['x'];h=hi['y']-lo['y'];d=hi['z']-lo['z']
+    deck=source['floors'][0]['y']-lo['y'];c=Kit(2)
+    k.box((0,deck-.059,0),(w,.066,d*.91),9);c.box((0,deck-.045,0),(w,.09,d*.91))
+    # The three repeatable bridge bays share an exact planar road; arches stay below it.
+    cols=12 if k.lod==0 else 6
+    for i in range(cols):
+        for j in range(4 if k.lod==0 else 2):k.box((-w/2+(i+.5)*w/cols,deck-.012,-d*.43+(j+.5)*d*.86/(4 if k.lod==0 else 2)),(w/cols-.003,.024,d*.86/(4 if k.lod==0 else 2)-.003),0)
+    for side in (-1,1):
+        z=side*d*.45
+        k.box((0,deck+.055,z),(w,.11,d*.10),10);c.box((0,deck+.055,z),(w,.11,d*.10))
+        for i in range(5):
+            pos=(-w/2+(i+.5)*w/5,(h+deck+.10)/2,z);size=(w*.11,h-deck-.10,d*.10)
+            k.box(pos,size,0);c.box(pos,size)
+        # Segmental arch made of closed wedge blocks; no filled collision box across the river.
+        span=w*.54;rise=max(.08,deck*.72);n=13 if k.lod==0 else 7
+        for i in range(n):
+            x0=-w/2+i*w/n;x1=-w/2+(i+1)*w/n
+            def under(x):return max(.0,deck-.17-rise*(abs(x)/(w/2))**2)
+            poly=[(x0,under(x0)),(x1,under(x1)),(x1,deck-.07),(x0,deck-.07)]
+            k.prism(poly,d*.12,mat=0,offset=z);c.prism(poly,d*.12,offset=z)
+        if name!='BridgeMiddle':
+            end=-w/2+.045 if name=='BridgeStart' else w/2-.045
+            k.box((end,deck*.28,z),(.09,deck*.56,d*.12),1);c.box((end,deck*.28,z),(.09,deck*.56,d*.12))
+            k.prism([(max(-w/2,end-.07),.0),(min(w/2,end+.07),.0),(end,.24)],d*.20,mat=10,offset=z)
+    return c
+
+def detail(k,name):
+    # Normalised detail axes are fitted below, including original hinge-aligned Z-wide doors.
+    w=.6;h=1;d=.10;c=Kit(2)
+    if name in ('Door','Double Door'):
+        for i in range(7):k.box((-w/2+(i+.5)*w/7,.5,0),(w/7-.003,h,d*.55),7)
+        for y in (.17,.52,.84):
+            k.box((0,y,-d*.37),(w*.94,.035,.018),6)
+            if k.lod<2:
+                for x in (-w*.39,-w*.12,w*.12,w*.39):k.box((x,y,-d*.49),(.018,.018,.008),6)
+        k.box((w*.32,.49,-d*.47),(.045,.12,.018),6);k.ring(w*.32,-d*.56,.017,.026,.48,.50,12,6)
+        c.box((0,.5,0),(w,h,d));return c
+    # Recessed glass/doorway and heavy dressed side jambs.
+    door='Frame' in name
+    k.box((0,.5,d*.30),(w*.80,h*.93,.018),11 if door else 8)
+    for x in (-w*.45,w*.45):
+        k.wall(x-w*.05,x+w*.05,0,h*.84,0,d,10,course=.14,block=.1)
+    if 'Simple' in name or name=='Small Window':
+        k.box((0,h*.95,0),(w,.10,d),10)
+    else:
+        k.arch(0,h*.70,w*.35,w*.50,d,0,10,n=11)
+    k.box((0,.025,0),(w,.05,d),10)
+    if not door:
+        k.box((0,.50,-d*.15),(.022,.87,.025),2)
+        k.box((0,.49,-d*.15),(w*.80,.022,.025),2)
+        if k.lod<2:
+            for i in range(-4,5):
+                for sign in (-1,1):
+                    x0=max(-w*.39,(-.5-i*.14)/sign);x1=min(w*.39,(.5-i*.14)/sign)
+                    if x1>x0:k.beam((x0,.5+i*.14+sign*x0,-d*.29),(x1,.5+i*.14+sign*x1,-d*.29),.008,.009,6)
+    for x in (-w*.45,w*.45):c.box((x,h/2,0),(w*.1,h,d))
+    c.box((0,h*.95,0),(w,.10,d));return c
+
+def deck(k):
+    # Original CastleTop was a zero-thickness platform. Keep its top at precisely the measured Y.
+    outline=[];segments=36 if k.lod==0 else 18
+    for x,z,start in [(1.45,-.95,math.pi),(1.45,.95,-math.pi/2),(-1.45,.95,0),(-1.45,-.95,math.pi/2)]:
+        for i in range(segments+1):
+            a=start+1.5*math.pi*i/segments;p=(x+.95*math.cos(a),z+.95*math.sin(a))
+            if not outline or math.dist(p,outline[-1])>1e-6:outline.append(p)
+    n=len(outline);verts=[(x,y,z) for y in (-.0002,0) for x,z in outline]
+    k.poly(verts,[tuple(range(n-1,-1,-1)),tuple(range(n,2*n))]+[(i,(i+1)%n,(i+1)%n+n,i+n) for i in range(n)],7)
+    return k
+
+def fit(k,src,door=False):
+    if door:k.v=[(z,y,x) for x,y,z in k.v]
+    v=np.array(k.v,dtype=np.float64);low=v.min(0);high=v.max(0)
+    target_low=np.array([src['bounds']['min'][a] for a in 'xyz']);target_high=np.array([src['bounds']['max'][a] for a in 'xyz'])
+    if src['name']=='CastleTop':target_low[1]=target_high[1]-.0002
+    v=(v-low)/np.maximum(high-low,1e-10)*(target_high-target_low)+target_low
+    k.v=v.tolist()
+
+def mesh_object(k,name,collection,bevel=True,bevel_width=None):
+    mesh=bpy.data.meshes.new(name);mesh.from_pydata(k.v,[],k.f);mesh.update()
+    obj=bpy.data.objects.new(name,mesh);collection.objects.link(obj);authored.append(obj)
+    for mat in materials:mesh.materials.append(mat)
+    for p,i in zip(mesh.polygons,k.mat):p.material_index=i
+    # Closed components, consistent normals; do not weld independent masonry blocks.
+    bm=bmesh.new();bm.from_mesh(mesh);bmesh.ops.recalc_face_normals(bm,faces=list(bm.faces))
+    # A uniform bevel can collapse tiny studs, roof lips or soot caps to zero-area
+    # strips. Give each closed construction shell a radius bounded by its shortest
+    # edge, and leave coplanar/low-angle seams unbevelled.
+    weight=bm.edges.layers.float.new('bevel_weight_edge');seen=set()
+    base_width=bevel_width if bevel_width is not None else .003 if k.lod==0 else .002
+    for vertex in bm.verts:
+        if vertex in seen:continue
+        pending=[vertex];edges=set();seen.add(vertex)
+        while pending:
+            v=pending.pop()
+            for e in v.link_edges:
+                edges.add(e);other=e.other_vert(v)
+                if other not in seen:seen.add(other);pending.append(other)
+        radius=min(base_width,min((e.calc_length() for e in edges),default=base_width)*.20)
+        for e in edges:e[weight]=radius/base_width if e.is_manifold and e.calc_face_angle()>.35 else 0
+    bm.to_mesh(mesh);bm.free()
+    if bevel and k.lod<2:
+        mod=obj.modifiers.new('Dressed edge radii','BEVEL');mod.width=base_width;mod.segments=2 if k.lod==0 else 1;mod.affect='EDGES';mod.limit_method='WEIGHT'
+        bpy.context.view_layer.objects.active=obj;obj.select_set(True)
+        bpy.ops.object.modifier_apply(modifier=mod.name);obj.select_set(False)
+        for p in obj.data.polygons:p.use_smooth=True
+        mod=obj.modifiers.new('Architectural face normals','WEIGHTED_NORMAL');mod.keep_sharp=True;mod.weight=60
+        bpy.context.view_layer.objects.active=obj;obj.select_set(True);bpy.ops.object.modifier_apply(modifier=mod.name);obj.select_set(False)
+    return obj
+
+def pack_rectangles(rects,padding=.001):
+    """Non-overlapping, orthonormal face charts. Binary-search a uniform texel scale."""
+    order=sorted(range(len(rects)),key=lambda i:min(rects[i]),reverse=True)
+    def attempt(scale):
+        rows=[];result={}
+        for i in order:
+            w,h=rects[i];rot=h>w
+            if rot:w,h=h,w
+            w=w*scale+padding*2;h=h*scale+padding*2
+            row=rows[-1] if rows and h<=rows[-1][2]+1e-12 and rows[-1][0]+w<=1 else None
+            if row is None:
+                y=sum(r[2] for r in rows)
+                if y+h>1 or w>1:return None
+                row=[0,y,h];rows.append(row)
+            result[i]=(row[0]+padding,row[1]+padding,scale,rot);row[0]+=w
+        return result
+    lo=0;hi=1/max(max(r) for r in rects)
+    # If padding alone won't fit, reduce it, retaining at least ~1 texel at 4K for UV1.
+    while attempt(0) is None:padding*=.8
+    for _ in range(22):
+        mid=(lo+hi)/2
+        if attempt(mid) is None:hi=mid
+        else:lo=mid
+    return attempt(lo*.995)
+
+def unwrap(mesh):
+    # Every quad/bevel face has its own planar chart. No overlap, no UV stretch on planar faces.
+    charts=[];groups={}
+    for p in mesh.polygons:
+        verts=[mesh.vertices[i].co.copy() for i in p.vertices];n=p.normal
+        u=(verts[1]-verts[0]).normalized();v=n.cross(u).normalized()
+        uv=[((x-verts[0]).dot(u),(x-verts[0]).dot(v)) for x in verts]
+        low=(min(x for x,y in uv),min(y for x,y in uv));coords=[(x-low[0],y-low[1]) for x,y in uv]
+        dims=(max(x for x,y in coords)+1e-7,max(y for x,y in coords)+1e-7)
+        charts.append((coords,dims));groups.setdefault(p.material_index,[]).append(p.index)
+    uv0=mesh.uv_layers.new(name='UV0_Atlas');uv1=mesh.uv_layers.new(name='UV1_Lightmap')
+    allpack=pack_rectangles([c[1] for c in charts],padding=.00045)
+    surfacepack={}
+    for mat,indices in groups.items():
+        packed=pack_rectangles([charts[i][1] for i in indices],padding=.0012)
+        for i,j in enumerate(indices):surfacepack[j]=packed[i]
+    for p in mesh.polygons:
+        for loop,(x,y) in zip(p.loop_indices,charts[p.index][0]):
+            a,b,s,rot=surfacepack[p.index];xx,yy=(y,x) if rot else (x,y)
+            uv0.data[loop].uv=((p.material_index%4+.015+(a+xx*s)*.97)/4,(p.material_index//4+.015+(b+yy*s)*.97)/4)
+            a,b,s,rot=allpack[p.index];xx,yy=(y,x) if rot else (x,y)
+            uv1.data[loop].uv=(a+xx*s,b+yy*s)
+    mesh.uv_layers.active_index=0
+    return len(charts)
+
+def audit(mesh):
+    bm=bmesh.new();bm.from_mesh(mesh)
+    bad=sum(not e.is_manifold for e in bm.edges);quads=sum(len(f.verts)==4 for f in bm.faces);faces=len(bm.faces);bm.free()
+    if bad:raise RuntimeError(f'{mesh.name}: {bad} non-manifold edges')
+    return {'nonManifoldEdges':bad,'faces':faces,'quadRatio':round(quads/max(1,faces),4)}
+
+def export(obj,path,collider=False):
+    m=obj.data;m.calc_loop_triangles();normals=m.corner_normals
+    # Unity is left handed (X,Y,Z). Blender uses (X,-Z,Y). Change basis for the editable file below;
+    # buffers remain in measured Unity mesh-local space with outward-facing winding.
+    count=len(m.loops);arr=np.zeros((count,10),dtype='<f4')
+    for loop in m.loops:
+        i=loop.index;arr[i,:3]=m.vertices[loop.vertex_index].co;arr[i,3:6]=normals[i].vector
+        if not collider:arr[i,6:8]=m.uv_layers[0].data[i].uv;arr[i,8:10]=m.uv_layers[1].data[i].uv
+    triangles=np.array([tuple(t.loops) for t in m.loop_triangles],dtype='<i4')
+    with path.open('wb') as f:f.write(struct.pack('<iii',0x424c4431,count,len(triangles)*3));f.write(arr.tobytes());f.write(triangles.tobytes())
+    return {'vertices':count,'triangles':len(triangles)}
+
+if only=='Textures':
+    textures();bpy.ops.wm.save_as_mainfile(filepath=str(SOURCE/'Buildings.blend'),compress=True)
+    print('[Buildings] Refreshed PBR atlas and packed master images; geometry is unchanged',flush=True);sys.exit(0)
+if only:
+    materials=[bpy.data.materials[name] for name,*rest in PALETTE]
+    manifest=json.loads((DATA/'manifest.json').read_text())['parts'];reports=json.loads((SOURCE/'mesh-audit.json').read_text())['parts']
+else:textures();manifest=[];reports=[]
+for source in reference['meshes']:
+    if only and only not in (source['model'],source['name']):continue
+    name=source['name'];key=source['key'];label=source['model']+' - '+name
+    if only:
+        old=bpy.data.collections.get(label)
+        if old:
+            for obj in list(old.objects):bpy.data.objects.remove(obj,do_unlink=True)
+            bpy.data.collections.remove(old)
+    collection=bpy.data.collections.new(label);bpy.context.scene.collection.children.link(collection)
+    record={'key':key,'name':name,'files':[],'collision':''};report={'key':key,'name':name,'lods':[]}
+    for lod in range(3):
+        k=Kit(lod)
+        if source['model']=='Houses':collision=house(k,name=='HouseB')
+        elif source['model']=='Wall':collision=wall(k,name=='Column')
+        elif source['model']=='Tower A':collision=tower(k,False)
+        elif source['model']=='Tower B':collision=tower(k,True)
+        elif name=='CastleTop':collision=deck(k)
+        elif source['model']=='Castle':collision=keep(k)
+        elif source['model']=='Bridge':collision=bridge(k,name,source)
+        else:collision=detail(k,name)
+        fit(k,source,name in ('Door','Double Door'));obj=mesh_object(k,name+f' LOD{lod}',collection,name!='CastleTop',.00015 if source['model']=='Doors and Windows' else None)
+        # Bevel removes extreme corners: restore the measured envelope after the finish pass.
+        fitted=Kit(lod);fitted.v=[tuple(v.co) for v in obj.data.vertices];fit(fitted,source)
+        for v,p in zip(obj.data.vertices,fitted.v):v.co=p
+        obj.data.update();result=audit(obj.data);unwrap(obj.data)
+        file=key+f'_LOD{lod}.bin';record['files'].append(file);result.update(export(obj,DATA/file));report['lods'].append(result)
+        obj.hide_render=lod>0;obj.hide_set(lod>0)
+        obj['Unity source key']=key;obj['LOD']=lod;obj['Measured local bounds']=str(source['bounds'])
+        if lod==0:
+            # Collision must use the visual's pre-bevel affine fit, preserving all architectural ratios.
+            fit(collision,source,name in ('Door','Double Door'));col=mesh_object(collision,name+' COLLISION',collection,False)
+            audit(col.data);filename=key+'_Collision.bin';export(col,DATA/filename,True);record['collision']=filename
+            col.hide_render=True;col.hide_set(True);col.display_type='WIRE'
+    manifest=[r for r in manifest if r['key']!=key];reports=[r for r in reports if r['key']!=key];manifest.append(record);reports.append(report)
+    print('[Buildings]',name,[r['triangles'] for r in report['lods']],flush=True)
+
+# Source is organized into collections, with shared PBR materials and explicit authoring collision shells.
+# Apply basis conversion ONLY after buffers have been written, for Blender's Z-up viewport.
+for obj in authored:
+    for v in obj.data.vertices:x,y,z=v.co;v.co=(x,-z,y)
+    obj.data.update()
+bpy.context.scene.unit_settings.system='METRIC';bpy.context.scene.unit_settings.scale_length=1
+bpy.context.scene.world.color=(.15,.15,.15)
+order={s['key']:i for i,s in enumerate(reference['meshes'])}
+(DATA/'manifest.json').write_text(json.dumps({'parts':sorted(manifest,key=lambda r:order[r['key']])},indent=2))
+(SOURCE/'mesh-audit.json').write_text(json.dumps({'seed':317,'atlasSize':4096,'parts':sorted(reports,key=lambda r:order[r['key']])},indent=2))
+bpy.ops.wm.save_as_mainfile(filepath=str(SOURCE/'Buildings.blend'),compress=True)
+print('[Buildings] Compressed master and measured binary export complete',flush=True)

@@ -1,0 +1,1231 @@
+{
+  "result": "PASS",
+  "masterSHA256": "a3cab2b3a949c2d186721b7282fa041810d8b7a0dd6a4fd30e45827b31476b64",
+  "objects": 72,
+  "meshes": [
+    {
+      "name": "Big Window COLLISION",
+      "nonManifoldEdges": 0,
+      "degenerateFaces": 0
+    },
+    {
+      "name": "Big Window LOD0",
+      "nonManifoldEdges": 0,
+      "degenerateFaces": 0,
+      "uv": [
+        {
+          "name": "UV0_Atlas",
+          "charts": 2268,
+          "overlappingCharts": 0,
+          "p99RelativeEdgeScaleError": 0.006054,
+          "maxRelativeEdgeScaleError": 0.007818
+        },
+        {
+          "name": "UV1_Lightmap",
+          "charts": 2268,
+          "overlappingCharts": 0,
+          "p99RelativeEdgeScaleError": 0.005344,
+          "maxRelativeEdgeScaleError": 0.005938
+        }
+      ]
+    },
+    {
+      "name": "Big Window LOD1",
+      "nonManifoldEdges": 0,
+      "degenerateFaces": 0,
+      "uv": [
+        {
+          "name": "UV0_Atlas",
+          "charts": 1092,
+          "overlappingCharts": 0,
+          "p99RelativeEdgeScaleError": 0.001044,
+          "maxRelativeEdgeScaleError": 0.001283
+        },
+        {
+          "name": "UV1_Lightmap",
+          "charts": 1092,
+          "overlappingCharts": 0,
+          "p99RelativeEdgeScaleError": 0.000348,
+          "maxRelativeEdgeScaleError": 0.000401
+        }
+      ]
+    },
+    {
+      "name": "Big Window LOD2",
+      "nonManifoldEdges": 0,
+      "degenerateFaces": 0,
+      "uv": [
+        {
+          "name": "UV0_Atlas",
+          "charts": 102,
+          "overlappingCharts": 0,
+          "p99RelativeEdgeScaleError": 7e-06,
+          "maxRelativeEdgeScaleError": 8e-06
+        },
+        {
+          "name": "UV1_Lightmap",
+          "charts": 102,
+          "overlappingCharts": 0,
+          "p99RelativeEdgeScaleError": 3e-06,
+          "maxRelativeEdgeScaleError": 4e-06
+        }
+      ]
+    },
+    {
+      "name": "BridgeEnd COLLISION",
+      "nonManifoldEdges": 0,
+      "degenerateFaces": 0
+    },
+    {
+      "name": "BridgeEnd LOD0",
+      "nonManifoldEdges": 0,
+      "degenerateFaces": 0,
+      "uv": [
+        {
+          "name": "UV0_Atlas",
+          "charts": 4888,
+          "overlappingCharts": 0,
+          "p99RelativeEdgeScaleError": 0.005554,
+          "maxRelativeEdgeScaleError": 0.009164
+        },
+        {
+          "name": "UV1_Lightmap",
+          "charts": 4888,
+          "overlappingCharts": 0,
+          "p99RelativeEdgeScaleError": 0.005489,
+          "maxRelativeEdgeScaleError": 0.009117
+        }
+      ]
+    },
+    {
+      "name": "BridgeEnd LOD1",
+      "nonManifoldEdges": 0,
+      "degenerateFaces": 0,
+      "uv": [
+        {
+          "name": "UV0_Atlas",
+          "charts": 1106,
+          "overlappingCharts": 0,
+          "p99RelativeEdgeScaleError": 0.000114,
+          "maxRelativeEdgeScaleError": 0.00027
+        },
+        {
+          "name": "UV1_Lightmap",
+          "charts": 1106,
+          "overlappingCharts": 0,
+          "p99RelativeEdgeScaleError": 0.000103,
+          "maxRelativeEdgeScaleError": 0.000113
+        }
+      ]
+    },
+    {
+      "name": "BridgeEnd LOD2",
+      "nonManifoldEdges": 0,
+      "degenerateFaces": 0,
+      "uv": [
+        {
+          "name": "UV0_Atlas",
+          "charts": 256,
+          "overlappingCharts": 0,
+          "p99RelativeEdgeScaleError": 5e-06,
+          "maxRelativeEdgeScaleError": 5e-06
+        },
+        {
+          "name": "UV1_Lightmap",
+          "charts": 256,
+          "overlappingCharts": 0,
+          "p99RelativeEdgeScaleError": 7e-06,
+          "maxRelativeEdgeScaleError": 8e-06
+        }
+      ]
+    },
+    {
+      "name": "BridgeMiddle COLLISION",
+      "nonManifoldEdges": 0,
+      "degenerateFaces": 0
+    },
+    {
+      "name": "BridgeMiddle LOD0",
+      "nonManifoldEdges": 0,
+      "degenerateFaces": 0,
+      "uv": [
+        {
+          "name": "UV0_Atlas",
+          "charts": 4698,
+          "overlappingCharts": 0,
+          "p99RelativeEdgeScaleError": 0.004309,
+          "maxRelativeEdgeScaleError": 0.00548
+        },
+        {
+          "name": "UV1_Lightmap",
+          "charts": 4698,
+          "overlappingCharts": 0,
+          "p99RelativeEdgeScaleError": 0.004343,
+          "maxRelativeEdgeScaleError": 0.005394
+        }
+      ]
+    },
+    {
+      "name": "BridgeMiddle LOD1",
+      "nonManifoldEdges": 0,
+      "degenerateFaces": 0,
+      "uv": [
+        {
+          "name": "UV0_Atlas",
+          "charts": 1014,
+          "overlappingCharts": 0,
+          "p99RelativeEdgeScaleError": 8.8e-05,
+          "maxRelativeEdgeScaleError": 0.000123
+        },
+        {
+          "name": "UV1_Lightmap",
+          "charts": 1014,
+          "overlappingCharts": 0,
+          "p99RelativeEdgeScaleError": 5.6e-05,
+          "maxRelativeEdgeScaleError": 8.7e-05
+        }
+      ]
+    },
+    {
+      "name": "BridgeMiddle LOD2",
+      "nonManifoldEdges": 0,
+      "degenerateFaces": 0,
+      "uv": [
+        {
+          "name": "UV0_Atlas",
+          "charts": 234,
+          "overlappingCharts": 0,
+          "p99RelativeEdgeScaleError": 2e-06,
+          "maxRelativeEdgeScaleError": 3e-06
+        },
+        {
+          "name": "UV1_Lightmap",
+          "charts": 234,
+          "overlappingCharts": 0,
+          "p99RelativeEdgeScaleError": 2e-06,
+          "maxRelativeEdgeScaleError": 3e-06
+        }
+      ]
+    },
+    {
+      "name": "BridgeStart COLLISION",
+      "nonManifoldEdges": 0,
+      "degenerateFaces": 0
+    },
+    {
+      "name": "BridgeStart LOD0",
+      "nonManifoldEdges": 0,
+      "degenerateFaces": 0,
+      "uv": [
+        {
+          "name": "UV0_Atlas",
+          "charts": 4888,
+          "overlappingCharts": 0,
+          "p99RelativeEdgeScaleError": 0.005508,
+          "maxRelativeEdgeScaleError": 0.009125
+        },
+        {
+          "name": "UV1_Lightmap",
+          "charts": 4888,
+          "overlappingCharts": 0,
+          "p99RelativeEdgeScaleError": 0.005533,
+          "maxRelativeEdgeScaleError": 0.009169
+        }
+      ]
+    },
+    {
+      "name": "BridgeStart LOD1",
+      "nonManifoldEdges": 0,
+      "degenerateFaces": 0,
+      "uv": [
+        {
+          "name": "UV0_Atlas",
+          "charts": 1106,
+          "overlappingCharts": 0,
+          "p99RelativeEdgeScaleError": 0.000119,
+          "maxRelativeEdgeScaleError": 0.00027
+        },
+        {
+          "name": "UV1_Lightmap",
+          "charts": 1106,
+          "overlappingCharts": 0,
+          "p99RelativeEdgeScaleError": 6.4e-05,
+          "maxRelativeEdgeScaleError": 7.5e-05
+        }
+      ]
+    },
+    {
+      "name": "BridgeStart LOD2",
+      "nonManifoldEdges": 0,
+      "degenerateFaces": 0,
+      "uv": [
+        {
+          "name": "UV0_Atlas",
+          "charts": 256,
+          "overlappingCharts": 0,
+          "p99RelativeEdgeScaleError": 5e-06,
+          "maxRelativeEdgeScaleError": 5e-06
+        },
+        {
+          "name": "UV1_Lightmap",
+          "charts": 256,
+          "overlappingCharts": 0,
+          "p99RelativeEdgeScaleError": 7e-06,
+          "maxRelativeEdgeScaleError": 8e-06
+        }
+      ]
+    },
+    {
+      "name": "Castle COLLISION",
+      "nonManifoldEdges": 0,
+      "degenerateFaces": 0
+    },
+    {
+      "name": "Castle LOD0",
+      "nonManifoldEdges": 0,
+      "degenerateFaces": 0,
+      "uv": [
+        {
+          "name": "UV0_Atlas",
+          "charts": 133157,
+          "overlappingCharts": 0,
+          "p99RelativeEdgeScaleError": 0.007695,
+          "maxRelativeEdgeScaleError": 0.011378
+        },
+        {
+          "name": "UV1_Lightmap",
+          "charts": 133157,
+          "overlappingCharts": 0,
+          "p99RelativeEdgeScaleError": 0.005145,
+          "maxRelativeEdgeScaleError": 0.009458
+        }
+      ]
+    },
+    {
+      "name": "Castle LOD1",
+      "nonManifoldEdges": 0,
+      "degenerateFaces": 0,
+      "uv": [
+        {
+          "name": "UV0_Atlas",
+          "charts": 43384,
+          "overlappingCharts": 0,
+          "p99RelativeEdgeScaleError": 0.000772,
+          "maxRelativeEdgeScaleError": 0.002748
+        },
+        {
+          "name": "UV1_Lightmap",
+          "charts": 43384,
+          "overlappingCharts": 0,
+          "p99RelativeEdgeScaleError": 0.000688,
+          "maxRelativeEdgeScaleError": 0.00165
+        }
+      ]
+    },
+    {
+      "name": "Castle LOD2",
+      "nonManifoldEdges": 0,
+      "degenerateFaces": 0,
+      "uv": [
+        {
+          "name": "UV0_Atlas",
+          "charts": 4505,
+          "overlappingCharts": 0,
+          "p99RelativeEdgeScaleError": 3.2e-05,
+          "maxRelativeEdgeScaleError": 0.000105
+        },
+        {
+          "name": "UV1_Lightmap",
+          "charts": 4505,
+          "overlappingCharts": 0,
+          "p99RelativeEdgeScaleError": 5e-05,
+          "maxRelativeEdgeScaleError": 0.000123
+        }
+      ]
+    },
+    {
+      "name": "CastleTop COLLISION",
+      "nonManifoldEdges": 0,
+      "degenerateFaces": 0
+    },
+    {
+      "name": "CastleTop LOD0",
+      "nonManifoldEdges": 0,
+      "degenerateFaces": 0,
+      "uv": [
+        {
+          "name": "UV0_Atlas",
+          "charts": 148,
+          "overlappingCharts": 0,
+          "p99RelativeEdgeScaleError": 0.002452,
+          "maxRelativeEdgeScaleError": 0.002452
+        },
+        {
+          "name": "UV1_Lightmap",
+          "charts": 148,
+          "overlappingCharts": 0,
+          "p99RelativeEdgeScaleError": 0.000659,
+          "maxRelativeEdgeScaleError": 0.000659
+        }
+      ]
+    },
+    {
+      "name": "CastleTop LOD1",
+      "nonManifoldEdges": 0,
+      "degenerateFaces": 0,
+      "uv": [
+        {
+          "name": "UV0_Atlas",
+          "charts": 76,
+          "overlappingCharts": 0,
+          "p99RelativeEdgeScaleError": 0.002444,
+          "maxRelativeEdgeScaleError": 0.002444
+        },
+        {
+          "name": "UV1_Lightmap",
+          "charts": 76,
+          "overlappingCharts": 0,
+          "p99RelativeEdgeScaleError": 0.000657,
+          "maxRelativeEdgeScaleError": 0.000658
+        }
+      ]
+    },
+    {
+      "name": "CastleTop LOD2",
+      "nonManifoldEdges": 0,
+      "degenerateFaces": 0,
+      "uv": [
+        {
+          "name": "UV0_Atlas",
+          "charts": 76,
+          "overlappingCharts": 0,
+          "p99RelativeEdgeScaleError": 0.002444,
+          "maxRelativeEdgeScaleError": 0.002444
+        },
+        {
+          "name": "UV1_Lightmap",
+          "charts": 76,
+          "overlappingCharts": 0,
+          "p99RelativeEdgeScaleError": 0.000657,
+          "maxRelativeEdgeScaleError": 0.000658
+        }
+      ]
+    },
+    {
+      "name": "Column COLLISION",
+      "nonManifoldEdges": 0,
+      "degenerateFaces": 0
+    },
+    {
+      "name": "Column LOD0",
+      "nonManifoldEdges": 0,
+      "degenerateFaces": 0,
+      "uv": [
+        {
+          "name": "UV0_Atlas",
+          "charts": 2538,
+          "overlappingCharts": 0,
+          "p99RelativeEdgeScaleError": 0.003988,
+          "maxRelativeEdgeScaleError": 0.004113
+        },
+        {
+          "name": "UV1_Lightmap",
+          "charts": 2538,
+          "overlappingCharts": 0,
+          "p99RelativeEdgeScaleError": 0.004,
+          "maxRelativeEdgeScaleError": 0.004019
+        }
+      ]
+    },
+    {
+      "name": "Column LOD1",
+      "nonManifoldEdges": 0,
+      "degenerateFaces": 0,
+      "uv": [
+        {
+          "name": "UV0_Atlas",
+          "charts": 1222,
+          "overlappingCharts": 0,
+          "p99RelativeEdgeScaleError": 4.8e-05,
+          "maxRelativeEdgeScaleError": 0.000119
+        },
+        {
+          "name": "UV1_Lightmap",
+          "charts": 1222,
+          "overlappingCharts": 0,
+          "p99RelativeEdgeScaleError": 7.6e-05,
+          "maxRelativeEdgeScaleError": 7.6e-05
+        }
+      ]
+    },
+    {
+      "name": "Column LOD2",
+      "nonManifoldEdges": 0,
+      "degenerateFaces": 0,
+      "uv": [
+        {
+          "name": "UV0_Atlas",
+          "charts": 36,
+          "overlappingCharts": 0,
+          "p99RelativeEdgeScaleError": 1e-06,
+          "maxRelativeEdgeScaleError": 1e-06
+        },
+        {
+          "name": "UV1_Lightmap",
+          "charts": 36,
+          "overlappingCharts": 0,
+          "p99RelativeEdgeScaleError": 1e-06,
+          "maxRelativeEdgeScaleError": 1e-06
+        }
+      ]
+    },
+    {
+      "name": "Door COLLISION",
+      "nonManifoldEdges": 0,
+      "degenerateFaces": 0
+    },
+    {
+      "name": "Door LOD0",
+      "nonManifoldEdges": 0,
+      "degenerateFaces": 0,
+      "uv": [
+        {
+          "name": "UV0_Atlas",
+          "charts": 1508,
+          "overlappingCharts": 0,
+          "p99RelativeEdgeScaleError": 0.027284,
+          "maxRelativeEdgeScaleError": 0.090918
+        },
+        {
+          "name": "UV1_Lightmap",
+          "charts": 1508,
+          "overlappingCharts": 0,
+          "p99RelativeEdgeScaleError": 0.027342,
+          "maxRelativeEdgeScaleError": 0.09104
+        }
+      ]
+    },
+    {
+      "name": "Door LOD1",
+      "nonManifoldEdges": 0,
+      "degenerateFaces": 0,
+      "uv": [
+        {
+          "name": "UV0_Atlas",
+          "charts": 742,
+          "overlappingCharts": 0,
+          "p99RelativeEdgeScaleError": 0.000293,
+          "maxRelativeEdgeScaleError": 0.000863
+        },
+        {
+          "name": "UV1_Lightmap",
+          "charts": 742,
+          "overlappingCharts": 0,
+          "p99RelativeEdgeScaleError": 0.000185,
+          "maxRelativeEdgeScaleError": 0.000225
+        }
+      ]
+    },
+    {
+      "name": "Door LOD2",
+      "nonManifoldEdges": 0,
+      "degenerateFaces": 0,
+      "uv": [
+        {
+          "name": "UV0_Atlas",
+          "charts": 116,
+          "overlappingCharts": 0,
+          "p99RelativeEdgeScaleError": 1.4e-05,
+          "maxRelativeEdgeScaleError": 2.7e-05
+        },
+        {
+          "name": "UV1_Lightmap",
+          "charts": 116,
+          "overlappingCharts": 0,
+          "p99RelativeEdgeScaleError": 1.5e-05,
+          "maxRelativeEdgeScaleError": 1.6e-05
+        }
+      ]
+    },
+    {
+      "name": "Double Door COLLISION",
+      "nonManifoldEdges": 0,
+      "degenerateFaces": 0
+    },
+    {
+      "name": "Double Door Frame COLLISION",
+      "nonManifoldEdges": 0,
+      "degenerateFaces": 0
+    },
+    {
+      "name": "Double Door Frame LOD0",
+      "nonManifoldEdges": 0,
+      "degenerateFaces": 0,
+      "uv": [
+        {
+          "name": "UV0_Atlas",
+          "charts": 1674,
+          "overlappingCharts": 0,
+          "p99RelativeEdgeScaleError": 0.007421,
+          "maxRelativeEdgeScaleError": 0.008316
+        },
+        {
+          "name": "UV1_Lightmap",
+          "charts": 1674,
+          "overlappingCharts": 0,
+          "p99RelativeEdgeScaleError": 0.005024,
+          "maxRelativeEdgeScaleError": 0.005753
+        }
+      ]
+    },
+    {
+      "name": "Double Door Frame LOD1",
+      "nonManifoldEdges": 0,
+      "degenerateFaces": 0,
+      "uv": [
+        {
+          "name": "UV0_Atlas",
+          "charts": 806,
+          "overlappingCharts": 0,
+          "p99RelativeEdgeScaleError": 0.001242,
+          "maxRelativeEdgeScaleError": 0.001456
+        },
+        {
+          "name": "UV1_Lightmap",
+          "charts": 806,
+          "overlappingCharts": 0,
+          "p99RelativeEdgeScaleError": 0.000342,
+          "maxRelativeEdgeScaleError": 0.000507
+        }
+      ]
+    },
+    {
+      "name": "Double Door Frame LOD2",
+      "nonManifoldEdges": 0,
+      "degenerateFaces": 0,
+      "uv": [
+        {
+          "name": "UV0_Atlas",
+          "charts": 90,
+          "overlappingCharts": 0,
+          "p99RelativeEdgeScaleError": 7e-06,
+          "maxRelativeEdgeScaleError": 1.3e-05
+        },
+        {
+          "name": "UV1_Lightmap",
+          "charts": 90,
+          "overlappingCharts": 0,
+          "p99RelativeEdgeScaleError": 4e-06,
+          "maxRelativeEdgeScaleError": 4e-06
+        }
+      ]
+    },
+    {
+      "name": "Double Door LOD0",
+      "nonManifoldEdges": 0,
+      "degenerateFaces": 0,
+      "uv": [
+        {
+          "name": "UV0_Atlas",
+          "charts": 1508,
+          "overlappingCharts": 0,
+          "p99RelativeEdgeScaleError": 0.024597,
+          "maxRelativeEdgeScaleError": 0.074776
+        },
+        {
+          "name": "UV1_Lightmap",
+          "charts": 1508,
+          "overlappingCharts": 0,
+          "p99RelativeEdgeScaleError": 0.024705,
+          "maxRelativeEdgeScaleError": 0.07522
+        }
+      ]
+    },
+    {
+      "name": "Double Door LOD1",
+      "nonManifoldEdges": 0,
+      "degenerateFaces": 0,
+      "uv": [
+        {
+          "name": "UV0_Atlas",
+          "charts": 742,
+          "overlappingCharts": 0,
+          "p99RelativeEdgeScaleError": 0.00029,
+          "maxRelativeEdgeScaleError": 0.000629
+        },
+        {
+          "name": "UV1_Lightmap",
+          "charts": 742,
+          "overlappingCharts": 0,
+          "p99RelativeEdgeScaleError": 0.000155,
+          "maxRelativeEdgeScaleError": 0.000198
+        }
+      ]
+    },
+    {
+      "name": "Double Door LOD2",
+      "nonManifoldEdges": 0,
+      "degenerateFaces": 0,
+      "uv": [
+        {
+          "name": "UV0_Atlas",
+          "charts": 116,
+          "overlappingCharts": 0,
+          "p99RelativeEdgeScaleError": 1.9e-05,
+          "maxRelativeEdgeScaleError": 3.3e-05
+        },
+        {
+          "name": "UV1_Lightmap",
+          "charts": 116,
+          "overlappingCharts": 0,
+          "p99RelativeEdgeScaleError": 1.6e-05,
+          "maxRelativeEdgeScaleError": 2.2e-05
+        }
+      ]
+    },
+    {
+      "name": "House COLLISION",
+      "nonManifoldEdges": 0,
+      "degenerateFaces": 0
+    },
+    {
+      "name": "House LOD0",
+      "nonManifoldEdges": 0,
+      "degenerateFaces": 0,
+      "uv": [
+        {
+          "name": "UV0_Atlas",
+          "charts": 27838,
+          "overlappingCharts": 0,
+          "p99RelativeEdgeScaleError": 0.004848,
+          "maxRelativeEdgeScaleError": 0.00933
+        },
+        {
+          "name": "UV1_Lightmap",
+          "charts": 27838,
+          "overlappingCharts": 0,
+          "p99RelativeEdgeScaleError": 0.004868,
+          "maxRelativeEdgeScaleError": 0.00917
+        }
+      ]
+    },
+    {
+      "name": "House LOD1",
+      "nonManifoldEdges": 0,
+      "degenerateFaces": 0,
+      "uv": [
+        {
+          "name": "UV0_Atlas",
+          "charts": 7450,
+          "overlappingCharts": 0,
+          "p99RelativeEdgeScaleError": 0.000222,
+          "maxRelativeEdgeScaleError": 0.000341
+        },
+        {
+          "name": "UV1_Lightmap",
+          "charts": 7450,
+          "overlappingCharts": 0,
+          "p99RelativeEdgeScaleError": 0.000196,
+          "maxRelativeEdgeScaleError": 0.000552
+        }
+      ]
+    },
+    {
+      "name": "House LOD2",
+      "nonManifoldEdges": 0,
+      "degenerateFaces": 0,
+      "uv": [
+        {
+          "name": "UV0_Atlas",
+          "charts": 496,
+          "overlappingCharts": 0,
+          "p99RelativeEdgeScaleError": 1.3e-05,
+          "maxRelativeEdgeScaleError": 1.4e-05
+        },
+        {
+          "name": "UV1_Lightmap",
+          "charts": 496,
+          "overlappingCharts": 0,
+          "p99RelativeEdgeScaleError": 1.2e-05,
+          "maxRelativeEdgeScaleError": 3e-05
+        }
+      ]
+    },
+    {
+      "name": "HouseB COLLISION",
+      "nonManifoldEdges": 0,
+      "degenerateFaces": 0
+    },
+    {
+      "name": "HouseB LOD0",
+      "nonManifoldEdges": 0,
+      "degenerateFaces": 0,
+      "uv": [
+        {
+          "name": "UV0_Atlas",
+          "charts": 29296,
+          "overlappingCharts": 0,
+          "p99RelativeEdgeScaleError": 0.004263,
+          "maxRelativeEdgeScaleError": 0.009333
+        },
+        {
+          "name": "UV1_Lightmap",
+          "charts": 29296,
+          "overlappingCharts": 0,
+          "p99RelativeEdgeScaleError": 0.004051,
+          "maxRelativeEdgeScaleError": 0.009065
+        }
+      ]
+    },
+    {
+      "name": "HouseB LOD1",
+      "nonManifoldEdges": 0,
+      "degenerateFaces": 0,
+      "uv": [
+        {
+          "name": "UV0_Atlas",
+          "charts": 8152,
+          "overlappingCharts": 0,
+          "p99RelativeEdgeScaleError": 0.000259,
+          "maxRelativeEdgeScaleError": 0.000441
+        },
+        {
+          "name": "UV1_Lightmap",
+          "charts": 8152,
+          "overlappingCharts": 0,
+          "p99RelativeEdgeScaleError": 0.000262,
+          "maxRelativeEdgeScaleError": 0.000301
+        }
+      ]
+    },
+    {
+      "name": "HouseB LOD2",
+      "nonManifoldEdges": 0,
+      "degenerateFaces": 0,
+      "uv": [
+        {
+          "name": "UV0_Atlas",
+          "charts": 496,
+          "overlappingCharts": 0,
+          "p99RelativeEdgeScaleError": 1.4e-05,
+          "maxRelativeEdgeScaleError": 1.6e-05
+        },
+        {
+          "name": "UV1_Lightmap",
+          "charts": 496,
+          "overlappingCharts": 0,
+          "p99RelativeEdgeScaleError": 1.2e-05,
+          "maxRelativeEdgeScaleError": 2.9e-05
+        }
+      ]
+    },
+    {
+      "name": "Simple Door Frame COLLISION",
+      "nonManifoldEdges": 0,
+      "degenerateFaces": 0
+    },
+    {
+      "name": "Simple Door Frame LOD0",
+      "nonManifoldEdges": 0,
+      "degenerateFaces": 0,
+      "uv": [
+        {
+          "name": "UV0_Atlas",
+          "charts": 1134,
+          "overlappingCharts": 0,
+          "p99RelativeEdgeScaleError": 0.005484,
+          "maxRelativeEdgeScaleError": 0.005538
+        },
+        {
+          "name": "UV1_Lightmap",
+          "charts": 1134,
+          "overlappingCharts": 0,
+          "p99RelativeEdgeScaleError": 0.004184,
+          "maxRelativeEdgeScaleError": 0.004461
+        }
+      ]
+    },
+    {
+      "name": "Simple Door Frame LOD1",
+      "nonManifoldEdges": 0,
+      "degenerateFaces": 0,
+      "uv": [
+        {
+          "name": "UV0_Atlas",
+          "charts": 546,
+          "overlappingCharts": 0,
+          "p99RelativeEdgeScaleError": 0.000759,
+          "maxRelativeEdgeScaleError": 0.000759
+        },
+        {
+          "name": "UV1_Lightmap",
+          "charts": 546,
+          "overlappingCharts": 0,
+          "p99RelativeEdgeScaleError": 0.000244,
+          "maxRelativeEdgeScaleError": 0.000244
+        }
+      ]
+    },
+    {
+      "name": "Simple Door Frame LOD2",
+      "nonManifoldEdges": 0,
+      "degenerateFaces": 0,
+      "uv": [
+        {
+          "name": "UV0_Atlas",
+          "charts": 30,
+          "overlappingCharts": 0,
+          "p99RelativeEdgeScaleError": 6e-06,
+          "maxRelativeEdgeScaleError": 6e-06
+        },
+        {
+          "name": "UV1_Lightmap",
+          "charts": 30,
+          "overlappingCharts": 0,
+          "p99RelativeEdgeScaleError": 1e-06,
+          "maxRelativeEdgeScaleError": 4e-06
+        }
+      ]
+    },
+    {
+      "name": "Small Window COLLISION",
+      "nonManifoldEdges": 0,
+      "degenerateFaces": 0
+    },
+    {
+      "name": "Small Window LOD0",
+      "nonManifoldEdges": 0,
+      "degenerateFaces": 0,
+      "uv": [
+        {
+          "name": "UV0_Atlas",
+          "charts": 1728,
+          "overlappingCharts": 0,
+          "p99RelativeEdgeScaleError": 0.005121,
+          "maxRelativeEdgeScaleError": 0.005297
+        },
+        {
+          "name": "UV1_Lightmap",
+          "charts": 1728,
+          "overlappingCharts": 0,
+          "p99RelativeEdgeScaleError": 0.004682,
+          "maxRelativeEdgeScaleError": 0.005099
+        }
+      ]
+    },
+    {
+      "name": "Small Window LOD1",
+      "nonManifoldEdges": 0,
+      "degenerateFaces": 0,
+      "uv": [
+        {
+          "name": "UV0_Atlas",
+          "charts": 832,
+          "overlappingCharts": 0,
+          "p99RelativeEdgeScaleError": 0.000808,
+          "maxRelativeEdgeScaleError": 0.001047
+        },
+        {
+          "name": "UV1_Lightmap",
+          "charts": 832,
+          "overlappingCharts": 0,
+          "p99RelativeEdgeScaleError": 0.000207,
+          "maxRelativeEdgeScaleError": 0.000238
+        }
+      ]
+    },
+    {
+      "name": "Small Window LOD2",
+      "nonManifoldEdges": 0,
+      "degenerateFaces": 0,
+      "uv": [
+        {
+          "name": "UV0_Atlas",
+          "charts": 42,
+          "overlappingCharts": 0,
+          "p99RelativeEdgeScaleError": 6e-06,
+          "maxRelativeEdgeScaleError": 6e-06
+        },
+        {
+          "name": "UV1_Lightmap",
+          "charts": 42,
+          "overlappingCharts": 0,
+          "p99RelativeEdgeScaleError": 2e-06,
+          "maxRelativeEdgeScaleError": 2e-06
+        }
+      ]
+    },
+    {
+      "name": "Tower COLLISION",
+      "nonManifoldEdges": 0,
+      "degenerateFaces": 0
+    },
+    {
+      "name": "Tower LOD0",
+      "nonManifoldEdges": 0,
+      "degenerateFaces": 0,
+      "uv": [
+        {
+          "name": "UV0_Atlas",
+          "charts": 42228,
+          "overlappingCharts": 0,
+          "p99RelativeEdgeScaleError": 0.004513,
+          "maxRelativeEdgeScaleError": 0.056777
+        },
+        {
+          "name": "UV1_Lightmap",
+          "charts": 42228,
+          "overlappingCharts": 0,
+          "p99RelativeEdgeScaleError": 0.004295,
+          "maxRelativeEdgeScaleError": 0.05843
+        }
+      ]
+    },
+    {
+      "name": "Tower LOD1",
+      "nonManifoldEdges": 0,
+      "degenerateFaces": 0,
+      "uv": [
+        {
+          "name": "UV0_Atlas",
+          "charts": 18876,
+          "overlappingCharts": 0,
+          "p99RelativeEdgeScaleError": 0.000271,
+          "maxRelativeEdgeScaleError": 0.000545
+        },
+        {
+          "name": "UV1_Lightmap",
+          "charts": 18876,
+          "overlappingCharts": 0,
+          "p99RelativeEdgeScaleError": 0.00031,
+          "maxRelativeEdgeScaleError": 0.001305
+        }
+      ]
+    },
+    {
+      "name": "Tower LOD2",
+      "nonManifoldEdges": 0,
+      "degenerateFaces": 0,
+      "uv": [
+        {
+          "name": "UV0_Atlas",
+          "charts": 780,
+          "overlappingCharts": 0,
+          "p99RelativeEdgeScaleError": 5.4e-05,
+          "maxRelativeEdgeScaleError": 7.1e-05
+        },
+        {
+          "name": "UV1_Lightmap",
+          "charts": 780,
+          "overlappingCharts": 0,
+          "p99RelativeEdgeScaleError": 3.8e-05,
+          "maxRelativeEdgeScaleError": 6.7e-05
+        }
+      ]
+    },
+    {
+      "name": "TowerB COLLISION",
+      "nonManifoldEdges": 0,
+      "degenerateFaces": 0
+    },
+    {
+      "name": "TowerB LOD0",
+      "nonManifoldEdges": 0,
+      "degenerateFaces": 0,
+      "uv": [
+        {
+          "name": "UV0_Atlas",
+          "charts": 53276,
+          "overlappingCharts": 0,
+          "p99RelativeEdgeScaleError": 0.005376,
+          "maxRelativeEdgeScaleError": 0.014269
+        },
+        {
+          "name": "UV1_Lightmap",
+          "charts": 53276,
+          "overlappingCharts": 0,
+          "p99RelativeEdgeScaleError": 0.005999,
+          "maxRelativeEdgeScaleError": 0.023104
+        }
+      ]
+    },
+    {
+      "name": "TowerB LOD1",
+      "nonManifoldEdges": 0,
+      "degenerateFaces": 0,
+      "uv": [
+        {
+          "name": "UV0_Atlas",
+          "charts": 12236,
+          "overlappingCharts": 0,
+          "p99RelativeEdgeScaleError": 0.001439,
+          "maxRelativeEdgeScaleError": 0.002706
+        },
+        {
+          "name": "UV1_Lightmap",
+          "charts": 12236,
+          "overlappingCharts": 0,
+          "p99RelativeEdgeScaleError": 0.002282,
+          "maxRelativeEdgeScaleError": 0.004801
+        }
+      ]
+    },
+    {
+      "name": "TowerB LOD2",
+      "nonManifoldEdges": 0,
+      "degenerateFaces": 0,
+      "uv": [
+        {
+          "name": "UV0_Atlas",
+          "charts": 1172,
+          "overlappingCharts": 0,
+          "p99RelativeEdgeScaleError": 0.00017,
+          "maxRelativeEdgeScaleError": 0.00075
+        },
+        {
+          "name": "UV1_Lightmap",
+          "charts": 1172,
+          "overlappingCharts": 0,
+          "p99RelativeEdgeScaleError": 0.000197,
+          "maxRelativeEdgeScaleError": 0.000412
+        }
+      ]
+    },
+    {
+      "name": "Wall COLLISION",
+      "nonManifoldEdges": 0,
+      "degenerateFaces": 0
+    },
+    {
+      "name": "Wall LOD0",
+      "nonManifoldEdges": 0,
+      "degenerateFaces": 0,
+      "uv": [
+        {
+          "name": "UV0_Atlas",
+          "charts": 12774,
+          "overlappingCharts": 0,
+          "p99RelativeEdgeScaleError": 0.004057,
+          "maxRelativeEdgeScaleError": 0.005084
+        },
+        {
+          "name": "UV1_Lightmap",
+          "charts": 12774,
+          "overlappingCharts": 0,
+          "p99RelativeEdgeScaleError": 0.004018,
+          "maxRelativeEdgeScaleError": 0.004898
+        }
+      ]
+    },
+    {
+      "name": "Wall LOD1",
+      "nonManifoldEdges": 0,
+      "degenerateFaces": 0,
+      "uv": [
+        {
+          "name": "UV0_Atlas",
+          "charts": 6152,
+          "overlappingCharts": 0,
+          "p99RelativeEdgeScaleError": 0.000155,
+          "maxRelativeEdgeScaleError": 0.000221
+        },
+        {
+          "name": "UV1_Lightmap",
+          "charts": 6152,
+          "overlappingCharts": 0,
+          "p99RelativeEdgeScaleError": 0.000119,
+          "maxRelativeEdgeScaleError": 0.0002
+        }
+      ]
+    },
+    {
+      "name": "Wall LOD2",
+      "nonManifoldEdges": 0,
+      "degenerateFaces": 0,
+      "uv": [
+        {
+          "name": "UV0_Atlas",
+          "charts": 174,
+          "overlappingCharts": 0,
+          "p99RelativeEdgeScaleError": 7e-06,
+          "maxRelativeEdgeScaleError": 9e-06
+        },
+        {
+          "name": "UV1_Lightmap",
+          "charts": 174,
+          "overlappingCharts": 0,
+          "p99RelativeEdgeScaleError": 7e-06,
+          "maxRelativeEdgeScaleError": 7e-06
+        }
+      ]
+    },
+    {
+      "name": "Window COLLISION",
+      "nonManifoldEdges": 0,
+      "degenerateFaces": 0
+    },
+    {
+      "name": "Window LOD0",
+      "nonManifoldEdges": 0,
+      "degenerateFaces": 0,
+      "uv": [
+        {
+          "name": "UV0_Atlas",
+          "charts": 2268,
+          "overlappingCharts": 0,
+          "p99RelativeEdgeScaleError": 0.006271,
+          "maxRelativeEdgeScaleError": 0.008133
+        },
+        {
+          "name": "UV1_Lightmap",
+          "charts": 2268,
+          "overlappingCharts": 0,
+          "p99RelativeEdgeScaleError": 0.005554,
+          "maxRelativeEdgeScaleError": 0.006282
+        }
+      ]
+    },
+    {
+      "name": "Window LOD1",
+      "nonManifoldEdges": 0,
+      "degenerateFaces": 0,
+      "uv": [
+        {
+          "name": "UV0_Atlas",
+          "charts": 1092,
+          "overlappingCharts": 0,
+          "p99RelativeEdgeScaleError": 0.001049,
+          "maxRelativeEdgeScaleError": 0.001229
+        },
+        {
+          "name": "UV1_Lightmap",
+          "charts": 1092,
+          "overlappingCharts": 0,
+          "p99RelativeEdgeScaleError": 0.000349,
+          "maxRelativeEdgeScaleError": 0.000436
+        }
+      ]
+    },
+    {
+      "name": "Window LOD2",
+      "nonManifoldEdges": 0,
+      "degenerateFaces": 0,
+      "uv": [
+        {
+          "name": "UV0_Atlas",
+          "charts": 102,
+          "overlappingCharts": 0,
+          "p99RelativeEdgeScaleError": 6e-06,
+          "maxRelativeEdgeScaleError": 8e-06
+        },
+        {
+          "name": "UV1_Lightmap",
+          "charts": 102,
+          "overlappingCharts": 0,
+          "p99RelativeEdgeScaleError": 2e-06,
+          "maxRelativeEdgeScaleError": 2e-06
+        }
+      ]
+    }
+  ]
+}

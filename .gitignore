@@ -49,3 +49,5 @@ Thumbs.db
 /ArtSource/Revenants/*.blend[1-9]
 /Tools/ArtPipeline/Revenants/meshes.json
 /Tools/ArtPipeline/Revenants/actions.json
+/ArtSource/Buildings/*.blend[1-9]
+/Tools/ArtPipeline/Buildings/*.bin

@@ -191,12 +191,14 @@ Assets/
   Environment/       Terrain textures/sky (Textures) and everything the builder generates (Generated)
   Resources/         Loaded at runtime: UI sprites, fonts, audio, prop prefabs, FX materials, knight recolour masks
   Animations/        KnightController, ZombieBrain (generated), old ZombieController
-  Advance Studios/   Medieval castle asset pack
+  Advance Studios/   Original castle reference FBXs and stable layout prefabs (custom meshes assigned)
   Toon_RTS_demo/     Legacy knight / animation rig and clips (retained)
   Resources/Marchwarden/ Original warrior meshes and PBR materials
+  Resources/Buildings/ Custom architectural meshes, collision shells and Standard PBR atlas
   Resources/Animations/Sword/ Twelve authored strikes and the ready guard
   Zombie/            Zombie models + animations
 ArtSource/Marchwarden/ Compressed editable Blender source, anatomical source/license, references and design notes
+ArtSource/Buildings/ Compressed editable castle kit, measured grid reference, audits and prefab previews
 Tools/ArtPipeline/   Reproducible Blender construction, rig export helpers and render/audit scripts
 Docs/                Developer guide and screenshots
 ```
@@ -217,6 +219,27 @@ how to add a zombie type / weapon / UI screen, and how to regenerate the world o
 - **Medieval Warrior → Rebuild sword animations** – regenerates the twelve strikes and ready guard from the shared combat timings.
 - **Medieval Warrior → Review sword and shield clearance** – samples strikes, combo blends, defense, palm attachments and wrist bend.
 - **Medieval Warrior → Revenants** – exports the zombie skeleton, imports the Blender roster, rebuilds its animations and renders the art/pose review.
+- **Medieval Warrior → Buildings** – imports the custom Blender kit into the existing prefabs, verifies dimensions/references/collision contacts, and rebakes navigation without moving the layout.
+
+## Custom medieval buildings
+
+The houses, defensive walls, towers, royal keep, bridges, doors and windows now use
+custom Blender geometry with bevelled masonry, timber framing, individual roof
+tiles, arch stonework and iron details. Three LODs share a 4K PBR atlas using the
+Built-in Standard shader. Separate closed collision shells retain deck/wall-walk
+heights and keep camera, arrow and movement contacts independent of rendering detail.
+
+The existing prefab GUIDs and original mesh-local bounds/pivots are retained,
+including direct mesh overrides in the additive background scene. No terrain pads
+or placed building transforms are regenerated during import. The editable source,
+exact grid dimensions, budgets and rebuild commands are documented in
+[ArtSource/Buildings](ArtSource/Buildings/README.md).
+
+Verification passed **8,055 building checks**, **260 navigation vicinity samples**
+and all **365 gameplay checks**. The saved Blender master independently passed
+topology and UV inspection on all 72 render/collision meshes. See the
+[architecture validation record](Docs/validation/2026-11-16-buildings.md) and
+[prefab previews](ArtSource/Buildings/Review/).
 
 ## Validation and art regeneration
 
@@ -226,6 +249,8 @@ contacts, live surface streams and sword trajectories. The earlier warrior revie
 passed 48 combat/pose checks and its hand topology audit. Saved reports:
 
 - [Gameplay regression](Docs/validation/2026-11-16-gameplay.txt)
+- [Gameplay regression with the custom castle kit](Docs/validation/2026-11-16-buildings-gameplay.txt)
+- [Building geometry, placement, collision and navigation](Docs/validation/2026-11-16-buildings.md)
 - [Revenant mesh and pose review](Docs/validation/2026-11-16-revenants.txt)
 - [Editable Blender action validation](Docs/validation/2026-11-16-revenant-source.json)
 - [Combat, defense and wrist clearance](Docs/validation/2026-11-08-combat-clearance.txt)
@@ -251,7 +276,8 @@ remain ignored; selected screenshots and verification reports are kept under `Do
 
 ## Credits & licences
 
-- Castle: *Medieval Castle* by Advance Studios. Knight animation rig and clips: *Toon RTS* demo by Polygon Blacksmith.
+- Architecture: custom Blender castle kit and procedural PBR textures, authored for this project. The original *Medieval Castle* pack by Advance Studios remains as the dimensional/layout reference, with its prefab identities and licence retained. [Building source and rebuild instructions](ArtSource/Buildings/README.md).
+- Knight animation rig and clips: *Toon RTS* demo by Polygon Blacksmith.
   Zombie: *Free Zombie* pack. (Unity Asset Store free assets.)
 - Terrain textures and sky HDRI: [Poly Haven](https://polyhaven.com) (CC0), colour-graded for the game.
 - Fonts: *Cinzel Decorative* and *MedievalSharp* (SIL Open Font License, see `Assets/Resources/Fonts`).

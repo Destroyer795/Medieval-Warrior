@@ -127,6 +127,42 @@ Batch mode (what CI / the smoke test uses):
 Unity.exe -batchmode -projectPath . -executeMethod EnvironmentBuilder.BuildBatch -shotDir <folder> [-smoke <folder>] -logFile build.log
 ```
 
+### Rebuild custom architecture
+
+The twelve existing castle-pack prefabs retain their GUIDs and transforms, but their
+renderers/colliders now use the custom kit in `Resources/Buildings`. Its editable
+master is `ArtSource/Buildings/Buildings.blend`. Run Blender 4.5 headlessly:
+
+```powershell
+blender --background --python Tools/ArtPipeline/buildings.py
+Unity.exe -batchmode -quit -projectPath . -executeMethod BuildingBuilder.BuildAndReview -logFile buildings-import.log
+Unity.exe -batchmode -quit -projectPath . -executeMethod BuildingBuilder.RebakeNavigation -logFile buildings-navigation.log
+```
+
+The Buildings editor menu exposes these steps. `BuildingBuilder` captures/measures
+the original mesh origins, bounds, child matrices and persistent IDs;
+`BuildingImport` reads the Blender binary buffers, configures Standard PBR texture
+imports, updates native Mesh streams without changing GUIDs and installs three
+LODs per module. It updates original prefabs plus unpacked/direct scene overrides.
+`BuildingReview` validates dimensions, component references, collision contacts,
+camera spheres, capsule locomotion and navigation routes. Both `Semi-Final` and
+the additive `Background` scene are covered; the baseline has 120 prefab roots and
+330 architectural mesh nodes. The original castle's missing named window subassets
+are repaired during import without moving their child transforms.
+
+UV0 uses unique planar charts within surface atlas cells; UV1 is independently
+packed for lightmaps. `Albedo` is sRGB, `Normal` is a Unity Normal Map, and `Masks`
+is linear RGBA (metallic, AO, reserved height, smoothness). One shared Standard
+material supports instancing; separate closed low-detail physics shells are used
+at every LOD. See [the building source guide](../ArtSource/Buildings/README.md) for
+exact dimensions, triangle budgets and the 0.2 mm closed CastleTop slab exception.
+
+Use this targeted importer/rebake when changing architecture. The broader environment
+builder also rebuilds terrain pads and re-seats buildings. `RebakeNavigation`
+preserves the existing NavMeshData GUID and player/spawn transforms. Do not export
+a new reference baseline from already-replaced prefabs. Vendor FBXs/licences remain
+as layout references; the replacement geometry and atlas images are project-authored.
+
 ### Run the automated play-test
 `Medieval Warrior → Run Smoke Test`, or in batch:
 ```

@@ -1,0 +1,184 @@
+{
+  "parts": [
+    {
+      "key": "a18e05c3226dd274caeb4a43212e40c8_n6623636414208535075",
+      "name": "BridgeEnd",
+      "files": [
+        "a18e05c3226dd274caeb4a43212e40c8_n6623636414208535075_LOD0.bin",
+        "a18e05c3226dd274caeb4a43212e40c8_n6623636414208535075_LOD1.bin",
+        "a18e05c3226dd274caeb4a43212e40c8_n6623636414208535075_LOD2.bin"
+      ],
+      "collision": "a18e05c3226dd274caeb4a43212e40c8_n6623636414208535075_Collision.bin"
+    },
+    {
+      "key": "a18e05c3226dd274caeb4a43212e40c8_1815251945203946248",
+      "name": "BridgeMiddle",
+      "files": [
+        "a18e05c3226dd274caeb4a43212e40c8_1815251945203946248_LOD0.bin",
+        "a18e05c3226dd274caeb4a43212e40c8_1815251945203946248_LOD1.bin",
+        "a18e05c3226dd274caeb4a43212e40c8_1815251945203946248_LOD2.bin"
+      ],
+      "collision": "a18e05c3226dd274caeb4a43212e40c8_1815251945203946248_Collision.bin"
+    },
+    {
+      "key": "a18e05c3226dd274caeb4a43212e40c8_4982261723046905864",
+      "name": "BridgeStart",
+      "files": [
+        "a18e05c3226dd274caeb4a43212e40c8_4982261723046905864_LOD0.bin",
+        "a18e05c3226dd274caeb4a43212e40c8_4982261723046905864_LOD1.bin",
+        "a18e05c3226dd274caeb4a43212e40c8_4982261723046905864_LOD2.bin"
+      ],
+      "collision": "a18e05c3226dd274caeb4a43212e40c8_4982261723046905864_Collision.bin"
+    },
+    {
+      "key": "d8d157ebfb23cdf4ba94e99d8458f7d2_4872299236319445139",
+      "name": "CastleTop",
+      "files": [
+        "d8d157ebfb23cdf4ba94e99d8458f7d2_4872299236319445139_LOD0.bin",
+        "d8d157ebfb23cdf4ba94e99d8458f7d2_4872299236319445139_LOD1.bin",
+        "d8d157ebfb23cdf4ba94e99d8458f7d2_4872299236319445139_LOD2.bin"
+      ],
+      "collision": "d8d157ebfb23cdf4ba94e99d8458f7d2_4872299236319445139_Collision.bin"
+    },
+    {
+      "key": "d8d157ebfb23cdf4ba94e99d8458f7d2_8104117749616084085",
+      "name": "Castle",
+      "files": [
+        "d8d157ebfb23cdf4ba94e99d8458f7d2_8104117749616084085_LOD0.bin",
+        "d8d157ebfb23cdf4ba94e99d8458f7d2_8104117749616084085_LOD1.bin",
+        "d8d157ebfb23cdf4ba94e99d8458f7d2_8104117749616084085_LOD2.bin"
+      ],
+      "collision": "d8d157ebfb23cdf4ba94e99d8458f7d2_8104117749616084085_Collision.bin"
+    },
+    {
+      "key": "d05fa8828be199048bb709f826cc3c53_n837091336493386933",
+      "name": "Simple Door Frame",
+      "files": [
+        "d05fa8828be199048bb709f826cc3c53_n837091336493386933_LOD0.bin",
+        "d05fa8828be199048bb709f826cc3c53_n837091336493386933_LOD1.bin",
+        "d05fa8828be199048bb709f826cc3c53_n837091336493386933_LOD2.bin"
+      ],
+      "collision": "d05fa8828be199048bb709f826cc3c53_n837091336493386933_Collision.bin"
+    },
+    {
+      "key": "d05fa8828be199048bb709f826cc3c53_1049928748687988745",
+      "name": "Window",
+      "files": [
+        "d05fa8828be199048bb709f826cc3c53_1049928748687988745_LOD0.bin",
+        "d05fa8828be199048bb709f826cc3c53_1049928748687988745_LOD1.bin",
+        "d05fa8828be199048bb709f826cc3c53_1049928748687988745_LOD2.bin"
+      ],
+      "collision": "d05fa8828be199048bb709f826cc3c53_1049928748687988745_Collision.bin"
+    },
+    {
+      "key": "d05fa8828be199048bb709f826cc3c53_2562013259454298222",
+      "name": "Big Window",
+      "files": [
+        "d05fa8828be199048bb709f826cc3c53_2562013259454298222_LOD0.bin",
+        "d05fa8828be199048bb709f826cc3c53_2562013259454298222_LOD1.bin",
+        "d05fa8828be199048bb709f826cc3c53_2562013259454298222_LOD2.bin"
+      ],
+      "collision": "d05fa8828be199048bb709f826cc3c53_2562013259454298222_Collision.bin"
+    },
+    {
+      "key": "d05fa8828be199048bb709f826cc3c53_2619086233303812490",
+      "name": "Door",
+      "files": [
+        "d05fa8828be199048bb709f826cc3c53_2619086233303812490_LOD0.bin",
+        "d05fa8828be199048bb709f826cc3c53_2619086233303812490_LOD1.bin",
+        "d05fa8828be199048bb709f826cc3c53_2619086233303812490_LOD2.bin"
+      ],
+      "collision": "d05fa8828be199048bb709f826cc3c53_2619086233303812490_Collision.bin"
+    },
+    {
+      "key": "d05fa8828be199048bb709f826cc3c53_3454997402486955451",
+      "name": "Double Door Frame",
+      "files": [
+        "d05fa8828be199048bb709f826cc3c53_3454997402486955451_LOD0.bin",
+        "d05fa8828be199048bb709f826cc3c53_3454997402486955451_LOD1.bin",
+        "d05fa8828be199048bb709f826cc3c53_3454997402486955451_LOD2.bin"
+      ],
+      "collision": "d05fa8828be199048bb709f826cc3c53_3454997402486955451_Collision.bin"
+    },
+    {
+      "key": "d05fa8828be199048bb709f826cc3c53_5194340702381293203",
+      "name": "Double Door",
+      "files": [
+        "d05fa8828be199048bb709f826cc3c53_5194340702381293203_LOD0.bin",
+        "d05fa8828be199048bb709f826cc3c53_5194340702381293203_LOD1.bin",
+        "d05fa8828be199048bb709f826cc3c53_5194340702381293203_LOD2.bin"
+      ],
+      "collision": "d05fa8828be199048bb709f826cc3c53_5194340702381293203_Collision.bin"
+    },
+    {
+      "key": "d05fa8828be199048bb709f826cc3c53_5916065699126462724",
+      "name": "Small Window",
+      "files": [
+        "d05fa8828be199048bb709f826cc3c53_5916065699126462724_LOD0.bin",
+        "d05fa8828be199048bb709f826cc3c53_5916065699126462724_LOD1.bin",
+        "d05fa8828be199048bb709f826cc3c53_5916065699126462724_LOD2.bin"
+      ],
+      "collision": "d05fa8828be199048bb709f826cc3c53_5916065699126462724_Collision.bin"
+    },
+    {
+      "key": "4537ab35a0f3c5d4491b0986d90893da_458433370814715639",
+      "name": "HouseB",
+      "files": [
+        "4537ab35a0f3c5d4491b0986d90893da_458433370814715639_LOD0.bin",
+        "4537ab35a0f3c5d4491b0986d90893da_458433370814715639_LOD1.bin",
+        "4537ab35a0f3c5d4491b0986d90893da_458433370814715639_LOD2.bin"
+      ],
+      "collision": "4537ab35a0f3c5d4491b0986d90893da_458433370814715639_Collision.bin"
+    },
+    {
+      "key": "4537ab35a0f3c5d4491b0986d90893da_4887216478360415443",
+      "name": "House",
+      "files": [
+        "4537ab35a0f3c5d4491b0986d90893da_4887216478360415443_LOD0.bin",
+        "4537ab35a0f3c5d4491b0986d90893da_4887216478360415443_LOD1.bin",
+        "4537ab35a0f3c5d4491b0986d90893da_4887216478360415443_LOD2.bin"
+      ],
+      "collision": "4537ab35a0f3c5d4491b0986d90893da_4887216478360415443_Collision.bin"
+    },
+    {
+      "key": "57a04a7dff8956f4299182fd6145b5b5_n1277366460620338370",
+      "name": "Tower",
+      "files": [
+        "57a04a7dff8956f4299182fd6145b5b5_n1277366460620338370_LOD0.bin",
+        "57a04a7dff8956f4299182fd6145b5b5_n1277366460620338370_LOD1.bin",
+        "57a04a7dff8956f4299182fd6145b5b5_n1277366460620338370_LOD2.bin"
+      ],
+      "collision": "57a04a7dff8956f4299182fd6145b5b5_n1277366460620338370_Collision.bin"
+    },
+    {
+      "key": "64f4be06a92a5dd4a99c31e59ac47d42_8243879411280590840",
+      "name": "TowerB",
+      "files": [
+        "64f4be06a92a5dd4a99c31e59ac47d42_8243879411280590840_LOD0.bin",
+        "64f4be06a92a5dd4a99c31e59ac47d42_8243879411280590840_LOD1.bin",
+        "64f4be06a92a5dd4a99c31e59ac47d42_8243879411280590840_LOD2.bin"
+      ],
+      "collision": "64f4be06a92a5dd4a99c31e59ac47d42_8243879411280590840_Collision.bin"
+    },
+    {
+      "key": "38b797ba6cc77df40a51cd3200365644_n1674268716328342803",
+      "name": "Column",
+      "files": [
+        "38b797ba6cc77df40a51cd3200365644_n1674268716328342803_LOD0.bin",
+        "38b797ba6cc77df40a51cd3200365644_n1674268716328342803_LOD1.bin",
+        "38b797ba6cc77df40a51cd3200365644_n1674268716328342803_LOD2.bin"
+      ],
+      "collision": "38b797ba6cc77df40a51cd3200365644_n1674268716328342803_Collision.bin"
+    },
+    {
+      "key": "38b797ba6cc77df40a51cd3200365644_8733429697405204941",
+      "name": "Wall",
+      "files": [
+        "38b797ba6cc77df40a51cd3200365644_8733429697405204941_LOD0.bin",
+        "38b797ba6cc77df40a51cd3200365644_8733429697405204941_LOD1.bin",
+        "38b797ba6cc77df40a51cd3200365644_8733429697405204941_LOD2.bin"
+      ],
+      "collision": "38b797ba6cc77df40a51cd3200365644_8733429697405204941_Collision.bin"
+    }
+  ]
+}

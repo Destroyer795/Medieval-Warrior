@@ -1,9 +1,15 @@
 # Procedural SFX + music for Medieval Warrior. Everything synthesised, no samples.
 import sys, wave
+import hashlib, json, shutil, subprocess, tempfile
+from pathlib import Path
+from horror_audio import build_bank
 import numpy as np
 from scipy import signal
 
 OUT = sys.argv[1]
+Path(OUT).mkdir(parents=True, exist_ok=True)
+menu_path = Path(OUT) / "music_menu.wav"
+menu_before = hashlib.sha256(menu_path.read_bytes()).hexdigest() if menu_path.exists() else None
 SR = 44100
 rng = np.random.default_rng(7)
 
@@ -44,44 +50,13 @@ def sweep_noise(d, f0, f1, q=1.5):
         out[i:i + seg] = bp(x[i:i + seg], lo, hi)
     return out
 
-# --- combat
-sw = sweep_noise(0.32, 500, 2600) * env(int(SR * 0.32), 0.05, 0.2)
-save('sword_swing', sw, peak=0.6)
-hit = lp(noise(0.25), 900) * expdecay(int(SR * 0.25), 22)
-ring = sum(np.sin(2 * np.pi * f * t(0.25)) for f in (1800, 2650, 3900)) * expdecay(int(SR * 0.25), 30) * 0.25
-save('sword_hit', hit + ring + 0.6 * np.sin(2 * np.pi * 90 * t(0.25)) * expdecay(int(SR * 0.25), 18))
-clank = sum(np.sin(2 * np.pi * f * t(0.4)) * expdecay(int(SR * 0.4), 9 + i * 4) for i, f in enumerate((620, 1340, 2210, 3370)))
-save('shield_block', clank + 0.8 * lp(noise(0.4), 1500) * expdecay(int(SR * 0.4), 40))
+# --- weighted combat and aperiodic throat / breath / foley layers
+for name, samples in build_bank().items():
+    save(name, samples)
+
 save('bow_draw', bp(noise(0.7), 300, 1400) * np.linspace(0.2, 1, int(SR * 0.7)) * (1 + 0.5 * np.sin(2 * np.pi * 23 * t(0.7))), peak=0.35)
 tw = pluck(110, 0.5, 0.99, 0.9) * expdecay(int(SR * 0.5), 6)
 save('bow_release', tw + 0.4 * sweep_noise(0.5, 3000, 600) * env(int(SR * 0.5), 0.01, 0.4))
-save('arrow_hit', lp(noise(0.18), 1200) * expdecay(int(SR * 0.18), 35) + 0.5 * np.sin(2 * np.pi * 160 * t(0.18)) * expdecay(int(SR * 0.18), 25))
-save('arrow_flesh', lp(noise(0.2), 700) * expdecay(int(SR * 0.2), 25) + 0.3 * bp(noise(0.2), 200, 600) * expdecay(int(SR * 0.2), 12))
-save('dodge', sweep_noise(0.3, 1800, 300) * env(int(SR * 0.3), 0.04, 0.2), peak=0.5)
-hurt = (signal.sawtooth(2 * np.pi * np.linspace(220, 140, int(SR * 0.3)).cumsum() / SR) * 0.6)
-save('player_hurt', bp(hurt, 200, 1400) * env(int(SR * 0.3), 0.01, 0.2) + 0.6 * lp(noise(0.3), 500) * expdecay(int(SR * 0.3), 20))
-
-# --- zombies: formant-filtered sawtooth growls with jitter
-def growl(d, f0, f1, formants=(500, 900, 2400), jitter=12):
-    n = int(SR * d)
-    f = np.linspace(f0, f1, n) + jitter * lp(rng.normal(0, 1, n), 30) * 3
-    src = signal.sawtooth(2 * np.pi * np.cumsum(f) / SR) + 0.3 * noise(d)
-    out = sum(bp(src, fm * 0.8, fm * 1.2) * w for fm, w in zip(formants, (1, 0.6, 0.25)))
-    am = 0.7 + 0.3 * np.sin(2 * np.pi * 7 * t(d) + rng.uniform(0, 6))
-    return out * am * env(n, 0.08, d * 0.5)
-for i in range(3):
-    save(f'zombie_groan{i}', growl(1.1 + i * 0.2, 85 + i * 12, 60 + i * 8, (450 + 60 * i, 1000, 2500)), peak=0.7)
-save('zombie_attack', growl(0.45, 140, 90, (650, 1200, 2600), 20), peak=0.8)
-save('zombie_die', growl(1.0, 110, 45, (400, 800, 2200), 8), peak=0.8)
-save('brute_roar', growl(1.4, 70, 55, (300, 650, 1800), 16) + 0.4 * lp(noise(1.4), 200) * env(int(SR * 1.4), 0.2, 0.8), peak=0.95)
-save('spit', bp(noise(0.35), 400, 2500) * env(int(SR * 0.35), 0.02, 0.25) * (1 + np.sin(2 * np.pi * 31 * t(0.35))), peak=0.6)
-save('splat', lp(noise(0.4), 1100) * expdecay(int(SR * 0.4), 14) * (1 + 0.6 * np.sin(2 * np.pi * 45 * t(0.4))))
-fuse = np.sign(np.sin(2 * np.pi * 880 * t(1.0))) * (np.sin(2 * np.pi * np.linspace(4, 14, int(SR)).cumsum() / SR) > 0) * 0.3
-save('bloater_fuse', lp(fuse, 3000) + 0.5 * growl(1.0, 120, 160, (500, 1100, 2500)), peak=0.6)
-boom = lp(noise(1.6), 400, 4) * expdecay(int(SR * 1.6), 3.2) + np.sin(2 * np.pi * np.linspace(70, 30, int(SR * 1.6)).cumsum() / SR) * expdecay(int(SR * 1.6), 4)
-save('explosion', boom + 0.3 * bp(noise(1.6), 1000, 4000) * expdecay(int(SR * 1.6), 9), peak=0.95)
-save('emerge', lp(noise(0.9), 600) * env(int(SR * 0.9), 0.2, 0.5) * (1 + 0.5 * np.sin(2 * np.pi * 9 * t(0.9))), peak=0.6)
-
 # --- pickups / UI
 def chime(freqs, d=0.6, gap=0.07):
     out = np.zeros(int(SR * (d + gap * len(freqs))))
@@ -129,31 +104,28 @@ fade = int(SR * 1.5)  # crossfade tail into head for a seamless loop
 amb[:fade] = amb[:fade] * np.linspace(0, 1, fade) + amb[-fade:] * np.linspace(1, 0, fade)
 save('ambient_meadow', amb[:-fade], sr=SR, peak=0.5)
 
-# --- music: plucked lute arpeggios over a drone in D dorian, 22.05 kHz to keep it light
-MSR = 22050
-bpm = 84; beat = 60 / bpm
-prog = [(62, 69, 74, 77), (60, 67, 72, 76), (58, 65, 70, 74), (60, 67, 72, 76)]  # Dm C Bb C (midi)
-def midi(m): return 440 * 2 ** ((m - 69) / 12)
-bars = 8; total = int(MSR * beat * 4 * bars)
-music = np.zeros(total + MSR * 2)
-pattern = [0, 2, 1, 3, 2, 1, 0, 2]
-for b in range(bars):
-    chord = prog[b % 4]
-    for i, p in enumerate(pattern):
-        start = int(MSR * (b * 4 * beat + i * beat / 2))
-        note = pluck(midi(chord[p]), 1.4, 0.995, 0.35, MSR) * expdecay(int(MSR * 1.4), 2.2) * (0.9 if i % 2 == 0 else 0.6)
-        music[start:start + len(note)] += note
-    root = midi(chord[0] - 12); n = int(MSR * beat * 4)
-    tt = np.arange(n) / MSR
-    drone = (np.sin(2 * np.pi * root * tt) + 0.4 * np.sin(2 * np.pi * root * 1.5 * tt)) * env(n, 0.4, 0.6) * 0.35
-    s = int(MSR * b * 4 * beat); music[s:s + n] += drone
-# soft frame drum on 1 and 3
-for b in range(bars):
-    for k in (0, 2):
-        s = int(MSR * (b * 4 + k) * beat); n = int(MSR * 0.3)
-        hit = np.sin(2 * np.pi * np.linspace(110, 55, n).cumsum() / MSR) * np.exp(-np.arange(n) / MSR * 12)
-        music[s:s + n] += hit * 0.5
-tail = music[total:total + MSR * 2]
-music = music[:total]; music[:len(tail)] += tail
-save('music_menu', lp(music, 5000, 2), sr=MSR, peak=0.6)
-print('audio ok')
+
+# The menu recipe is frozen byte-for-byte, including its historical random-number
+# preamble. Existing menu audio is never opened for writing. A missing menu is
+# reproduced in a temporary folder, copying ONLY the unchanged theme into place.
+if not menu_path.exists():
+    with tempfile.TemporaryDirectory(prefix="mw-menu-") as temporary:
+        subprocess.run([sys.executable, str(Path(__file__).with_name("menu_theme_legacy.py")), temporary], check=True)
+        shutil.copyfile(Path(temporary)/"music_menu.wav", menu_path)
+menu_after = hashlib.sha256(menu_path.read_bytes()).hexdigest()
+assert menu_before is None or menu_before == menu_after, "Menu theme changed"
+
+report = {"result": "PASS", "menu_sha256": menu_after, "menu_unchanged": menu_before == menu_after,
+          "menu_recipe_sha256": hashlib.sha256(Path(__file__).with_name("menu_theme_legacy.py").read_bytes()).hexdigest(), "clips": []}
+for path in sorted(Path(OUT).glob("*.wav")):
+    with wave.open(str(path), "rb") as source:
+        assert source.getsampwidth() == 2 and source.getnchannels() == 1, path.name
+        pcm = np.frombuffer(source.readframes(source.getnframes()), dtype="<i2").astype(float)/32768
+        assert len(pcm) and np.isfinite(pcm).all() and np.max(np.abs(pcm)) < .999, path.name
+        report["clips"].append({"name": path.stem, "rate": source.getframerate(), "seconds": len(pcm)/source.getframerate(),
+            "peak": float(np.max(np.abs(pcm))), "rms": float(np.sqrt(np.mean(pcm**2))), "dc": float(np.mean(pcm)),
+            "sha256": hashlib.sha256(path.read_bytes()).hexdigest()})
+audit = Path(__file__).resolve().parent.parent.parent/"ArtSource/Audio"
+audit.mkdir(parents=True, exist_ok=True)
+(audit/"synthesis-audit.json").write_text(json.dumps(report, indent=2)+"\n")
+print(f"audio PASS: {len(report['clips'])} valid mono PCM banks; menu unchanged={report['menu_unchanged']}")

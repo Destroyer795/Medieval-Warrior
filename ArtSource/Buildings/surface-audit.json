@@ -1,0 +1,98 @@
+{
+  "seed": 317,
+  "atlasSize": 4096,
+  "matteTiles": [
+    {
+      "tile": 2,
+      "name": "Oiled dark oak",
+      "smoothnessMax": 0.0,
+      "metallic": 0,
+      "blenderSpecularIORLevel": 0,
+      "normalXYRms": 0.1234,
+      "microOcclusionMin": 0.36
+    },
+    {
+      "tile": 3,
+      "name": "Warm lime plaster",
+      "smoothnessMax": 0.0,
+      "metallic": 0,
+      "blenderSpecularIORLevel": 0,
+      "normalXYRms": 0.1489,
+      "microOcclusionMin": 0.7191
+    },
+    {
+      "tile": 4,
+      "name": "Oxblood clay tiles",
+      "smoothnessMax": 0.0,
+      "metallic": 0,
+      "blenderSpecularIORLevel": 0,
+      "normalXYRms": 0.1083,
+      "microOcclusionMin": 0.735
+    },
+    {
+      "tile": 7,
+      "name": "Old oak planks",
+      "smoothnessMax": 0.0,
+      "metallic": 0,
+      "blenderSpecularIORLevel": 0,
+      "normalXYRms": 0.1197,
+      "microOcclusionMin": 0.36
+    }
+  ],
+  "houseContactAO": [
+    {
+      "name": "House_LOD0",
+      "size": 2048,
+      "raysPerVertex": 20,
+      "radiusLocalMetres": 0.065,
+      "min": 0.26,
+      "mean": 0.595,
+      "p10": 0.3203
+    },
+    {
+      "name": "House_LOD1",
+      "size": 1024,
+      "raysPerVertex": 20,
+      "radiusLocalMetres": 0.065,
+      "min": 0.26,
+      "mean": 0.6789,
+      "p10": 0.4307
+    },
+    {
+      "name": "House_LOD2",
+      "size": 512,
+      "raysPerVertex": 20,
+      "radiusLocalMetres": 0.065,
+      "min": 0.2636,
+      "mean": 0.7384,
+      "p10": 0.4574
+    },
+    {
+      "name": "HouseB_LOD0",
+      "size": 2048,
+      "raysPerVertex": 20,
+      "radiusLocalMetres": 0.065,
+      "min": 0.26,
+      "mean": 0.5995,
+      "p10": 0.3215
+    },
+    {
+      "name": "HouseB_LOD1",
+      "size": 1024,
+      "raysPerVertex": 20,
+      "radiusLocalMetres": 0.065,
+      "min": 0.26,
+      "mean": 0.679,
+      "p10": 0.4217
+    },
+    {
+      "name": "HouseB_LOD2",
+      "size": 512,
+      "raysPerVertex": 20,
+      "radiusLocalMetres": 0.065,
+      "min": 0.2887,
+      "mean": 0.7446,
+      "p10": 0.4698
+    }
+  ]
+}

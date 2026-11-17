@@ -1,0 +1,337 @@
+{
+  "masonryResolution": 4096,
+  "repeatMetres": 2.5,
+  "mortarDepthMetres": 0.035,
+  "vertexAO": [
+    {
+      "name": "Big Window LOD0",
+      "corners": 9072,
+      "minimum": 0.52,
+      "mean": 0.8607
+    },
+    {
+      "name": "Big Window LOD1",
+      "corners": 4032,
+      "minimum": 0.52,
+      "mean": 0.8434
+    },
+    {
+      "name": "Big Window LOD2",
+      "corners": 408,
+      "minimum": 0.6024,
+      "mean": 0.9329
+    },
+    {
+      "name": "BridgeEnd LOD0",
+      "corners": 19548,
+      "minimum": 0.52,
+      "mean": 0.7833
+    },
+    {
+      "name": "BridgeEnd LOD1",
+      "corners": 4080,
+      "minimum": 0.52,
+      "mean": 0.8433
+    },
+    {
+      "name": "BridgeEnd LOD2",
+      "corners": 1020,
+      "minimum": 0.52,
+      "mean": 0.9
+    },
+    {
+      "name": "BridgeMiddle LOD0",
+      "corners": 18792,
+      "minimum": 0.52,
+      "mean": 0.7844
+    },
+    {
+      "name": "BridgeMiddle LOD1",
+      "corners": 3744,
+      "minimum": 0.52,
+      "mean": 0.8405
+    },
+    {
+      "name": "BridgeMiddle LOD2",
+      "corners": 936,
+      "minimum": 0.52,
+      "mean": 0.8954
+    },
+    {
+      "name": "BridgeStart LOD0",
+      "corners": 19548,
+      "minimum": 0.52,
+      "mean": 0.7833
+    },
+    {
+      "name": "BridgeStart LOD1",
+      "corners": 4080,
+      "minimum": 0.52,
+      "mean": 0.8433
+    },
+    {
+      "name": "BridgeStart LOD2",
+      "corners": 1020,
+      "minimum": 0.52,
+      "mean": 0.8991
+    },
+    {
+      "name": "Castle LOD0",
+      "corners": 532982,
+      "minimum": 0.52,
+      "mean": 0.7926
+    },
+    {
+      "name": "Castle LOD1",
+      "corners": 163012,
+      "minimum": 0.52,
+      "mean": 0.7898
+    },
+    {
+      "name": "Castle LOD2",
+      "corners": 18182,
+      "minimum": 0.52,
+      "mean": 0.8753
+    },
+    {
+      "name": "CastleTop LOD0",
+      "corners": 876,
+      "minimum": 0.8162,
+      "mean": 0.9978
+    },
+    {
+      "name": "CastleTop LOD1",
+      "corners": 444,
+      "minimum": 0.8605,
+      "mean": 0.9956
+    },
+    {
+      "name": "CastleTop LOD2",
+      "corners": 444,
+      "minimum": 0.8165,
+      "mean": 0.9959
+    },
+    {
+      "name": "Column LOD0",
+      "corners": 10152,
+      "minimum": 0.52,
+      "mean": 0.8397
+    },
+    {
+      "name": "Column LOD1",
+      "corners": 4512,
+      "minimum": 0.52,
+      "mean": 0.8227
+    },
+    {
+      "name": "Column LOD2",
+      "corners": 144,
+      "minimum": 0.6359,
+      "mean": 0.9282
+    },
+    {
+      "name": "Door LOD0",
+      "corners": 6032,
+      "minimum": 0.52,
+      "mean": 0.777
+    },
+    {
+      "name": "Door LOD1",
+      "corners": 2756,
+      "minimum": 0.52,
+      "mean": 0.766
+    },
+    {
+      "name": "Door LOD2",
+      "corners": 464,
+      "minimum": 0.52,
+      "mean": 0.8104
+    },
+    {
+      "name": "Double Door Frame LOD0",
+      "corners": 6696,
+      "minimum": 0.52,
+      "mean": 0.9131
+    },
+    {
+      "name": "Double Door Frame LOD1",
+      "corners": 2976,
+      "minimum": 0.52,
+      "mean": 0.8905
+    },
+    {
+      "name": "Double Door Frame LOD2",
+      "corners": 360,
+      "minimum": 0.6294,
+      "mean": 0.9638
+    },
+    {
+      "name": "Double Door LOD0",
+      "corners": 6032,
+      "minimum": 0.52,
+      "mean": 0.7768
+    },
+    {
+      "name": "Double Door LOD1",
+      "corners": 2756,
+      "minimum": 0.52,
+      "mean": 0.7647
+    },
+    {
+      "name": "Double Door LOD2",
+      "corners": 464,
+      "minimum": 0.52,
+      "mean": 0.8115
+    },
+    {
+      "name": "House LOD0",
+      "corners": 111348,
+      "minimum": 1.0,
+      "mean": 1.0
+    },
+    {
+      "name": "House LOD1",
+      "corners": 27504,
+      "minimum": 1.0,
+      "mean": 1.0
+    },
+    {
+      "name": "House LOD2",
+      "corners": 1980,
+      "minimum": 1.0,
+      "mean": 1.0
+    },
+    {
+      "name": "HouseB LOD0",
+      "corners": 117180,
+      "minimum": 1.0,
+      "mean": 1.0
+    },
+    {
+      "name": "HouseB LOD1",
+      "corners": 30096,
+      "minimum": 1.0,
+      "mean": 1.0
+    },
+    {
+      "name": "HouseB LOD2",
+      "corners": 1980,
+      "minimum": 1.0,
+      "mean": 1.0
+    },
+    {
+      "name": "Simple Door Frame LOD0",
+      "corners": 4536,
+      "minimum": 0.52,
+      "mean": 0.9075
+    },
+    {
+      "name": "Simple Door Frame LOD1",
+      "corners": 2016,
+      "minimum": 0.52,
+      "mean": 0.8865
+    },
+    {
+      "name": "Simple Door Frame LOD2",
+      "corners": 120,
+      "minimum": 0.598,
+      "mean": 0.9349
+    },
+    {
+      "name": "Small Window LOD0",
+      "corners": 6912,
+      "minimum": 0.52,
+      "mean": 0.8314
+    },
+    {
+      "name": "Small Window LOD1",
+      "corners": 3072,
+      "minimum": 0.52,
+      "mean": 0.8159
+    },
+    {
+      "name": "Small Window LOD2",
+      "corners": 168,
+      "minimum": 0.5737,
+      "mean": 0.86
+    },
+    {
+      "name": "Tower LOD0",
+      "corners": 168912,
+      "minimum": 0.52,
+      "mean": 0.794
+    },
+    {
+      "name": "Tower LOD1",
+      "corners": 69696,
+      "minimum": 0.52,
+      "mean": 0.7742
+    },
+    {
+      "name": "Tower LOD2",
+      "corners": 3120,
+      "minimum": 0.52,
+      "mean": 0.9326
+    },
+    {
+      "name": "TowerB LOD0",
+      "corners": 213192,
+      "minimum": 0.52,
+      "mean": 0.8256
+    },
+    {
+      "name": "TowerB LOD1",
+      "corners": 46096,
+      "minimum": 0.52,
+      "mean": 0.823
+    },
+    {
+      "name": "TowerB LOD2",
+      "corners": 4728,
+      "minimum": 0.52,
+      "mean": 0.9533
+    },
+    {
+      "name": "Wall LOD0",
+      "corners": 51084,
+      "minimum": 0.52,
+      "mean": 0.804
+    },
+    {
+      "name": "Wall LOD1",
+      "corners": 22704,
+      "minimum": 0.52,
+      "mean": 0.793
+    },
+    {
+      "name": "Wall LOD2",
+      "corners": 684,
+      "minimum": 0.52,
+      "mean": 0.9289
+    },
+    {
+      "name": "Window LOD0",
+      "corners": 9072,
+      "minimum": 0.52,
+      "mean": 0.8662
+    },
+    {
+      "name": "Window LOD1",
+      "corners": 4032,
+      "minimum": 0.52,
+      "mean": 0.849
+    },
+    {
+      "name": "Window LOD2",
+      "corners": 408,
+      "minimum": 0.6178,
+      "mean": 0.9408
+    }
+  ],
+  "foundationRepeatMetres": 2,
+  "sources": [
+    "https://polyhaven.com/a/castle_wall_slates",
+    "https://polyhaven.com/a/rock_wall_02"
+  ],
+  "license": "CC0"
+}

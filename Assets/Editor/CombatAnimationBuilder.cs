@@ -149,6 +149,7 @@ public static class CombatAnimationBuilder
             var curves=tracked.Select(_=>new[]{new AnimationCurve(),new AnimationCurve(),new AnimationCurve(),new AnimationCurve()}).ToArray();
             idle.SampleAnimation(go,0);GuardPose(go);Vector3 restHand=hand.position;
             Quaternion restHandRot=hand.rotation; Vector3 restLeft=lHand.position;
+            Quaternion previousForearm=fore.rotation;
             var previous=tracked.Select(t=>t.localRotation).ToArray();
             for(int frame=0;frame<=96;frame++)
             {
@@ -161,8 +162,15 @@ public static class CombatAnimationBuilder
                 float rise=Ease(phase/windPhase);
                 float recover=Ease(Mathf.InverseLerp(followPhase,1,phase));
                 Pose start=Windup[variant], hit=Contact[variant];
-                Vector3 endHand=hit.hand+(hit.hand-start.hand).normalized*(move.thrust?.065f:.095f);
+                Vector3 endHand=hit.hand+(hit.hand-start.hand).normalized*(move.thrust?.10f:.12f);
                 Vector3 handTarget=Flight(restHand,start.hand,hit.hand,endHand,phase,move);
+                if(phase>followPhase&&!move.thrust)
+                {
+                    float recoverPhase=Mathf.InverseLerp(followPhase,1,phase);
+                    Vector3 outside=V(.46f,1.20f,.43f);
+                    handTarget=recoverPhase<.6f?Vector3.Lerp(endHand,outside,Ease(recoverPhase/.6f)):
+                        Vector3.Lerp(outside,restHand,Ease((recoverPhase-.6f)/.4f));
+                }
                 Vector3 torso=Flight(Vector3.zero,start.torso,hit.torso*.80f,hit.torso*.85f,phase,move);
                 spine.rotation=Quaternion.Euler(torso)*spine.rotation;
                 head.rotation=Quaternion.Slerp(restHead,head.rotation,.35f);
@@ -174,7 +182,8 @@ public static class CombatAnimationBuilder
                 if(reach.magnitude>soft)handTarget=upper.position+reach.normalized*(soft+(maximum-soft)*(1-Mathf.Exp(-(reach.magnitude-soft)/(maximum-soft))));
                 Vector3 elbowHint=Vector3.Lerp(fore.position,V(.55f,1.13f,-.11f),rise);
                 PoseMath.ArmStable(upper,fore,hand,handTarget,elbowHint);
-                Vector3 plane=move.thrust?Vector3.right:Vector3.Cross(start.tip,hit.tip).normalized;
+                Vector3 sweepAxis=Vector3.Cross(start.tip,hit.tip).normalized;
+                Vector3 plane=move.thrust?Vector3.right:sweepAxis;
                 if(plane.sqrMagnitude<.1f)plane=Vector3.right;
                 // A double-edged blade has equivalent +/- face normals. Keep
                 // the one nearest the ready guard to avoid an unnecessary
@@ -182,13 +191,34 @@ public static class CombatAnimationBuilder
                 if(Vector3.Dot(plane,Vector3.right)<0)plane=-plane;
                 Quaternion windRotation=PoseMath.AlongBlade(start.tip,plane)*Quaternion.Inverse(gripOffset);
                 Quaternion contactRotation=PoseMath.AlongBlade(hit.tip,plane)*Quaternion.Inverse(gripOffset);
-                Vector3 followBlade=move.thrust?hit.tip:Quaternion.AngleAxis(18,plane)*hit.tip;
+                // Face-normal sign is interchangeable; cutting direction isn't.
+                // Using the flipped face normal here made rising cuts reverse at contact.
+                Vector3 followBlade=move.thrust?hit.tip:Quaternion.AngleAxis(30,sweepAxis)*hit.tip;
                 Quaternion followRotation=PoseMath.AlongBlade(followBlade,plane)*Quaternion.Inverse(gripOffset);
                 if(phase<windPhase)hand.rotation=Quaternion.Slerp(restHandRot,windRotation,rise);
                 else if(phase<contactPhase)hand.rotation=Quaternion.Slerp(windRotation,contactRotation,Mathf.InverseLerp(windPhase,contactPhase,phase));
                 else if(phase<followPhase)hand.rotation=Quaternion.Slerp(contactRotation,followRotation,Mathf.InverseLerp(contactPhase,followPhase,phase));
-                else hand.rotation=Quaternion.Slerp(followRotation,restHandRot,recover);
+                else if(move.thrust)hand.rotation=Quaternion.Slerp(followRotation,restHandRot,recover);
+                else
+                {
+                    float recoverPhase=Mathf.InverseLerp(followPhase,1,phase);
+                    Quaternion clearRotation=PoseMath.AlongBlade(V(.12f,.95f,.65f),Vector3.right)*Quaternion.Inverse(gripOffset);
+                    hand.rotation=recoverPhase<.6f?Quaternion.Slerp(followRotation,clearRotation,Ease(recoverPhase/.6f)):
+                        Quaternion.Slerp(clearRotation,restHandRot,Ease((recoverPhase-.6f)/.4f));
+                }
                 PoseMath.SetWrist(fore,hand,hand.rotation,gripOffset*Vector3.up,data.rightWristRest);
+                if(frame>0)
+                {
+                    // Keep pronation continuous at the solver's opposite-axis
+                    // singularity. Both frames share the same forearm axis, so
+                    // limiting roll preserves elbow/hand endpoints and the grip.
+                    Quaternion wantedHand=hand.rotation;Vector3 axis=(hand.position-fore.position).normalized;
+                    Vector3 localAxis=fore.InverseTransformDirection(axis);
+                    Quaternion aligned=Quaternion.FromToRotation(previousForearm*localAxis,axis)*previousForearm;
+                    fore.rotation=Quaternion.RotateTowards(aligned,fore.rotation,900*move.duration/96);
+                    hand.rotation=wantedHand;
+                }
+                previousForearm=fore.rotation;
                 // Open the shield to the left before the cut begins. Returning
                 // cuts wind up above/in front of its rim, not behind its face.
                 float shieldOpen=Ease(Mathf.InverseLerp(0,.14f,phase))*(1-Ease(Mathf.InverseLerp(.82f,1,phase)));

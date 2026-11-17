@@ -4,7 +4,7 @@ using UnityEngine;
 // authoring tool and combat, so damage occurs during the cutting phase.
 public static class SwordMoves
 {
-    public const float Crossfade=.050f, FadeIn=.035f, RecoveryFade=.075f, InputBuffer=.16f;
+    public const float Crossfade=.050f, FadeIn=.035f, RecoveryFade=.055f, InputBuffer=.25f;
     public readonly struct Move
     {
         public readonly string name;
@@ -12,10 +12,10 @@ public static class SwordMoves
         public readonly bool thrust;
         public Move(string name, float duration, float contact, bool thrust = false)
         {
-            this.name=name;this.duration=duration;this.contact=contact;this.thrust=thrust;
+            this.name=name;this.duration=duration+.09f;this.contact=contact;this.thrust=thrust;
             windup=contact-(thrust?.055f:.065f);
-            followThrough=contact+(thrust?.065f:.075f);
-            chain=duration-.085f;
+            followThrough=contact+(thrust?.085f:.105f);
+            chain=Mathf.Max(this.duration-.12f,followThrough+.035f);
         }
     }
     public static readonly Move[] All = {

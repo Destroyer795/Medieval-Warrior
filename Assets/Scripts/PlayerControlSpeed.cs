@@ -164,7 +164,12 @@ public class PlayerControlSpeed : MonoBehaviour
     void Update()
     {
         shieldDefense?.Restore();
-        if (Paused) return;
+        if (Paused)
+        {
+            if(CombatTime.IsHitStopped&&CurrentWeapon==Weapon.Sword&&GameInput.AttackDown)
+                swordBufferedUntil=Time.time+SwordMoves.InputBuffer;
+            return;
+        }
 
         // --- 1. WEAPON SWITCH
         if (!Dodging)
@@ -312,6 +317,22 @@ public class PlayerControlSpeed : MonoBehaviour
         return alignment < 0.98f ? Vector3.zero : forward * desiredVelocity.magnitude;
     }
 
+    readonly RaycastHit[] floorHits=new RaycastHit[24];
+    bool WalkableSupport(out RaycastHit ground)
+    {
+        ground=default;float nearest=float.PositiveInfinity;
+        int count=Physics.SphereCastNonAlloc(rb.position+Vector3.up*.55f,.22f,Vector3.down,floorHits,.8f,
+            Physics.DefaultRaycastLayers,QueryTriggerInteraction.Ignore);
+        for(int i=0;i<count;i++)
+        {
+            var hit=floorHits[i];
+            if(hit.collider.transform.IsChildOf(transform)||hit.collider.GetComponentInParent<EnemyController>()!=null||hit.normal.y<.08f)continue;
+            if(rb.position.y-hit.point.y>.24f||hit.distance>=nearest)continue;
+            nearest=hit.distance;ground=hit;
+        }
+        return nearest<float.PositiveInfinity;
+    }
+
     void FixedUpdate()
     {
         if (rb == null || rb.isKinematic) return;
@@ -320,14 +341,19 @@ public class PlayerControlSpeed : MonoBehaviour
         Quaternion facing = hasFacing ? TurnTowards(rb.rotation, Time.fixedDeltaTime) : rb.rotation;
         if (hasFacing) rb.MoveRotation(facing);
         Vector3 v = AlignedVelocity(facing);
+        float vertical=rb.linearVelocity.y;
 
         // too steep to walk up (mountains frame the valley, they aren't a ladder)
-        if (v.sqrMagnitude > 0.01f && Physics.Raycast(rb.position + Vector3.up * 0.6f, Vector3.down, out var ground, 1.6f, ~0, QueryTriggerInteraction.Ignore))
+        if (WalkableSupport(out var ground))
         {
             float slope = Vector3.Angle(ground.normal, Vector3.up);
             Vector3 downhill = Vector3.ProjectOnPlane(ground.normal, Vector3.up);
             if (slope > maxSlope && Vector3.Dot(v, downhill) < 0f)
                 v -= Vector3.Project(v, downhill.normalized);
+            else if(slope<=maxSlope)
+                // Keep the requested horizontal heading/speed, supplying the Y
+                // velocity that lies on the floor instead of driving into it.
+                vertical=-(ground.normal.x*v.x+ground.normal.z*v.z)/ground.normal.y-.15f;
         }
 
         // soft world edge
@@ -343,7 +369,7 @@ public class PlayerControlSpeed : MonoBehaviour
         }
 
         // Keep gravity on Y, drive X/Z from input
-        rb.linearVelocity = new Vector3(v.x, rb.linearVelocity.y, v.z);
+        rb.linearVelocity = new Vector3(v.x, vertical, v.z);
     }
 
     // ------------------------------------------------------------ stamina / dodge
@@ -386,6 +412,7 @@ public class PlayerControlSpeed : MonoBehaviour
         if(GameInput.AttackDown)swordBufferedUntil=Time.time+SwordMoves.InputBuffer;
         if(Time.time>swordBufferedUntil)return;
         float chainGate=SwordMoves.All[SwordVariant].chain*Mathf.Clamp(attackCooldown/.42f,.5f,1.5f);
+        chainGate=Mathf.Max(chainGate,SwordMoves.All[SwordVariant].followThrough+.035f);
         if(Time.time-lastAttack<chainGate)return;
         swordBufferedUntil=-99f;
         ComboStep = Time.time - lastAttack < Mathf.Min(comboWindow,.70f) ? (ComboStep + 1) % 3 : 0;

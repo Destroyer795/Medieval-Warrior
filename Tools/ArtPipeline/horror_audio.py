@@ -38,25 +38,37 @@ class Foley:
             envelope += self.decay(decay*self.rng.uniform(.6, 1.8), when)*self.rng.uniform(.2, 1)
         return self.noise(low, high)*envelope
 
+    def resonance(self, source, center, bandwidth):
+        # Continuous time-varying vocal-tract resonance. Filter memory survives
+        # every sample; no independently filtered chunks or periodic reset clicks.
+        omega=2*np.pi*center/SR;alpha=np.sin(omega)*bandwidth/(2*center)
+        b=alpha/(1+alpha);a1=-2*np.cos(omega)/(1+alpha);a2=(1-alpha)/(1+alpha)
+        out=np.zeros(self.n)
+        for i in range(2,self.n):
+            out[i]=b[i]*(source[i]-source[i-2])-a1[i]*out[i-1]-a2[i]*out[i-2]
+        return out/(np.sqrt(np.mean(out*out))+1e-9)
+
     def throat(self, start=78, end=43):
         # Missing/irregular glottal closures excite NOISE-rich resonances. There
         # is no sawtooth carrier: unstable vocal fry, breath and saliva dominate.
-        frequency = np.linspace(start, end, self.n)*np.exp(.23*self.curve(17)+.11*self.curve(43))
+        frequency = np.linspace(start, end, self.n)*np.exp(.16*self.curve(17)+.07*self.curve(43))
         phase = np.cumsum(frequency)/SR
         cycle = phase.astype(int)
         closures = self.rng.uniform(.1, 1, cycle[-1]+2)
         closures[self.rng.random(len(closures)) < .19] = 0
-        pulse = np.exp(-((phase % 1-.09)/.036)**2)*closures[cycle]
-        source = self.band(pulse, 45, 5000)*2.5 + self.noise(65, 6200)*.72
-        rattle = self.band(source, 110, 420)*1.4*(.8+.4*self.curve(11))
-        rattle += self.band(source, 430, 1000)*(.65+.3*self.curve(7))
-        rattle += self.band(source, 1200, 2800)*(.23+.2*self.curve(19))
-        choking = np.clip(.5+.6*self.curve(6)+.3*np.sin(phase*.47), .04, 1)
+        opening=phase%1
+        flow=np.where(opening<.58,np.sin(np.pi*np.minimum(opening/.58,1))**2,0)*closures[cycle]
+        pulse=np.diff(flow,prepend=0)*SR/np.maximum(frequency,20)
+        source=self.band(pulse,45,6500)*.6+self.noise(90,6200)*.25
+        rattle=self.resonance(source,185+35*self.curve(7),95)*.7
+        rattle+=self.resonance(source,610+130*self.curve(5),190)*.55
+        rattle+=self.resonance(source,1550+250*self.curve(9),350)*.22
+        choking = np.clip(.62+.45*self.curve(6)+.22*self.curve(25), .08, 1)
         sub = self.tone(min(85, start*.8), max(40, end), 1.1)*(.45+.3*self.curve(13))
-        breath = self.noise(1200, 8500)*(.12+.24*np.maximum(0, self.curve(9)))
-        saliva = self.grains(19, 240, 3800, 170)*.22
+        breath = self.noise(1200, 8500)*(.1+.26*np.maximum(0, self.curve(9)))
+        saliva = self.grains(19, 240, 3800, 170)*.19
         envelope = np.minimum(1, self.t/.045)*np.minimum(1, (self.d-self.t)/(.4*self.d))**1.5
-        return (rattle*choking+sub*.65+breath+saliva)*envelope
+        return (np.tanh(rattle*.85)*choking+sub*.45+breath+saliva)*envelope
 
     def finish(self, x):
         x = self.band(x, 28, 15500)
@@ -133,6 +145,15 @@ def build_bank():
     bank['dodge'] = f.finish(leather+mail+f.noise(100,2200)*f.decay(16,.16)*.45)
     f = Foley('player_hurt', .38)
     bank['player_hurt'] = f.finish(f.throat(126, 77)+f.noise(130,2200)*f.decay(18)*.5)
+
+    # Bowstring snap, two damped limb modes and the shaft clearing the rest.
+    # No pitched Karplus–Strong musical pluck or half-second synthetic whistle.
+    f=Foley('bow_release',.24)
+    string=f.noise(1800,14000)*f.decay(260)
+    limbs=sum(np.sin(2*np.pi*frequency*f.t)*f.decay(decay)*weight for frequency,decay,weight in
+              ((142,48,.2),(317,68,.1),(617,100,.045)))
+    shaft=f.noise(1700,10500)*np.exp(-((f.t-.034)/.017)**2)*.42
+    bank['bow_release']=f.finish(string+limbs+shaft+f.noise(180,1500)*f.decay(95)*.32)
 
     f = Foley('parry', .52)
     ring = sum(np.sin(2*np.pi*freq*f.t)*f.decay(28+i*7)*.2 for i,freq in enumerate((630,1387,2611,4177)))

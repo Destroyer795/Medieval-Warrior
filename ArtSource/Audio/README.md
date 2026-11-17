@@ -28,6 +28,18 @@ are present in the complete committed bank; a fresh run of `sfx.py` creates 35.
 `AudioManager.PlayAt` varies pitch by at most ±8% relative to the archetype's base
 register; UI and music playback keep their requested pitch.
 
+The current voice revision uses differentiated glottal-flow closures and continuous
+time-varying tract resonators, retaining audible low/mid rasp alongside the sub-bass.
+Groans begin 0.5–1.8s after emergence, retry quickly when a voice slot is busy and
+continue to work while navigation is pending. At most three ambient groans overlap.
+Creature voices use a 9–11m reference distance and 60m range, with a 6.5kHz minimum
+distance-filter cutoff so breath and clicks remain audible. Nearby creature cues
+briefly lower the battle/ambience bed; menu music is excluded from this ducking.
+
+`bow_release` is a 0.24s string snap, rapidly damped bow-limb resonance and shaft
+clearance noise. The old 110Hz musical pluck is no longer used by the effects
+generator. Its copy in the frozen menu recipe remains untouched.
+
 ## Protected menu theme
 
 The shipped `music_menu.wav` is never opened for writing during regeneration.

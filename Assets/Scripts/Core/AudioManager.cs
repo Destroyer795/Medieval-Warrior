@@ -10,6 +10,7 @@ public class AudioManager : MonoBehaviour
     AudioSource music, battle;
     float musicScale = 1f, battleTarget, battleLevel;
     static float nextAmbientVoice;
+    float creatureFocusUntil,creatureFocus;
 
     static AudioManager Instance
     {
@@ -27,7 +28,7 @@ public class AudioManager : MonoBehaviour
 
     AudioClip Clip(string name)
     {
-        if (!clips.TryGetValue(name, out var c))
+        if (!clips.TryGetValue(name, out var c)||c==null)
         {
             c = Resources.Load<AudioClip>("Audio/" + name);
             clips[name] = c;
@@ -84,17 +85,22 @@ public class AudioManager : MonoBehaviour
     }
 
     /// <summary>Plays a positional sound with a little pitch variation so repeats don't sound robotic.</summary>
-    public static void PlayAt(string name, Vector3 position, float volume = 1f, float pitchJitter = 0.08f,
-        float basePitch = 1f, float lowPass = 22000f, int priority = 128, float spatialBlend = 0.85f)
+    public static bool PlayAt(string name, Vector3 position, float volume = 1f, float pitchJitter = 0.08f,
+        float basePitch = 1f, float lowPass = 22000f, int priority = 128, float spatialBlend = 0.85f,
+        float minDistance=3f,float maxDistance=45f)
     {
         var clip = Instance.Clip(name);
-        if (clip == null) return;
+        if (clip == null) return false;
         var v = Instance.FreeVoice(priority);
-        if (v == null) return;
+        if (v == null) return false;
         var filter = v.GetComponent<AudioLowPassFilter>();
         if (lowPass < 22000f && filter == null) filter = v.gameObject.AddComponent<AudioLowPassFilter>();
         if (filter != null) { filter.enabled = lowPass < 22000f; filter.cutoffFrequency = lowPass; }
         v.priority = priority;
+        // Pooled voices must restore their distance profile on every use.
+        bool creature=CreatureCue(name)&&volume>=.45f;
+        v.minDistance=creature?Mathf.Max(minDistance,8):minDistance;
+        v.maxDistance=creature?Mathf.Max(maxDistance,60):maxDistance;
         v.transform.position = position;
         v.spatialBlend = spatialBlend;
         // Relative variation preserves each archetype's register while keeping
@@ -104,6 +110,9 @@ public class AudioManager : MonoBehaviour
         v.volume = volume * GameSettings.SfxVolume;
         v.clip = clip;
         v.Play();
+        if(creature&&GameSettings.SfxVolume>.01f&&Camera.main!=null&&Vector3.Distance(Camera.main.transform.position,position)<35)
+            Instance.creatureFocusUntil=Mathf.Max(Instance.creatureFocusUntil,Time.unscaledTime+Mathf.Min(clip.length/v.pitch,2.5f));
+        return true;
     }
 
     public static void PlayPlayerDamage(Vector3 position, float damage, float healthFraction, bool blocked)
@@ -116,19 +125,30 @@ public class AudioManager : MonoBehaviour
                 healthFraction < 0.25f ? 0.84f : 0.97f, 10000f, 24, 0.1f);
     }
 
-    public static void PlayZombieVoice(string clip, Vector3 position, ZombieType type)
+    static bool CreatureCue(string name)=>name.StartsWith("zombie_",System.StringComparison.Ordinal)||name=="brute_roar"||
+        name=="spit"||name=="splat"||name=="bloater_fuse"||name=="emerge"||name=="explosion";
+
+    public static bool PlayZombieVoice(string clip, Vector3 position, ZombieType type)
     {
         float distance = Camera.main != null ? Vector3.Distance(Camera.main.transform.position, position) : 0f;
-        if (distance > 45f) return;
+        if (distance > 60f) return false;
         bool ambient = clip.StartsWith("zombie_groan", System.StringComparison.Ordinal);
         // Stagger the horde instead of letting dozens of identical groans mask attacks.
-        if (ambient && Time.time < nextAmbientVoice) return;
-        if (ambient) nextAmbientVoice = Time.time + 0.3f;
-        float pitch = type == ZombieType.Warlord ? 0.62f : type == ZombieType.Brute ? 0.7f
-            : type == ZombieType.Bloater ? 0.76f : type == ZombieType.Runner ? 1.04f : 0.86f;
-        float volume = ambient ? 0.5f : clip == "brute_roar" ? 0.95f : 0.75f;
-        float filter = Mathf.Lerp(9000f, 2200f, Mathf.InverseLerp(5f, 40f, distance));
-        PlayAt(clip, position + Vector3.up * 1.2f, volume, 0.08f, pitch, filter, ambient ? 180 : 80, 1f);
+        if (ambient && Time.time < nextAmbientVoice) return false;
+        if(ambient)
+        {
+            int audible=0;
+            foreach(var voice in Instance.voices)
+                if(voice.isPlaying&&voice.clip!=null&&voice.clip.name.StartsWith("zombie_groan",System.StringComparison.Ordinal))audible++;
+            if(audible>=3)return false;
+        }
+        float pitch = type == ZombieType.Warlord ? .82f : type == ZombieType.Brute ? .86f
+            : type == ZombieType.Bloater ? .9f : type == ZombieType.Runner ? 1.04f : 1f;
+        float volume = ambient ? .88f : clip == "brute_roar" ? 1f : .95f;
+        float filter = Mathf.Lerp(14000f,6500f,Mathf.InverseLerp(10,55,distance));
+        bool played=PlayAt(clip,position+Vector3.up*1.2f,volume,.08f,pitch,filter,ambient?148:72,1,ambient?9:11,60);
+        if(played&&ambient)nextAmbientVoice=Time.time+.38f;
+        return played;
     }
 
     public static void PlayMusic(string name, float volume = 1f)
@@ -142,6 +162,7 @@ public class AudioManager : MonoBehaviour
             m.playOnAwake = false;
         }
         var clip = Instance.Clip(name);
+        if(name=="music_menu"){Instance.creatureFocusUntil=0;Instance.creatureFocus=0;nextAmbientVoice=0;}
         Instance.musicScale = volume;
         m.volume = volume * GameSettings.MusicVolume;
         if (m.clip == clip && m.isPlaying) return;
@@ -176,10 +197,12 @@ public class AudioManager : MonoBehaviour
 
     void Update()
     {
-        if (battle == null) return;
+        creatureFocus=Mathf.MoveTowards(creatureFocus,Time.unscaledTime<creatureFocusUntil?1:0,Time.unscaledDeltaTime*(Time.unscaledTime<creatureFocusUntil?8:2));
+        bool menu=music!=null&&music.clip!=null&&music.clip.name=="music_menu";
+        float space=menu?1:Mathf.Lerp(1,.62f,creatureFocus);
         battleLevel = Mathf.MoveTowards(battleLevel, battleTarget, Time.unscaledDeltaTime * (battleTarget > battleLevel ? 0.5f : 0.2f));
-        battle.volume = battleLevel * 0.85f * GameSettings.MusicVolume;
-        if (music != null) music.volume = musicScale * GameSettings.MusicVolume * (1f - battleLevel * 0.6f);
+        if(battle!=null)battle.volume = battleLevel * 0.85f * GameSettings.MusicVolume*space;
+        if (music != null) music.volume = musicScale * GameSettings.MusicVolume * (1f - battleLevel * 0.6f)*space;
     }
 
     public static void RefreshMusicVolume()

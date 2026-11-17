@@ -177,7 +177,7 @@ public class EnemyController : MonoBehaviour
 
         circleAngle = UnityEngine.Random.Range(0f, 360f);
         circleRadius = UnityEngine.Random.Range(3.6f, 5.2f);
-        groanTimer = UnityEngine.Random.Range(1f, 6f);
+        groanTimer = UnityEngine.Random.Range(.5f,1.8f);
         groanIndex = UnityEngine.Random.Range(0, 3);
         lastPosition = transform.position;
         runnerDecisionAt=runnerSideUntil=runnerWithdrawUntil=0;runnerSide=0;runnerEvadedSwing=-1;
@@ -200,6 +200,7 @@ public class EnemyController : MonoBehaviour
         UpdateAnimator();
 
         if (state == State.Emerging) { UpdateEmerging(); return; }
+        UpdateVoice();
         if (player == null || navAgent == null || !navAgent.enabled || !navAgent.isOnNavMesh) return;
         if (playerHealth != null && playerHealth.IsDead) { Idle(); return; }
 
@@ -208,12 +209,6 @@ public class EnemyController : MonoBehaviour
         {
             if(Time.time>=staggerUntil)SetState(type==ZombieType.Spitter?State.Kite:State.Hunt);
             return;
-        }
-        groanTimer -= Time.deltaTime;
-        if (groanTimer <= 0f)
-        {
-            AudioManager.PlayZombieVoice("zombie_groan" + (groanIndex++ % 3), transform.position, type);
-            groanTimer = UnityEngine.Random.Range(5f, 11f);
         }
 
         if (type == ZombieType.Warlord && !enraged && HealthFraction < 0.5f) Enrage();
@@ -231,6 +226,16 @@ public class EnemyController : MonoBehaviour
     }
 
     float DistanceToPlayer => Vector3.Distance(Flat(transform.position), Flat(player.position));
+    void UpdateVoice()
+    {
+        groanTimer-=Time.deltaTime;
+        if(groanTimer>0||state==State.Attack||state==State.Fuse||state==State.Charge||state==State.Staggered)return;
+        bool played=AudioManager.PlayZombieVoice("zombie_groan"+(groanIndex%3),transform.position,type);
+        if(played)groanIndex++;
+        // A busy voice pool/global spacing is a short retry, not eleven seconds
+        // of silence. Voice breathing also works while a path is still pending.
+        groanTimer=played?UnityEngine.Random.Range(3.2f,6.2f):UnityEngine.Random.Range(.2f,.45f);
+    }
     static Vector3 Flat(Vector3 v) => new Vector3(v.x, 0, v.z);
 
     void SetState(State s)
@@ -618,7 +623,7 @@ public class EnemyController : MonoBehaviour
         emergeDepth = 1.9f * transform.localScale.y;
         transform.position -= Vector3.up * emergeDepth;
         FX.Dust(transform.position + Vector3.up * emergeDepth, 1.1f, 20, new Color(0.38f, 0.28f, 0.18f, 0.8f));
-        AudioManager.PlayAt("emerge", transform.position, 0.8f);
+        AudioManager.PlayAt("emerge", transform.position+Vector3.up*emergeDepth, 0.95f);
     }
 
     void UpdateEmerging()

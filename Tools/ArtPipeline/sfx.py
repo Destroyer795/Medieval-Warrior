@@ -55,8 +55,6 @@ for name, samples in build_bank().items():
     save(name, samples)
 
 save('bow_draw', bp(noise(0.7), 300, 1400) * np.linspace(0.2, 1, int(SR * 0.7)) * (1 + 0.5 * np.sin(2 * np.pi * 23 * t(0.7))), peak=0.35)
-tw = pluck(110, 0.5, 0.99, 0.9) * expdecay(int(SR * 0.5), 6)
-save('bow_release', tw + 0.4 * sweep_noise(0.5, 3000, 600) * env(int(SR * 0.5), 0.01, 0.4))
 # --- pickups / UI
 def chime(freqs, d=0.6, gap=0.07):
     out = np.zeros(int(SR * (d + gap * len(freqs))))

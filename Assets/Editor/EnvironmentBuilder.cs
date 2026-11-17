@@ -865,7 +865,7 @@ public static class EnvironmentBuilder
         go.name = "Terrain";
         go.transform.SetParent(parent, false);
         go.transform.position = origin;
-        GameObjectUtility.SetStaticEditorFlags(go, StaticEditorFlags.BatchingStatic | StaticEditorFlags.NavigationStatic | StaticEditorFlags.OccludeeStatic);
+        GameObjectUtility.SetStaticEditorFlags(go, StaticEditorFlags.BatchingStatic | StaticEditorFlags.OccludeeStatic);
         var terrain = go.GetComponent<Terrain>();
         terrain.heightmapPixelError = 3f;
         terrain.basemapDistance = 250f;

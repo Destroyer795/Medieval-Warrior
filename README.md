@@ -131,6 +131,12 @@ unchanged, verified by SHA-256. Later waves thicken fog and shift lighting towar
 a Blood Moon tone; champion waves announce their threat with a boss horn and banner.
 See [the audio source guide](ArtSource/Audio/README.md) for regeneration and menu protection.
 
+Creature voices now remain audible at encounter distances, with quick groan
+retries and room in the mix for breath, rasp and wet impacts. Sword cuts complete
+their follow-through before a combo can restart; the bow has a short string-and-shaft
+release instead of a musical twang. Steep village alleys have gentler local grades,
+ground-following player movement and prop clearance through the wider passages.
+
 **UI** – medieval gold-and-iron interface: ornate health bar with damage trail, stamina bar,
 heraldic shield in your colours, objective plaque, combo meter, boss bar, weapon slots and arrow
 count, crosshair, hit markers, enemy health bars, off-screen threat arrows, kill feed, banners,
@@ -273,11 +279,13 @@ topology and UV inspection on all 72 render/collision meshes. See the
 
 ## Validation and art regeneration
 
-The latest complete run passed **391 gameplay checks**, with no gameplay errors or
+The latest complete run passed **433 gameplay checks**, with no gameplay errors or
 exceptions. The Revenants review also checks all eight meshes, walking sole
 contacts, live surface streams and sword trajectories. The earlier warrior review
 passed 48 combat/pose checks and its hand topology audit. Saved reports:
 
+- [Creature playback, complete sword strokes, bow release and slope traversal](Docs/validation/2026-11-17-action-feedback.md)
+- [Complete 433-check gameplay report](Docs/validation/2026-11-17-action-feedback-gameplay.txt)
 - [Horror audio, combat feedback and boon synergies](Docs/validation/2026-11-17-combat-audio.md)
 - [Complete 391-check gameplay report](Docs/validation/2026-11-17-combat-audio-gameplay.txt)
 - [Gameplay regression](Docs/validation/2026-11-16-gameplay.txt)

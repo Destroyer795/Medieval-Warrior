@@ -1,0 +1,434 @@
+PASS
+PASS  main menu UI built
+PASS  menu camera orbits the castle
+PASS  castle world loaded behind the menu
+PASS  knight preview + customisation component
+PASS  Marchwarden replaces the demo mesh in the customise preview
+PASS  customisation preview loads the ten-percent-taller warrior
+PASS  game loads the world scene itself
+PASS  GameManager present
+PASS  HUD built
+PASS  match moved from intro to playing
+PASS  zombies spawned on their own (4 alive)
+PASS  player components
+PASS  Marchwarden replaces the demo mesh in gameplay
+PASS  gameplay stature is ten percent taller and repeated setup does not compound scale
+PASS  Marchwarden has separate PBR surfaces and original equipped weapons
+PASS  the enlarged upper torso retains a broad anatomical rib cage
+PASS  quiver bag is compact at realistic belt dimensions
+PASS  sixty metal lamellae use rigid hinge weights instead of thigh deformation
+PASS  heater has a distinct raised arch above its shoulders (0.048 m)
+PASS  cinematic shoulders keep all four anatomical skin influences at runtime
+PASS  independent native cloth loads a lightweight mesh with a pinned waist
+PASS  cloth has explicit thigh, calf, heel, toe and pelvis collision capsules
+PASS  cloth uses continuous capsule collision and virtual triangle particles
+PASS  mesh-bound 4K surface atlas and tangent normals are loaded in gameplay
+PASS  warrior surface UVs stay inside the unique texture atlas
+PASS  all fourteen surfaces retain independent close-up texture detail
+PASS  new cloth and shield support saved palette customisation
+PASS  visible warrior stands taller with the gladiator crest (1.87 m)
+PASS  live neutral shield rim stays below the head joint (0.0204 m)
+PASS  sword and heater handles sit in the palms (0.0000/0.0000 m)
+PASS  the simulated linen surface is visible to the rendered close-up camera
+PASS  zombie_groan0 is emitted by the live AI with an audible encounter-distance profile
+PASS  zombie_groan0 preserves breath/rasp instead of muffling it away
+PASS  zombie_groan1 is emitted by the live AI with an audible encounter-distance profile
+PASS  zombie_groan1 preserves breath/rasp instead of muffling it away
+PASS  zombie_groan2 is emitted by the live AI with an audible encounter-distance profile
+PASS  zombie_groan2 preserves breath/rasp instead of muffling it away
+PASS  zombie_attack plays through the creature-effects distance profile
+PASS  zombie_die plays through the creature-effects distance profile
+PASS  brute_roar plays through the creature-effects distance profile
+PASS  spit plays through the creature-effects distance profile
+PASS  splat plays through the creature-effects distance profile
+PASS  bloater_fuse plays through the creature-effects distance profile
+PASS  explosion plays through the creature-effects distance profile
+PASS  emerge plays through the creature-effects distance profile
+PASS  battle ambience leaves space for nearby creature voices
+PASS  bow release is a short string/shaft snap with a rapidly damped tail
+PASS  rapid clicks cannot truncate the full cutting follow-through
+PASS  one buffered follow-up starts after the completed stroke
+PASS  Rigidbody walk forward through House (20) / HouseB (9) (0.08m left, 0.10m lateral)
+PASS  Rigidbody walk reverse through House (20) / HouseB (9) (0.09m left, 0.08m lateral)
+PASS  Rigidbody walk forward through HouseB (11) / HouseB (12) (0.07m left, 0.42m lateral)
+PASS  Rigidbody walk reverse through HouseB (11) / HouseB (12) (0.08m left, 0.43m lateral)
+PASS  Rigidbody walk forward through HouseB (1) / HouseB (18) (0.09m left, 0.25m lateral)
+PASS  Rigidbody walk reverse through HouseB (1) / HouseB (18) (0.09m left, 0.24m lateral)
+PASS  Rigidbody walk forward through House (8) / HouseB (14) (0.11m left, 0.32m lateral)
+PASS  Rigidbody walk reverse through House (8) / HouseB (14) (0.10m left, 0.32m lateral)
+PASS  Rigidbody walk forward through House (1) / HouseB (12) (0.09m left, 0.06m lateral)
+PASS  Rigidbody walk reverse through House (1) / HouseB (12) (0.09m left, 0.06m lateral)
+PASS  Rigidbody walk forward through HouseB (8) / House B (0.09m left, 0.09m lateral)
+PASS  Rigidbody walk reverse through HouseB (8) / House B (0.12m left, 0.10m lateral)
+PASS  Rigidbody walk forward through House (2) / House (9) (0.08m left, 0.04m lateral)
+PASS  Rigidbody walk reverse through House (2) / House (9) (0.06m left, 0.03m lateral)
+PASS  Rigidbody sprint forward through House (2) / House (9) (0.03m left, 0.03m lateral)
+PASS  Rigidbody sprint reverse through House (2) / House (9) (0.06m left, 0.01m lateral)
+PASS  Rigidbody walk forward through House (3) / House (20) (0.07m left, 0.00m lateral)
+PASS  Rigidbody walk reverse through House (3) / House (20) (0.10m left, 0.00m lateral)
+PASS  Rigidbody sprint forward through House (3) / House (20) (0.02m left, 0.00m lateral)
+PASS  Rigidbody sprint reverse through House (3) / House (20) (0.11m left, 0.00m lateral)
+PASS  Rigidbody walk forward through House (9) / HouseB (10) (0.06m left, 0.05m lateral)
+PASS  Rigidbody walk reverse through House (9) / HouseB (10) (0.08m left, 0.07m lateral)
+PASS  Rigidbody sprint forward through House (9) / HouseB (10) (0.08m left, 0.02m lateral)
+PASS  Rigidbody sprint reverse through House (9) / HouseB (10) (0.02m left, 0.04m lateral)
+PASS  crowd spawn prefab contains no demo zombie surfaces
+PASS  Walker spawns its distinct Blender anatomy and shared PBR surface
+PASS  Walker uses the new generic skeletal clips without humanoid retarget conflicts
+PASS  Walker walk/run actually moves leg bones in Play mode
+PASS  Walker attack actually moves arm bones in Play mode
+PASS  Walker death actually lowers the animated body in Play mode
+PASS  Walker standing soles reach the physical floor (clearance -0.004m)
+PASS  Walker has query-only arm, leg and head hit volumes
+PASS  Walker exposed forearm can be struck outside its torso capsule
+PASS  Walker a limb hit deals damage and records blood at the struck surface
+PASS  Walker blood projects to nearby posed anatomy instead of the root capsule
+PASS  a real arrow can wound an exposed arm through the anatomical hit volume
+PASS  Runner spawns its distinct Blender anatomy and shared PBR surface
+PASS  Runner uses the new generic skeletal clips without humanoid retarget conflicts
+PASS  Runner walk/run actually moves leg bones in Play mode
+PASS  Runner attack actually moves arm bones in Play mode
+PASS  Runner death actually lowers the animated body in Play mode
+PASS  Runner standing soles reach the physical floor (clearance -0.004m)
+PASS  Runner has query-only arm, leg and head hit volumes
+PASS  Runner exposed forearm can be struck outside its torso capsule
+PASS  Runner a limb hit deals damage and records blood at the struck surface
+PASS  Runner blood projects to nearby posed anatomy instead of the root capsule
+PASS  Brute spawns its distinct Blender anatomy and shared PBR surface
+PASS  Brute uses the new generic skeletal clips without humanoid retarget conflicts
+PASS  Brute walk/run actually moves leg bones in Play mode
+PASS  Brute attack actually moves arm bones in Play mode
+PASS  Brute death actually lowers the animated body in Play mode
+PASS  Brute standing soles reach the physical floor (clearance -0.006m)
+PASS  Brute has query-only arm, leg and head hit volumes
+PASS  Brute exposed forearm can be struck outside its torso capsule
+PASS  Brute a limb hit deals damage and records blood at the struck surface
+PASS  Brute blood projects to nearby posed anatomy instead of the root capsule
+PASS  Spitter spawns its distinct Blender anatomy and shared PBR surface
+PASS  Spitter uses the new generic skeletal clips without humanoid retarget conflicts
+PASS  Spitter walk/run actually moves leg bones in Play mode
+PASS  Spitter attack actually moves arm bones in Play mode
+PASS  Spitter death actually lowers the animated body in Play mode
+PASS  Spitter standing soles reach the physical floor (clearance -0.004m)
+PASS  Spitter has query-only arm, leg and head hit volumes
+PASS  Spitter exposed forearm can be struck outside its torso capsule
+PASS  Spitter a limb hit deals damage and records blood at the struck surface
+PASS  Spitter blood projects to nearby posed anatomy instead of the root capsule
+PASS  Bloater spawns its distinct Blender anatomy and shared PBR surface
+PASS  Bloater uses the new generic skeletal clips without humanoid retarget conflicts
+PASS  Bloater walk/run actually moves leg bones in Play mode
+PASS  Bloater attack actually moves arm bones in Play mode
+PASS  Bloater death actually lowers the animated body in Play mode
+PASS  Bloater standing soles reach the physical floor (clearance -0.005m)
+PASS  Bloater has query-only arm, leg and head hit volumes
+PASS  Bloater exposed forearm can be struck outside its torso capsule
+PASS  Bloater a limb hit deals damage and records blood at the struck surface
+PASS  Bloater blood projects to nearby posed anatomy instead of the root capsule
+PASS  Warlord spawns its distinct Blender anatomy and shared PBR surface
+PASS  Warlord uses the new generic skeletal clips without humanoid retarget conflicts
+PASS  Warlord walk/run actually moves leg bones in Play mode
+PASS  Warlord attack actually moves arm bones in Play mode
+PASS  Warlord death actually lowers the animated body in Play mode
+PASS  Warlord standing soles reach the physical floor (clearance -0.015m)
+PASS  Warlord has query-only arm, leg and head hit volumes
+PASS  Warlord exposed forearm can be struck outside its torso capsule
+PASS  Warlord a limb hit deals damage and records blood at the struck surface
+PASS  Warlord blood projects to nearby posed anatomy instead of the root capsule
+PASS  Warlord telegraph cannot damage before blade contact
+PASS  Warlord baked blade contact lands at normal melee reach, style 0 (distance 1.72m)
+PASS  Warlord contact detection leaves the live animation pose untouched, style 0
+PASS  Warlord sword sweep damages at most once per attack, style 0
+PASS  Warlord telegraph cannot damage before blade contact
+PASS  Warlord baked blade contact lands at normal melee reach, style 1 (distance 1.72m)
+PASS  Warlord contact detection leaves the live animation pose untouched, style 1
+PASS  Warlord sword sweep damages at most once per attack, style 1
+PASS  Warlord misses when its committed blade passes beside the warrior
+PASS  Swordsman spawns its distinct Blender anatomy and shared PBR surface
+PASS  Swordsman uses the new generic skeletal clips without humanoid retarget conflicts
+PASS  Swordsman walk/run actually moves leg bones in Play mode
+PASS  Swordsman attack actually moves arm bones in Play mode
+PASS  Swordsman death actually lowers the animated body in Play mode
+PASS  Swordsman standing soles reach the physical floor (clearance -0.008m)
+PASS  Swordsman has query-only arm, leg and head hit volumes
+PASS  Swordsman exposed forearm can be struck outside its torso capsule
+PASS  Swordsman a limb hit deals damage and records blood at the struck surface
+PASS  Swordsman blood projects to nearby posed anatomy instead of the root capsule
+PASS  Swordsman telegraph cannot damage before blade contact
+PASS  Swordsman baked blade contact lands at normal melee reach, style 0 (distance 1.50m)
+PASS  Swordsman contact detection leaves the live animation pose untouched, style 0
+PASS  Swordsman sword sweep damages at most once per attack, style 0
+PASS  Swordsman telegraph cannot damage before blade contact
+PASS  Swordsman baked blade contact lands at normal melee reach, style 1 (distance 1.50m)
+PASS  Swordsman contact detection leaves the live animation pose untouched, style 1
+PASS  Swordsman sword sweep damages at most once per attack, style 1
+PASS  Swordsman misses when its committed blade passes beside the warrior
+PASS  Bulwark spawns its distinct Blender anatomy and shared PBR surface
+PASS  Bulwark uses the new generic skeletal clips without humanoid retarget conflicts
+PASS  Bulwark walk/run actually moves leg bones in Play mode
+PASS  Bulwark attack actually moves arm bones in Play mode
+PASS  Bulwark death actually lowers the animated body in Play mode
+PASS  Bulwark standing soles reach the physical floor (clearance -0.008m)
+PASS  Bulwark has query-only arm, leg and head hit volumes
+PASS  Bulwark exposed forearm can be struck outside its torso capsule
+PASS  Bulwark a limb hit deals damage and records blood at the struck surface
+PASS  Bulwark blood projects to nearby posed anatomy instead of the root capsule
+PASS  Bulwark intercepts a frontal torso weapon hit
+PASS  Bulwark can be damaged from behind its shield
+PASS  an arrow above the Bulwark shield can reach its head
+PASS  shield bash opens the Bulwark guard without freezing its brain
+PASS  Bulwark telegraph cannot damage before blade contact
+PASS  Bulwark baked blade contact lands at normal melee reach, style 0 (distance 1.50m)
+PASS  Bulwark contact detection leaves the live animation pose untouched, style 0
+PASS  Bulwark sword sweep damages at most once per attack, style 0
+PASS  Bulwark exposes its torso during attack follow-through
+PASS  Bulwark telegraph cannot damage before blade contact
+PASS  Bulwark baked blade contact lands at normal melee reach, style 1 (distance 1.50m)
+PASS  Bulwark contact detection leaves the live animation pose untouched, style 1
+PASS  Bulwark sword sweep damages at most once per attack, style 1
+PASS  Bulwark exposes its torso during attack follow-through
+PASS  Bulwark misses when its committed blade passes beside the warrior
+PASS  Walker takes damage without interrupting Hunt, navigation, animation or attack ownership
+PASS  Walker takes damage without interrupting Attack, navigation, animation or attack ownership
+PASS  a real sword hit deals damage without global hit-stop
+PASS  Runner takes damage without interrupting Hunt, navigation, animation or attack ownership
+PASS  Runner takes damage without interrupting Attack, navigation, animation or attack ownership
+PASS  Brute takes damage without interrupting Hunt, navigation, animation or attack ownership
+PASS  Brute takes damage without interrupting Attack, navigation, animation or attack ownership
+PASS  Brute takes damage without interrupting Charge, navigation, animation or attack ownership
+PASS  Spitter takes damage without interrupting Kite, navigation, animation or attack ownership
+PASS  Spitter takes damage without interrupting Attack, navigation, animation or attack ownership
+PASS  Bloater takes damage without interrupting Hunt, navigation, animation or attack ownership
+PASS  Bloater takes damage without interrupting Attack, navigation, animation or attack ownership
+PASS  Bloater takes damage without interrupting Fuse, navigation, animation or attack ownership
+PASS  Warlord takes damage without interrupting Hunt, navigation, animation or attack ownership
+PASS  Warlord takes damage without interrupting Attack, navigation, animation or attack ownership
+PASS  Warlord takes damage without interrupting Charge, navigation, animation or attack ownership
+PASS  Swordsman takes damage without interrupting Hunt, navigation, animation or attack ownership
+PASS  Swordsman takes damage without interrupting Attack, navigation, animation or attack ownership
+PASS  Bulwark takes damage without interrupting Hunt, navigation, animation or attack ownership
+PASS  Bulwark takes damage without interrupting Attack, navigation, animation or attack ownership
+PASS  all horror, combat, synergy and protected menu audio clips load in play mode
+PASS  positional combat voices vary within 0.92–1.08 pitch
+PASS  UI audio retains its requested pitch
+PASS  a confirmed heavy sword finisher triggers micro hit-stop
+PASS  hit-stop expires on unscaled time without altering physics timestep
+PASS  hit-stop restores underlying cinematic slow motion
+PASS  hit-stop completion cannot unpause the pause menu
+PASS  hit-stop completion cannot unpause boon selection
+PASS  choosing a boon restores normal time after a cancelled hit-stop
+PASS  parry staggers its attacker and Thunder Guard stuns nearby undead (True/True, 2.32m)
+PASS  Thunder Guard respects physical cover instead of stunning through walls
+PASS  Vampiric Riposte restores six health on a successful parry
+PASS  successful parry produces a distinct bright flash
+PASS  perfect shield block prevents damage, staggers and triggers riposte healing
+PASS  Reaper's third strike reaches outside the normal arc and ignites phantom flame
+PASS  transformative boons respect their stack cap
+PASS  Splinter Volley damages a nearby cluster through an actual arrow contact
+PASS  arrow shrapnel respects physical wall cover
+PASS  a confirmed arrow critical triggers micro hit-stop
+PASS  piercing arrows trigger shrapnel once and fire splinters ignite nearby enemies
+PASS  arrow critical hit-stop restores gameplay time
+PASS  fifth wave creates its Brute champion
+PASS  champion wave plays the boss horn stinger
+PASS  champion wave displays a bold threat banner
+PASS  later waves progressively deepen fog and Blood Moon atmosphere
+PASS  boon offers exclude fully owned transformations
+PASS  Runner attack sector includes the back and excludes front and sides
+PASS  Runner can be positioned in front for attack rejection
+PASS  Runner refuses to start a frontal attack
+PASS  Runner cannot damage the warrior from the front
+PASS  Runner can reach the rear attack position
+PASS  Runner commits when positioned behind the warrior
+PASS  turning to face a winding-up Runner cancels its attack
+PASS  Runner rear strikes still deal damage
+PASS  Runner encounters choose either flank (21 left / 27 right)
+PASS  Runner routes vary their position and distance (42 goals, 3.7–4.9 m)
+PASS  Runner decisions advance around the flank instead of lingering in front (48/48)
+PASS  Runner has a short committed strike and recovery cycle
+PASS  Runner reaches the rear promptly from a frontal approach (1.27 s)
+PASS  Runner follows the flank with a committed attack (1.60 s)
+PASS  Runner closes distance during the early strike windup
+PASS  Runner breaks away promptly after its strike instead of standing still
+PASS  live raised heater protects the sternum
+PASS  live heater block clears the chest throughout entry/hold/release (0.0214 m)
+PASS  live braced block keeps feet planted (0.0001 m)
+PASS  live heater block retains clear sightlines
+PASS  blocking and release do not accumulate a pelvis offset or sink the character
+PASS  player root motion disabled
+PASS  A faces the requested cardinal direction
+PASS  A moves in the requested direction
+PASS  A does not walk diagonally while pivoting (0.002m lateral)
+PASS  D faces the requested cardinal direction
+PASS  D moves in the requested direction
+PASS  D does not walk diagonally while pivoting (0.001m lateral)
+PASS  S faces the requested cardinal direction
+PASS  S moves in the requested direction
+PASS  S does not walk diagonally while pivoting (0.005m lateral)
+PASS  runtime upper-body attack mask is active
+PASS  walking produces bounded live cloth movement
+PASS  walking legs continue animating during a sword attack
+PASS  walking translation continues during a sword attack
+PASS  running produces bounded live cloth movement
+PASS  running legs continue animating during a sword attack
+PASS  running translation continues during a sword attack
+PASS  12 authored sword attack clips loaded
+PASS  live sword stroke 00 clears shield through anticipation, cut and recovery (0.210 m)
+PASS  quiver and arrows clear arm/torso during strike 00 (0.192/0.055 m)
+PASS  hinged armor clears legs/linen during strike 00 (0.014/0.006 m)
+PASS  live sword stroke 01 clears shield through anticipation, cut and recovery (0.404 m)
+PASS  quiver and arrows clear arm/torso during strike 01 (0.158/0.054 m)
+PASS  hinged armor clears legs/linen during strike 01 (0.014/0.006 m)
+PASS  live sword stroke 02 clears shield through anticipation, cut and recovery (0.248 m)
+PASS  quiver and arrows clear arm/torso during strike 02 (0.186/0.048 m)
+PASS  hinged armor clears legs/linen during strike 02 (0.014/0.006 m)
+PASS  live sword stroke 03 clears shield through anticipation, cut and recovery (0.413 m)
+PASS  quiver and arrows clear arm/torso during strike 03 (0.154/0.055 m)
+PASS  hinged armor clears legs/linen during strike 03 (0.014/0.006 m)
+PASS  live sword stroke 04 clears shield through anticipation, cut and recovery (0.371 m)
+PASS  quiver and arrows clear arm/torso during strike 04 (0.119/0.053 m)
+PASS  hinged armor clears legs/linen during strike 04 (0.014/0.006 m)
+PASS  live sword stroke 05 clears shield through anticipation, cut and recovery (0.326 m)
+PASS  quiver and arrows clear arm/torso during strike 05 (0.207/0.057 m)
+PASS  hinged armor clears legs/linen during strike 05 (0.014/0.006 m)
+PASS  live sword stroke 06 clears shield through anticipation, cut and recovery (0.404 m)
+PASS  quiver and arrows clear arm/torso during strike 06 (0.156/0.054 m)
+PASS  hinged armor clears legs/linen during strike 06 (0.014/0.006 m)
+PASS  live sword stroke 07 clears shield through anticipation, cut and recovery (0.259 m)
+PASS  quiver and arrows clear arm/torso during strike 07 (0.181/0.055 m)
+PASS  hinged armor clears legs/linen during strike 07 (0.014/0.006 m)
+PASS  live sword stroke 08 clears shield through anticipation, cut and recovery (0.386 m)
+PASS  quiver and arrows clear arm/torso during strike 08 (0.202/0.057 m)
+PASS  hinged armor clears legs/linen during strike 08 (0.014/0.006 m)
+PASS  live sword stroke 09 clears shield through anticipation, cut and recovery (0.335 m)
+PASS  quiver and arrows clear arm/torso during strike 09 (0.188/0.055 m)
+PASS  hinged armor clears legs/linen during strike 09 (0.014/0.006 m)
+PASS  live sword stroke 10 clears shield through anticipation, cut and recovery (0.403 m)
+PASS  quiver and arrows clear arm/torso during strike 10 (0.163/0.055 m)
+PASS  hinged armor clears legs/linen during strike 10 (0.014/0.006 m)
+PASS  live sword stroke 11 clears shield through anticipation, cut and recovery (0.385 m)
+PASS  quiver and arrows clear arm/torso during strike 11 (0.148/0.054 m)
+PASS  hinged armor clears legs/linen during strike 11 (0.014/0.006 m)
+PASS  backhand differs visibly from first cut
+PASS  overhead finisher differs visibly from first cut
+PASS  alternate sword variation 3 has a distinct contact point or blade orientation
+PASS  alternate sword variation 4 has a distinct contact point or blade orientation
+PASS  alternate sword variation 5 has a distinct contact point or blade orientation
+PASS  new sword stroke Descending backhand has a distinct hand path or blade orientation
+PASS  new sword stroke Low rising return has a distinct hand path or blade orientation
+PASS  new sword stroke High-line thrust has a distinct hand path or blade orientation
+PASS  new sword stroke Short outside cut has a distinct hand path or blade orientation
+PASS  new sword stroke Inside returning cut has a distinct hand path or blade orientation
+PASS  new sword stroke High backhand finish has a distinct hand path or blade orientation
+PASS  combo start retains the outgoing attack weight instead of snapping to idle
+PASS  combo cross-fade begins on the outgoing pose
+PASS  combo cross-fade reaches the next attack continuously
+PASS  rapid attacks retain readable preparation and contact within 185 ms
+PASS  an early attack press is buffered and starts exactly one follow-up at the chain gate
+PASS  live cloth particles stay finite through locomotion, dodge, block, cuts and thrusts
+PASS  rendered tunic particles and triangle interiors clear leg and foot capsules through the stress sequence (0.0080 m)
+PASS  cloth waist stays attached to the belt (0.0077 m)
+PASS  cloth responds to momentum without runaway stretching (0.264 m)
+PASS  the lower tunic stays above foot level (0.369 m above the root)
+PASS  rigid hip plates drape outside moving legs and simulated linen (0.0119/0.0060 m)
+PASS  armor hinges remain attached to the belt (0.0000 m)
+PASS  compact quiver and arrows clear right arm and torso through movement (0.0163/0.0550 m)
+PASS  quiver contact response stays within its belt suspension (0.097 m)
+PASS  cloth resets inertia safely after the test teleport
+PASS  free orbit camera stays outside obstruction
+PASS  aim camera stays outside obstruction
+PASS  quiver is mounted on the right hip
+PASS  quiver starts with exact ammo count
+PASS  firing removes one physical quiver arrow
+PASS  expanded quiver displays every refilled arrow
+PASS  quiver is physically empty at zero ammo
+PASS  arrow pickup refills the visible quiver
+PASS  fully drawn fire arrow has an active flame emitter
+PASS  fire arrow impact ignites the zombie
+PASS  burning zombie has sustained flames
+PASS  ignited zombie takes ongoing fire damage
+PASS  burn expires and removes zombie flames
+PASS  burn damage can kill and cleans up flames
+PASS  lethal fire arrow hits still show an ignition burst (health -0.4)
+PASS  Walker moves towards the knight (6.5 m)
+PASS  Walker locomotion animation follows speed (peak 2.55)
+PASS  Walker has root motion off
+PASS  Runner moves towards the knight (14.9 m)
+PASS  Runner locomotion animation follows speed (peak 3.60)
+PASS  Runner has root motion off
+PASS  Brute moves towards the knight (5.2 m)
+PASS  Brute locomotion animation follows speed (peak 1.76)
+PASS  Brute has root motion off
+PASS  Spitter keeps range (moved 0.0 m)
+PASS  Spitter has root motion off
+PASS  Bloater moves towards the knight (5.8 m)
+PASS  Bloater locomotion animation follows speed (peak 2.26)
+PASS  Bloater has root motion off
+PASS  Warlord moves towards the knight (6.0 m)
+PASS  Warlord locomotion animation follows speed (peak 1.67)
+PASS  Warlord has root motion off
+PASS  Swordsman moves towards the knight (1.6 m)
+PASS  Swordsman locomotion animation follows speed (peak 2.90)
+PASS  Swordsman has root motion off
+PASS  Bulwark moves towards the knight (2.5 m)
+PASS  Bulwark locomotion animation follows speed (peak 2.31)
+PASS  Bulwark has root motion off
+PASS  three shots fired and counted
+PASS  arrows consumed (unless topped up from a crate)
+PASS  arrows hit zombies (6/66)
+PASS  draw hand pulls the string back (0.39 m -> 0.76 m between hands)
+PASS  sword and shield stowed for the bow (original Marchwarden sword and shield, explicit equipment mounts)
+PASS  bow arm points along the aim (24 deg off)
+PASS  bow grip touches palm (0.000 m)
+PASS  draw fingers adopt the string hook pose instead of retaining the sword grip
+PASS  draw hand reaches stable facial anchor (0.002 m)
+PASS  draw elbow aligns behind arrow (10.8 deg)
+PASS  nocked arrow follows aim (0.9 deg)
+PASS  compact quiver clears the full bow draw without leaving its suspension
+PASS  bow body follows yaw -90
+PASS  bow arm follows yaw -90 (24.4 deg)
+PASS  arrow and grip remain aligned after yaw -90
+PASS  quiver and arrows clear the draw arm and torso at yaw -90
+PASS  bow body follows yaw 90
+PASS  bow arm follows yaw 90 (23.0 deg)
+PASS  arrow and grip remain aligned after yaw 90
+PASS  quiver and arrows clear the draw arm and torso at yaw 90
+PASS  bow pitch stays clamped at camera pitch -70
+PASS  bow pitch stays clamped at camera pitch 70
+PASS  shield sits flush against chest mount (0.012 m)
+PASS  shield mount faces behind the knight
+PASS  bow grip sits flush against chest mount (0.013 m)
+PASS  entire stowed bow lies within 11 cm of the back plane
+PASS  stowed bowstring lies flat and close to the back
+PASS  ground rolls through the castle (6.0 m of relief)
+PASS  houses sit on the terrain (37/37 seated)
+PASS  sword finisher damages a zombie
+PASS  enraged Warlord summons the dead (5 -> 8)
+PASS  kills counted (8)
+PASS  spent arrows are supported by ground or embedded in scenery (1 grounded, 0 embedded, 0 unsupported)
+PASS  score increases with kills
+PASS  bile damages the knight (100 -> 95)
+PASS  acid pool created
+PASS  acid impacts have distinct asymmetric lobes and splash silhouettes
+PASS  acid damage footprint follows each irregular shoreline
+PASS  acid shoreline follows the ground with a thin wet surface
+PASS  acid uses the wet animated puddle surface
+PASS  expired acid objects release their unique surface meshes
+PASS  arrow pickup collected (35 -> 45)
+PASS  supply crates with pickups exist in the world
+PASS  banners fly from the towers
+PASS  village chimneys smoke
+PASS  pause freezes time
+PASS  resume restores time
+PASS  Defend the Castle offered boons at 1/3 and 2/3 (2)
+PASS  the Warlord leads the final assault
+PASS  Defend the Castle can be won
+PASS  returns to main menu
+PASS  time scale reset in menu
+PASS  endless horde wave started (wave 1)
+PASS  clearing a wave offers a boon
+PASS  time frozen while choosing
+PASS  boon applied
+PASS  time resumes after the pick
+PASS  death ends the run
+PASS  last stand timer running
+PASS  no errors/exceptions logged (0)

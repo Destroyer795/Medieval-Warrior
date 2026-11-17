@@ -126,6 +126,38 @@ settings without overwriting the next scene's menu lighting.
 
 ### Regenerate horror and combat audio
 
+The latest playback fix makes groans audible at normal encounter ranges: creature
+voices reset their pooled attenuation to 9–11m minimum / 60m maximum, preserve
+6.5–14kHz breath detail and briefly duck the battle/ambience bed. Groans retry after
+pool/throttle rejection instead of losing the entire 3–6s breathing interval; their
+clock works independently of pending navigation. Three concurrent ambient groans
+are allowed, while attack/death/roar cues retain higher priority. Menu ducking is
+disabled, and a cached missing clip is retried rather than kept null indefinitely.
+The generator now uses glottal-flow derivatives and continuous moving resonances
+for throat rasp. Bow release uses a short string/limb/shaft transient instead of a
+pitched musical pluck.
+
+Sword strokes preserve their original 135–185ms contact timing and finish the cut
+before another buffered attack can start. The complete single-stroke gesture is
+0.43–0.54s, including a shield-safe recovery; combo links remain earlier than the
+end of recovery. Rising cuts continue around their signed sweep axis rather than
+reversing when an equivalent blade-face normal flips. Forearm pronation is bounded
+during authoring, keeping the hand endpoint and grip fixed. Rebuild with
+`CombatAnimationBuilder.Build`, then `SwordClearanceReview.Run`. The 250ms input
+buffer also accepts attack presses during micro hit-stop, but not during menus.
+
+Village slope fixes use `BuildingBuilder.SoftenHouseSlopes` and
+`BuildingBuilder.ClearVillageRoutes`. Three steep passages were locally graded;
+all 56 surveyed route surfaces are below 32 degrees. The latter utility trims
+route junctions against actual collision hulls, moves obstructing props, preserves
+pickup children, refreshes ground contact and rebakes the existing NavMeshData.
+The environment rebuild reserves these wider corridors too. `PlayerControlSpeed`
+uses a nonallocating support probe and supplies the walkable surface's vertical
+velocity while retaining the requested horizontal heading/speed. It still refuses
+uphill movement above `maxSlope`; stun/knockback keeps control of the Rigidbody.
+`ActionFeedbackSmoke` tests live AI sound triggers, completed combos, and actual
+Rigidbody walking/sprinting both ways through the repaired inclines.
+
 ```powershell
 python Tools/ArtPipeline/sfx.py Assets/Resources/Audio
 Unity.exe -batchmode -quit -projectPath . -executeMethod CombatOverhaulReview.VerifyAudio -logFile combat-audio-compile.log

@@ -1,0 +1,16 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fab37218f38c80b44a3537704ddd0fd5, type: 3}
+  m_Name: EnvironmentArt
+  m_EditorClassIdentifier: Assembly-CSharp::EnvironmentArtAsset
+  supplyCrate: {fileID: 4300000, guid: 480d7363dd0b39e4ca639eb34dae1328, type: 2}
+  crateMaterial: {fileID: 2100000, guid: 74c18dba101c1f94c886e8ac94384e8e, type: 2}

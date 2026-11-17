@@ -136,6 +136,7 @@ public static class EnvironmentBuilder
         ScatterBaseProps(env.transform, prefabs);
         PlaceSupplyCrates(env.transform);
         PlaceBannersAndChimneys(env.transform);
+        BuildingBuilder.PrepareHousePassagesForEnvironment(game, terrain);
         TameTorchLights(world);
 
         SceneManager.SetActiveScene(game);
@@ -1411,8 +1412,8 @@ public static class EnvironmentBuilder
             sun.shadows = LightShadows.Soft;
             sun.shadowStrength = 0.72f;
             sun.shadowResolution = LightShadowResolution.VeryHigh;
-            sun.shadowBias = 0.03f;
-            sun.shadowNormalBias = 0.3f;
+            sun.shadowBias = 0.015f;
+            sun.shadowNormalBias = 0.06f;
             RenderSettings.sun = sun;
         }
         EditorSceneManager.MarkSceneDirty(scene);
@@ -1443,9 +1444,9 @@ public static class EnvironmentBuilder
         }
         var ao = Add<AmbientOcclusion>();
         ao.mode.Override(AmbientOcclusionMode.MultiScaleVolumetricObscurance);
-        ao.intensity.Override(0.75f);
-        ao.thicknessModifier.Override(1.4f);
-        ao.color.Override(new Color(0.1f, 0.08f, 0.12f));
+        ao.intensity.Override(0.55f);
+        ao.thicknessModifier.Override(1.0f);
+        ao.color.Override(new Color(0.08f, 0.08f, 0.075f));
         var bloom = Add<Bloom>();
         bloom.intensity.Override(0.25f);
         bloom.threshold.Override(1.25f);

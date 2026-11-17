@@ -2,8 +2,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-// Low-poly props built in code so they share the toon look of the characters:
-// bow, arrows, supply crates, potions. Used at runtime and by the editor builder.
+// Shared prop access, with authored art where available and procedural fallbacks.
 public static class ProceduralModels
 {
     public class MeshKit
@@ -206,7 +205,7 @@ public static class ProceduralModels
     };
 
     // ------------------------------------------------------------ supply crate with an arrow bundle
-    public static Mesh CrateMesh() => Cached("crate", () =>
+    public static Mesh CrateMesh() => EnvironmentArtAsset.Asset!=null&&EnvironmentArtAsset.Asset.supplyCrate!=null?EnvironmentArtAsset.Asset.supplyCrate:Cached("crate", () =>
     {
         var k = new MeshKit(2); // 0 planks, 1 iron
         Vector3 size = new Vector3(1.0f, 0.62f, 0.7f);
@@ -224,7 +223,7 @@ public static class ProceduralModels
         return k.Build("SupplyCrate");
     });
 
-    public static Material[] CrateMaterials() => new[]
+    public static Material[] CrateMaterials() => EnvironmentArtAsset.Asset!=null&&EnvironmentArtAsset.Asset.crateMaterial!=null?new[]{EnvironmentArtAsset.Asset.crateMaterial}:new[]
     {
         Mat("crate_wood", new Color(0.62f, 0.42f, 0.24f), 0.15f),
         Mat("crate_iron", new Color(0.3f, 0.3f, 0.32f), 0.45f, 0.6f),

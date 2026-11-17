@@ -26,6 +26,7 @@ public static partial class BuildingBuilder
         if(!Application.isBatchMode&&!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo())return;
         verification=new Verification();messages=new List<string>();
         var reference=JsonUtility.FromJson<Reference>(File.ReadAllText(ReferenceFile));var manifest=ReadManifest();
+        ValidateHouseLayoutRevision(reference);
         foreach(var part in manifest.parts)
         {
             var source=reference.meshes.First(m=>m.key==part.key);int previous=int.MaxValue;
@@ -54,7 +55,7 @@ public static partial class BuildingBuilder
             Check(Difference(prefab.bounds,new Size(BoundsOf(root)))<.0005f,prefab.name+" original aggregate bounds");
             var ids=new HashSet<string>(ComponentIds(root));Check(prefab.componentIds.All(ids.Contains),prefab.name+" original persistent component IDs");
             Check(root.GetComponentsInChildren<MeshFilter>(true).All(f=>f.sharedMesh!=null),prefab.name+" no missing mesh references");
-            Check(root.GetComponentsInChildren<MeshRenderer>(true).All(r=>r.sharedMaterials.All(m=>m!=null&&m.shader.name=="Standard")),prefab.name+" Standard materials");
+            Check(root.GetComponentsInChildren<MeshRenderer>(true).All(r=>r.sharedMaterials.All(IsArchitectureMaterial)),prefab.name+" Built-in PBR materials");
             foreach(var use in prefab.parts)
             {
                 // Repeated names in the vendor hierarchy are intentional. Verify every matching
@@ -68,17 +69,17 @@ public static partial class BuildingBuilder
             foreach(var original in layout.placements)
             {
                 GlobalObjectId.TryParse(original.id,out var id);var go=GlobalObjectId.GlobalObjectIdentifierToObjectSlow(id) as GameObject;
-                Check(go!=null,original.path+" original scene object ID");Check(Difference(go.transform.localToWorldMatrix,original.matrix)<.00001f,original.path+" world transform");
+                Check(go!=null,original.path+" original scene object ID");Check(Difference(go.transform.localToWorldMatrix,ReviewedLayoutMatrix(original,go.transform))<.00001f,original.path+" reviewed world transform");
                 Check(Difference(original.bounds,new Size(BoundsOf(go)))<.0005f,original.path+" scene bounds");verification.prefabRoots++;
                 Check(go.GetComponentsInChildren<MeshFilter>(true).All(f=>f.sharedMesh!=null),original.path+" scene instance meshes resolved");
             }
             foreach(var original in layout.nodes)
             {
                 GlobalObjectId.TryParse(original.id,out var id);var filter=GlobalObjectId.GlobalObjectIdentifierToObjectSlow(id) as MeshFilter;
-                Check(filter!=null,original.path+" original scene MeshFilter ID");Check(Difference(filter.transform.localToWorldMatrix,original.matrix)<.00001f,original.path+" mesh world transform");
+                Check(filter!=null,original.path+" original scene MeshFilter ID");Check(Difference(filter.transform.localToWorldMatrix,ReviewedLayoutMatrix(original,filter.transform))<.00001f,original.path+" reviewed mesh world transform");
                 Check(AssetDatabase.GetAssetPath(filter.sharedMesh)==MeshPath(original.key,0),original.path+" custom replacement mesh");
                 Check(Difference(original.bounds,new Size(filter.sharedMesh.bounds))<.0005f,original.path+" mesh bounding box");verification.meshNodes++;
-                Check(filter.GetComponent<MeshRenderer>().sharedMaterials.All(m=>m!=null&&m.shader.name=="Standard"),original.path+" scene material references");
+                Check(filter.GetComponent<MeshRenderer>().sharedMaterials.All(IsArchitectureMaterial),original.path+" scene material references");
                 foreach(var collider in filter.GetComponents<MeshCollider>())Check(collider.sharedMesh!=null&&AssetDatabase.GetAssetPath(collider.sharedMesh)==CollisionPath(original.key),original.path+" custom collision reference");
             }
         }
@@ -144,8 +145,12 @@ public static partial class BuildingBuilder
         foreach(var prefab in reference.prefabs)
         {
             var go=Object.Instantiate(AssetDatabase.LoadAssetAtPath<GameObject>(prefab.path));go.transform.SetPositionAndRotation(Vector3.zero,Quaternion.identity);
+            var placed=reference.scenes.SelectMany(s=>s.placements).FirstOrDefault(p=>p.asset==prefab.path);
+            var scale=placed==null?Vector3.one*5:new Vector3(placed.matrix.GetColumn(0).magnitude,placed.matrix.GetColumn(1).magnitude,placed.matrix.GetColumn(2).magnitude);
+            go.transform.localScale=scale;
             foreach(var lod in go.GetComponentsInChildren<LODGroup>())lod.ForceLOD(0);
-            var b=BoundsOf(go);float span=Mathf.Max(b.size.x,b.size.y,b.size.z);
+            var localBounds=BoundsOf(go);var b=new Bounds(go.transform.TransformPoint(localBounds.center),Vector3.Scale(localBounds.size,scale));float span=Mathf.Max(b.size.x,b.size.y,b.size.z);
+            Shader.SetGlobalFloat("_EnvironmentGroundMode",2);Shader.SetGlobalFloat("_EnvironmentFlatGround",b.min.y);
             camera.transform.position=b.center+new Vector3(1,.65f,-1.4f).normalized*span*2.5f;camera.transform.LookAt(b.center);
             camera.orthographic=true;camera.orthographicSize=span*.66f;camera.nearClipPlane=.001f;camera.farClipPlane=span*10;
             var target=new RenderTexture(1200,1000,24);camera.targetTexture=target;camera.Render();RenderTexture.active=target;
@@ -155,7 +160,7 @@ public static partial class BuildingBuilder
         }
         EditorSceneManager.NewScene(NewSceneSetup.EmptyScene,NewSceneMode.Single);
         }
-        finally{QualitySettings.shadows=oldShadows;QualitySettings.shadowResolution=oldResolution;QualitySettings.shadowDistance=oldDistance;}
+        finally{Shader.SetGlobalFloat("_EnvironmentGroundMode",0);QualitySettings.shadows=oldShadows;QualitySettings.shadowResolution=oldResolution;QualitySettings.shadowDistance=oldDistance;}
     }
     [MenuItem("Medieval Warrior/Buildings/Rebake navigation and verify routes")]
     public static void RebakeNavigation()
@@ -197,7 +202,9 @@ public static partial class BuildingBuilder
             var localExtents=(node.bounds.max-node.bounds.min)*.5f;
             for(int side=0;side<4;side++)
             {
-                var p=node.matrix.MultiplyPoint3x4(localCenter+new Vector3(Mathf.Cos(side*Mathf.PI/2)*(localExtents.x+.15f),0,Mathf.Sin(side*Mathf.PI/2)*(localExtents.z+.15f)));
+                GlobalObjectId.TryParse(node.id,out var id);var filter=GlobalObjectId.GlobalObjectIdentifierToObjectSlow(id) as MeshFilter;
+                var matrix=filter!=null?filter.transform.localToWorldMatrix:node.matrix;
+                var p=matrix.MultiplyPoint3x4(localCenter+new Vector3(Mathf.Cos(side*Mathf.PI/2)*(localExtents.x+.15f),0,Mathf.Sin(side*Mathf.PI/2)*(localExtents.z+.15f)));
                 if(NavMesh.SamplePosition(p,out _,8,NavMesh.AllAreas))samples++;
             }
         }

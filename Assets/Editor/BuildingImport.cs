@@ -41,14 +41,15 @@ public static partial class BuildingBuilder
             mesh.name=Path.GetFileNameWithoutExtension(filename);mesh.indexFormat=vertices.Length>65535?IndexFormat.UInt32:IndexFormat.UInt16;
             mesh.vertices=vertices;mesh.triangles=triangles;
             if(!collision){mesh.normals=normals;mesh.uv=uv;mesh.uv2=lightmap;mesh.RecalculateTangents();}else mesh.RecalculateNormals();
+            if(!collision)ApplyBakedAO(mesh,Path.GetFileNameWithoutExtension(filename)+".ao.bin");
             mesh.RecalculateBounds();mesh.UploadMeshData(false);EditorUtility.SetDirty(mesh);return mesh;
         }
     }
     static Material BuildSurface()
     {
         string path=Output+"/Buildings.mat";var mat=AssetDatabase.LoadAssetAtPath<Material>(path);
-        if(mat==null){mat=new Material(Shader.Find("Standard"));AssetDatabase.CreateAsset(mat,path);}
-        mat.shader=Shader.Find("Standard");mat.color=Color.white;mat.enableInstancing=true;
+        if(mat==null){mat=new Material(Shader.Find("Medieval Warrior/Weathered Architecture"));AssetDatabase.CreateAsset(mat,path);}
+        mat.shader=Shader.Find("Medieval Warrior/Weathered Architecture");mat.color=Color.white;mat.enableInstancing=true;
         foreach(string label in new[]{"Albedo","Normal","Masks"})
         {
             string texturePath=Output+"/Textures/"+label+".png";
@@ -62,9 +63,8 @@ public static partial class BuildingBuilder
             else if(label=="Normal")mat.SetTexture("_BumpMap",texture);
             else{mat.SetTexture("_MetallicGlossMap",texture);mat.SetTexture("_OcclusionMap",texture);}
         }
-        mat.SetFloat("_GlossMapScale",1);mat.SetFloat("_BumpScale",.65f);mat.SetFloat("_OcclusionStrength",.55f);
-        mat.SetFloat("_SmoothnessTextureChannel",0);mat.EnableKeyword("_NORMALMAP");mat.EnableKeyword("_METALLICGLOSSMAP");
-        EditorUtility.SetDirty(mat);return mat;
+        mat.SetFloat("_GlossMapScale",1);mat.SetFloat("_Glossiness",0);mat.SetFloat("_BumpScale",1);mat.SetFloat("_OcclusionStrength",1);
+        ConfigureMasonry(mat);EditorUtility.SetDirty(mat);PrepareHouseSurfaces(mat);PrepareArchitectureSurfaces(mat);return mat;
     }
     static BuiltPart FindPart(MeshFilter filter,Manifest manifest)
     {
@@ -84,7 +84,7 @@ public static partial class BuildingBuilder
             var part=FindPart(filter,manifest);if(part==null)continue;
             filter.sharedMesh=AssetDatabase.LoadAssetAtPath<Mesh>(MeshPath(part.key,0));
             var renderer=filter.GetComponent<MeshRenderer>();if(renderer==null)renderer=filter.gameObject.AddComponent<MeshRenderer>();
-            renderer.sharedMaterials=new[]{material};renderer.shadowCastingMode=ShadowCastingMode.On;renderer.receiveShadows=true;
+            renderer.sharedMaterials=new[]{SurfaceFor(part,0,material)};renderer.shadowCastingMode=ShadowCastingMode.On;renderer.receiveShadows=true;
             if(filter.GetComponent<MeshCollider>()==null)filter.gameObject.AddComponent<MeshCollider>();
             foreach(var collider in filter.GetComponents<MeshCollider>())
             {
@@ -102,7 +102,7 @@ public static partial class BuildingBuilder
                 // Preserve the module's lightmap/static flags, but never add collision to the LOD nodes.
                 GameObjectUtility.SetStaticEditorFlags(node.gameObject,GameObjectUtility.GetStaticEditorFlags(filter.gameObject));
                 var mf=node.GetComponent<MeshFilter>();if(mf==null)mf=node.gameObject.AddComponent<MeshFilter>();mf.sharedMesh=AssetDatabase.LoadAssetAtPath<Mesh>(MeshPath(part.key,lod));
-                var mr=node.GetComponent<MeshRenderer>();if(mr==null)mr=node.gameObject.AddComponent<MeshRenderer>();mr.sharedMaterials=new[]{material};renderers[lod]=mr;
+                var mr=node.GetComponent<MeshRenderer>();if(mr==null)mr=node.gameObject.AddComponent<MeshRenderer>();mr.sharedMaterials=new[]{SurfaceFor(part,lod,material)};renderers[lod]=mr;
             }
             group.SetLODs(new[]{new LOD(.38f,new[]{renderers[0]}),new LOD(.13f,new[]{renderers[1]}),new LOD(.008f,new[]{renderers[2]})});
             group.fadeMode=LODFadeMode.None;group.RecalculateBounds();

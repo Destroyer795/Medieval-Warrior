@@ -38,6 +38,8 @@ the same lighting settings; the builder writes them into all three scenes.
 | `CameraFollow` | Orbit camera with mouse look, collision, bow aim (shoulder offset + FOV) and screen shake. |
 | `Arrow`, `BileGlob`, `AcidPool`, `Combat.Explode`, `Pickup` | Projectiles, area damage and loot. |
 | `FX` | Particle bursts built in code, hit-stop, screen shake. |
+| `CombatTime` | Owns the gameplay timescale and coalesces 50–80ms unscaled impact stops; pause, boons and cinematics replace the stop safely. |
+| `CombatBoons` | Contact-driven Thunder Guard, phantom burn and one-shot arrow shrapnel; respects physical visibility and shield guards. |
 | `AudioManager` | `Play2D`, `PlayAt` (3D), `PlayMusic` and `SetBattleIntensity` (war-drum layer driven by how many zombies are near); clips come from `Resources/Audio` by name. |
 | `Boons` | Per-match upgrades: definitions, stacks, `Roll` (offer three), `Apply` (one-off effects) and the multipliers gameplay code reads (`SwordDamage`, `DrawSpeed`, `Pierce`, `FireArrows`, ...). `GameManager.OfferBoon` freezes time and `GameHUD.ShowBoons` shows the cards. |
 | `GameInput` | Every gameplay input in one place (keyboard/mouse + gamepad via the Input System). Use it instead of `Input.*`. |
@@ -84,6 +86,73 @@ hand-frame conventions and validation. The shader uses matte diffuse lighting;
 the body does not emit a glowing damage flash.
 
 ## Common tasks
+
+### Combat feedback, run synergies and battle escalation
+
+`PlayerControlSpeed.CheckForHits` only adds finisher hit-stop after a weapon contact
+lands; guarded contacts use clank feedback without a flesh hit cue. `Arrow.HitEnemy`
+adds a shorter stop on a confirmed critical. `PlayerHealth.SuccessfulParry` handles
+both offensive parries and perfect shield blocks: instant defensive stagger,
+bright sparks/flash, a dedicated cue, camera kick and boon procs. Offensive parries
+must face the attacker. Ordinary damage still preserves the enemy state/attack
+clock and does not force knockback or stagger.
+
+`CombatTime.SetScale` replaces direct timescale writes in match/menu flow. Hit-stop
+is an unscaled overlay, capped at 80ms even for simultaneous contacts; it never
+changes `Time.fixedDeltaTime`, physics velocities or animator update modes. Pause,
+boon offers, restarts and menu transitions cancel a pending stop. Boss/end-match
+slow motion remains the underlying gameplay scale. The camera can render its
+short impact kick through hit-stop while actual menu pauses still freeze it;
+camera aiming direction remains independent of the visual kick.
+
+New single-stack boons extend the existing offer table and reset with each match:
+
+| Boon | Contact effect |
+|---|---|
+| Thunder Guard | Parry/perfect block emits a 4.5m line-of-sight shockwave; ordinary enemies stagger 0.85s, bosses 0.4s. |
+| Reaper's Cleave | Third strike uses 1.35× reach and a wider forward arc; landed hits burn for 3s at 0.6 damage/s with phantom flame. |
+| Splinter Volley | First arrow impact bursts once, dealing 55% arrow damage (cap 2) within 2.6m; excludes the primary target and respects cover/guards. |
+| Vampiric Riposte | Successful parry/perfect block heals 6 HP, capped at maximum health. |
+
+Shrapnel does not recursively spawn more shrapnel. Piercing arrows burst once;
+fire-arrow splinters also ignite secondary targets for 2s at 0.5 damage/s.
+`EnemyController.Stagger` explicitly interrupts attack ownership and guard; generic
+`TakeDamage` remains continuous. `FX` creates bounded, transient bursts rather than
+per-frame searches. `GameManager.UpdateBattleAtmosphere` caches the initial lighting
+and progressively changes fog, ambient fill and sun colour with wave/progress/boss
+pressure, keeping bounded darkening for readable silhouettes. Champion waves play
+one boss stinger instead of overlapping wave/boss horns. Scene exit restores captured
+settings without overwriting the next scene's menu lighting.
+
+### Regenerate horror and combat audio
+
+```powershell
+python Tools/ArtPipeline/sfx.py Assets/Resources/Audio
+Unity.exe -batchmode -quit -projectPath . -executeMethod CombatOverhaulReview.VerifyAudio -logFile combat-audio-compile.log
+```
+
+`horror_audio.py` replaces regular sawtooth groans with missing/jittered throat
+closures, noise-excited resonances, sub-rumble, breath, saliva clicks and foley.
+The Brute separately uses distorted octaves and cavern reflections. Combat cues
+combine blade drag, steel transients, flesh/bone, damped iron/wood and dry mail/dirt.
+The complete bank contains 40 mono PCM WAVs, including four dedicated new cue names:
+`parry`, `thunder_guard`, `phantom_cleave`, `splinter`. The match intro preloads
+combat clips to avoid first-contact loading hitches, and entering the menu clears
+the combat-drum intensity. `PlayAt` multiplies archetype
+pitch by a variation up to `Random.Range(0.92f, 1.08f)`; UI/music pitch stays fixed.
+
+The existing `music_menu.wav` is never written by regeneration and its before/after
+SHA-256 must match. `menu_theme_legacy.py` preserves the entire old generator verbatim,
+including the RNG preamble; only a missing menu is recreated in a temporary folder.
+A clean-room rebuild reproduced the shipped theme exactly. See
+[the audio source guide](../ArtSource/Audio/README.md) and its synthesis audit.
+
+The unused `com.unity.ai.inference` dependency was removed to eliminate its global
+`AttributeBasedFieldGenerator` warning. Its bundled `GraphConverter` indexed
+`classSymbols[0]` even when no neural-network operators existed in the gameplay
+assembly. No game scripts or assets use that package. Compiler warnings are not
+suppressed. Terrain navigation collects physical geometry through `NavMeshSurface`,
+so its obsolete `NavigationStatic` flag was also removed.
 
 ### Add a zombie type
 1. Add a value to `ZombieType` and a row to the table in `ZombieTypes.cs` (stats, tint, glow, points).

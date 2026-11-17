@@ -10,7 +10,7 @@ using UnityEngine.SceneManagement;
 // Runtime half of the automated smoke test (editor only, compiled out of builds).
 // Only wakes up when Temp/mw_smoke.txt exists, i.e. when SmokeTest started play mode.
 [DefaultExecutionOrder(200)]
-public class SmokeTestDriver : MonoBehaviour
+public partial class SmokeTestDriver : MonoBehaviour
 {
     string shotDir;
     readonly StringBuilder report = new StringBuilder();
@@ -195,8 +195,13 @@ public class SmokeTestDriver : MonoBehaviour
         foreach (var z in EnemyController.All.ToArray()) Destroy(z.gameObject);
         yield return null;
         health.InvulnerableUntil = float.PositiveInfinity;
+        if(File.Exists("Artifacts/CombatReviewOnly.txt"))
+        {
+            yield return ReviewCombatOverhaul(player,health);Finish(savedMode,savedDiff);yield break;
+        }
         yield return ReviewRevenants(player,health);
         yield return ReviewDamageContinuity(player);
+        yield return ReviewCombatOverhaul(player,health);
         if(File.Exists("Artifacts/DamageReviewOnly.txt")){Finish(savedMode,savedDiff);yield break;}
         yield return ReviewRunner(player,health);
         if(File.Exists("Artifacts/RunnerReviewOnly.txt")){Finish(savedMode,savedDiff);yield break;}

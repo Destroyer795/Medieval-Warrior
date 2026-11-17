@@ -6,7 +6,8 @@ public class MainController : MonoBehaviour
 {
     void Awake()
     {
-        Time.timeScale = 1f;
+        CombatTime.SetScale(1f);
+        AudioManager.SetBattleIntensity(0,true);
         Cursor.visible = true;
         Cursor.lockState = CursorLockMode.None;
 

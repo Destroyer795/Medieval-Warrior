@@ -35,6 +35,16 @@ public class AudioManager : MonoBehaviour
         return c;
     }
 
+    public static void WarmCombatBank()
+    {
+        foreach(string name in new[]{"sword_swing","sword_hit","shield_block","bow_draw","bow_release","arrow_hit","arrow_flesh","dodge","player_hurt",
+            "zombie_groan0","zombie_groan1","zombie_groan2","zombie_attack","zombie_die","brute_roar","spit","splat","bloater_fuse","explosion","emerge",
+            "parry","thunder_guard","phantom_cleave","splinter","boss_horn"})
+        {
+            var clip=Instance.Clip(name);if(clip!=null)clip.LoadAudioData();
+        }
+    }
+
     AudioSource FreeVoice(int priority = 128)
     {
         foreach (var v in voices) if (!v.isPlaying) return v;
@@ -87,7 +97,10 @@ public class AudioManager : MonoBehaviour
         v.priority = priority;
         v.transform.position = position;
         v.spatialBlend = spatialBlend;
-        v.pitch = Mathf.Clamp(basePitch + Random.Range(-pitchJitter, pitchJitter), 0.4f, 1.6f);
+        // Relative variation preserves each archetype's register while keeping
+        // every repeated enemy/combat contact subtly different. UI/music are fixed.
+        float variation=Mathf.Lerp(1,Random.Range(.92f,1.08f),Mathf.Clamp01(pitchJitter/.08f));
+        v.pitch = Mathf.Clamp(basePitch * variation, 0.4f, 1.6f);
         v.volume = volume * GameSettings.SfxVolume;
         v.clip = clip;
         v.Play();
@@ -115,7 +128,7 @@ public class AudioManager : MonoBehaviour
             : type == ZombieType.Bloater ? 0.76f : type == ZombieType.Runner ? 1.04f : 0.86f;
         float volume = ambient ? 0.5f : clip == "brute_roar" ? 0.95f : 0.75f;
         float filter = Mathf.Lerp(9000f, 2200f, Mathf.InverseLerp(5f, 40f, distance));
-        PlayAt(clip, position + Vector3.up * 1.2f, volume, 0.045f, pitch, filter, ambient ? 180 : 80, 1f);
+        PlayAt(clip, position + Vector3.up * 1.2f, volume, 0.08f, pitch, filter, ambient ? 180 : 80, 1f);
     }
 
     public static void PlayMusic(string name, float volume = 1f)

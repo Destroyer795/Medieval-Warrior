@@ -2,7 +2,8 @@ using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 
-public enum BoonId { Vigour, SwiftDraw, KeenEdge, SecondWind, Piercing, FireArrows, Quiver, Bulwark, Vampiric, FleetFoot, Bloodlust }
+public enum BoonId { Vigour, SwiftDraw, KeenEdge, SecondWind, Piercing, FireArrows, Quiver, Bulwark, Vampiric, FleetFoot, Bloodlust,
+    ThunderGuard, ReapersCleave, SplinterVolley, VampiricRiposte }
 
 // Upgrades the knight earns during a match (pick one of three). They reset every match.
 // Gameplay code reads the multipliers below; one-off effects happen in Apply.
@@ -28,6 +29,10 @@ public static class Boons
         new Def { id = BoonId.Vampiric, name = "Vampiric Blade", description = "Each sword kill restores 5 health.", icon = "potion", maxStacks = 3 },
         new Def { id = BoonId.FleetFoot, name = "Fleet Foot", description = "Move 12% faster.", icon = "stamina", maxStacks = 3 },
         new Def { id = BoonId.Bloodlust, name = "Bloodlust", description = "Kill streaks last 2 seconds longer.", icon = "skull", maxStacks = 3 },
+        new Def { id = BoonId.ThunderGuard, name = "Thunder Guard", description = "Perfect blocks and parries stun nearby undead with a thunder shockwave.", icon = "shield", maxStacks = 1 },
+        new Def { id = BoonId.ReapersCleave, name = "Reaper's Cleave", description = "The third sword strike sweeps a wider arc and burns with phantom flame.", icon = "sword", maxStacks = 1 },
+        new Def { id = BoonId.SplinterVolley, name = "Splinter Volley", description = "Arrows burst into shrapnel, damaging nearby undead. Works with piercing and fire.", icon = "arrow", maxStacks = 1 },
+        new Def { id = BoonId.VampiricRiposte, name = "Vampiric Riposte", description = "A successful parry or perfect block restores 6 health.", icon = "potion", maxStacks = 1 },
     };
 
     static readonly Dictionary<BoonId, int> stacks = new Dictionary<BoonId, int>();
@@ -49,6 +54,7 @@ public static class Boons
 
     public static void Apply(BoonId id, GameObject player)
     {
+        if(Stacks(id)>=Get(id).maxStacks)return;
         stacks[id] = Stacks(id) + 1;
         if (Total >= 6) Feats.Unlock("blessed");
         if (player == null) return;
@@ -79,4 +85,8 @@ public static class Boons
     public static float LifeSteal => 5f * Stacks(BoonId.Vampiric);
     public static float MoveSpeed => 1f + 0.12f * Stacks(BoonId.FleetFoot);
     public static float ComboWindow => 4f + 2f * Stacks(BoonId.Bloodlust);
+    public static bool ThunderGuard => Stacks(BoonId.ThunderGuard)>0;
+    public static bool ReapersCleave => Stacks(BoonId.ReapersCleave)>0;
+    public static bool SplinterVolley => Stacks(BoonId.SplinterVolley)>0;
+    public static float RiposteHeal => Stacks(BoonId.VampiricRiposte)>0 ? 6f : 0f;
 }

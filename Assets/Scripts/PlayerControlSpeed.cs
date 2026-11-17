@@ -570,37 +570,42 @@ public class PlayerControlSpeed : MonoBehaviour
     void CheckForHits(int step, int variant)
     {
         Vector3 hitPosition = transform.position + transform.forward + Vector3.up;
-        Collider[] hitColliders = Physics.OverlapSphere(hitPosition, attackRange);
+        bool phantom=step==2&&Boons.ReapersCleave;
+        Collider[] hitColliders = Physics.OverlapSphere(hitPosition, attackRange*(phantom?1.35f:1));
 
         HashSet<EnemyController> hitEnemies = new HashSet<EnemyController>();
         bool finisher = step == 2;
         float damage = (finisher ? 2f : 1f) * Boons.SwordDamage;
         float knock = finisher ? 7f : 2.5f;
+        int landedHits=0;
+        Vector3 swingDirection=SwordMoves.All[variant].thrust?transform.forward:
+            (transform.right*(step==1?-1:1)+transform.forward*.35f+Vector3.down*(finisher?.45f:0)).normalized;
 
         foreach (Collider hit in hitColliders)
         {
             EnemyController enemy = hit.GetComponentInParent<EnemyController>();
             if (enemy == null || enemy.IsDead || hitEnemies.Contains(enemy)) continue;
             Vector3 dir = (enemy.transform.position - transform.position).normalized;
-            if (Vector3.Dot(transform.forward, dir) > (SwordMoves.All[variant].thrust ? .65f : .3f))
+            if (Vector3.Dot(transform.forward, dir) > (phantom?-.2f:SwordMoves.All[variant].thrust ? .65f : .3f))
             {
                 Vector3 swordOrigin = swordHand != null ? swordHand.position : hitPosition;
                 Vector3 contact = hit.ClosestPoint(swordOrigin);
                 Vector3 toCollider = hit.bounds.center - swordOrigin;
                 if (toCollider.sqrMagnitude > 0.0001f && hit.Raycast(new Ray(swordOrigin, toCollider.normalized), out var swordHit, toCollider.magnitude))
                     contact = swordHit.point;
-                FX.Sparks(contact, -dir + Vector3.up * 0.15f);
-                bool landed=enemy.ReceiveWeaponHit(damage, dir, knock,contact);
+                bool landed=enemy.ReceiveWeaponHit(damage, dir, knock,contact,bloodDirection:swingDirection);
                 hitEnemies.Add(enemy); // one hit per enemy
+                if(landed){landedHits++;if(phantom)CombatBoons.PhantomHit(enemy,contact);}
                 if (enemy.IsDead && Boons.LifeSteal > 0f && myHealthScript != null) myHealthScript.Heal(Boons.LifeSteal);
                 if (landed&&GameManager.instance != null) GameManager.instance.RegisterMeleeHit(enemy);
             }
         }
 
-        if (hitEnemies.Count > 0)
+        if (landedHits > 0)
         {
-            AudioManager.PlayAt("sword_hit", hitPosition, 1f, 0.1f);
-            FX.Shake(finisher ? 0.35f : 0.18f);
+            AudioManager.PlayAt("sword_hit", hitPosition, 1f);
+            if(phantom)AudioManager.PlayAt("phantom_cleave",hitPosition,.7f);
+            FX.Impact(swingDirection,finisher?.48f:.18f,finisher?.065f:0);
         }
     }
 

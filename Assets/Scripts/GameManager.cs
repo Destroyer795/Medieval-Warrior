@@ -60,6 +60,12 @@ public class GameManager : MonoBehaviour
     bool warlordSpawned;
     float nextBruteTime;
     PlayerHealth playerHealth;
+    public float AtmosphereLevel {get;private set;}
+    bool atmosphereCaptured,baseFog;
+    int atmosphereScene;
+    float baseFogDensity,baseFogEnd,baseAmbientIntensity,baseSunIntensity,lastThreatCue=-99;
+    Color baseFogColor,baseAmbientSky,baseAmbientEquator,baseAmbientGround,baseSunColor;
+    Light battleSun;
 
     // =======================
     // UNITY
@@ -74,7 +80,7 @@ public class GameManager : MonoBehaviour
         }
 
         instance = this;
-        Time.timeScale = 1f;
+        CombatTime.SetScale(1f);
 
         // The castle, terrain and props live in the Background scene.
         // Load it here so the level also works when played straight from the editor.
@@ -84,7 +90,7 @@ public class GameManager : MonoBehaviour
 
     void OnDestroy()
     {
-        if (instance == this) instance = null;
+        if (instance == this){RestoreAtmosphere();CombatTime.SetScale(1);instance = null;}
     }
 
     void Start()
@@ -105,6 +111,7 @@ public class GameManager : MonoBehaviour
         MatchTime += Time.deltaTime;
         if (Combo > 0 && Time.time > comboExpires) Combo = 0;
         UpdateBattleMusic();
+        UpdateBattleAtmosphere();
 
         switch (State)
         {
@@ -151,9 +158,11 @@ public class GameManager : MonoBehaviour
 
         if (FindFirstObjectByType<GameHUD>() == null) new GameObject("Game HUD").AddComponent<GameHUD>();
         AudioManager.PlayMusic("ambient_meadow", 0.9f);
+        AudioManager.WarmCombatBank();
+        CaptureAtmosphere();
 
         LockCursor(true);
-        Time.timeScale = 1f;
+        CombatTime.SetScale(1f);
         State = MatchState.Intro;
         introTimer = 3.5f;
         GameHUD.Banner(GameSettings.ModeName(Mode), IntroLine(), 3.2f);
@@ -257,7 +266,10 @@ public class GameManager : MonoBehaviour
         var spawner = ZombieSpawner.Instance;
         var e = spawner != null ? spawner.Spawn(type, false) : null;
         if (e != null && type != ZombieType.Walker && introduced.Add(type))
+        {
             GameHUD.Announce($"{ZombieTypes.Get(type).name}: {ZombieTypes.Get(type).description}", new Color(1f, 0.75f, 0.45f));
+            if(type==ZombieType.Brute&&Time.time-lastThreatCue>8)ThreatStinger(type);
+        }
         return e;
     }
 
@@ -288,7 +300,7 @@ public class GameManager : MonoBehaviour
         if (choices.Length == 0) return;
         ChoosingBoon = true;
         BoonsOffered++;
-        Time.timeScale = 0f;
+        CombatTime.SetScale(0f);
         LockCursor(false);
         AudioManager.Play2D("heal", 0.8f);
         GameHUD.ShowBoons(choices, PickBoon);
@@ -299,7 +311,7 @@ public class GameManager : MonoBehaviour
         if (!ChoosingBoon) return;
         Boons.Apply(id, playerHealth != null ? playerHealth.gameObject : GameObject.FindWithTag("Player"));
         ChoosingBoon = false;
-        if (!isPaused && !gameEnded) { Time.timeScale = 1f; LockCursor(true); }
+        if (!isPaused && !gameEnded) { CombatTime.SetScale(1f); LockCursor(true); }
         GameHUD.Toast(Boons.Get(id).name + " gained", UIKit.Gold, Boons.Get(id).icon, 2.5f, 32);
         AudioManager.Play2D("pickup", 1f);
     }
@@ -314,6 +326,49 @@ public class GameManager : MonoBehaviour
         float level = Mathf.Clamp01(near / 4f);
         if (Boss != null && !Boss.IsDead) level = 1f;
         AudioManager.SetBattleIntensity(level);
+    }
+
+    void CaptureAtmosphere()
+    {
+        atmosphereCaptured=true;atmosphereScene=SceneManager.GetActiveScene().handle;
+        baseFog=RenderSettings.fog;baseFogDensity=RenderSettings.fogDensity;baseFogColor=RenderSettings.fogColor;baseFogEnd=RenderSettings.fogEndDistance;
+        baseAmbientIntensity=RenderSettings.ambientIntensity;baseAmbientSky=RenderSettings.ambientSkyColor;
+        baseAmbientEquator=RenderSettings.ambientEquatorColor;baseAmbientGround=RenderSettings.ambientGroundColor;
+        battleSun=RenderSettings.sun;
+        if(battleSun!=null){baseSunColor=battleSun.color;baseSunIntensity=battleSun.intensity;}
+    }
+    void UpdateBattleAtmosphere()
+    {
+        if(!atmosphereCaptured)return;
+        float pressure=Mode==GameMode.EndlessHorde?Mathf.Clamp01((Wave-1)/14f):Mode==GameMode.DefendTheCastle?
+            Mathf.Clamp01(currentKills/(float)Mathf.Max(1,targetKills)):Mathf.Clamp01(MatchTime/(GameSettings.Profile.lastStandMinutes*60));
+        if(Boss!=null&&!Boss.IsDead)pressure=Mathf.Max(pressure,.65f);
+        AtmosphereLevel=Mathf.MoveTowards(AtmosphereLevel,pressure,Time.deltaTime*.1f);
+        float level=AtmosphereLevel;
+        // Keep silhouettes readable with bounded darkening and cool fog/red light.
+        RenderSettings.fog=baseFog||level>.15f;
+        RenderSettings.fogDensity=Mathf.Lerp(baseFogDensity,Mathf.Clamp(baseFogDensity*1.8f,.0035f,.012f),level);
+        RenderSettings.fogEndDistance=Mathf.Lerp(baseFogEnd,baseFogEnd*.78f,level);
+        RenderSettings.fogColor=Color.Lerp(baseFogColor,new Color(.24f,.18f,.23f),level*.65f);
+        RenderSettings.ambientIntensity=baseAmbientIntensity*Mathf.Lerp(1,.82f,level);
+        RenderSettings.ambientSkyColor=Color.Lerp(baseAmbientSky,baseAmbientSky*new Color(.88f,.74f,.83f),level);
+        RenderSettings.ambientEquatorColor=Color.Lerp(baseAmbientEquator,baseAmbientEquator*new Color(.9f,.76f,.84f),level);
+        RenderSettings.ambientGroundColor=Color.Lerp(baseAmbientGround,baseAmbientGround*.82f,level);
+        if(battleSun!=null)
+        {
+            battleSun.color=Color.Lerp(baseSunColor,new Color(1,.34f,.28f),level*.72f);
+            battleSun.intensity=baseSunIntensity*Mathf.Lerp(1,.78f,level);
+        }
+    }
+    void RestoreAtmosphere()
+    {
+        if(!atmosphereCaptured)return;
+        if(battleSun!=null){battleSun.color=baseSunColor;battleSun.intensity=baseSunIntensity;}
+        // Don't overwrite a newly loaded menu's scene-owned RenderSettings.
+        if(SceneManager.GetActiveScene().handle!=atmosphereScene)return;
+        RenderSettings.fog=baseFog;RenderSettings.fogDensity=baseFogDensity;RenderSettings.fogColor=baseFogColor;RenderSettings.fogEndDistance=baseFogEnd;
+        RenderSettings.ambientIntensity=baseAmbientIntensity;RenderSettings.ambientSkyColor=baseAmbientSky;
+        RenderSettings.ambientEquatorColor=baseAmbientEquator;RenderSettings.ambientGroundColor=baseAmbientGround;
     }
 
     void UpdateTips()
@@ -337,8 +392,16 @@ public class GameManager : MonoBehaviour
         var spawner = ZombieSpawner.Instance;
         if (spawner == null) return;
         Boss = spawner.Spawn(type, true);
+        if(Boss==null)return;
+        ThreatStinger(type);
+    }
+    void ThreatStinger(ZombieType type)
+    {
+        lastThreatCue=Time.time;
         AudioManager.Play2D("boss_horn", 1f);
-        GameHUD.Banner(type == ZombieType.Warlord ? "The Warlord Approaches" : "A Brute Leads the Wave", "Bring it down!", 3f);
+        FX.Shake(.55f);
+        GameHUD.Banner(type == ZombieType.Warlord ? "<b>THE WARLORD APPROACHES</b>" : "<b>A BRUTE LEADS THE DEAD</b>",
+            type==ZombieType.Warlord?"Break his guard. Survive his charge.":"A towering horror enters the battle.",3.2f);
     }
 
     float damageAtWaveStart;
@@ -354,7 +417,7 @@ public class GameManager : MonoBehaviour
         spawnTimer = 1.5f;
         State = MatchState.Playing;
         GameHUD.Banner("Wave " + n, n % 5 == 0 ? "A champion of the dead leads this assault" : "They rise again...", 2.6f);
-        AudioManager.Play2D("wave_horn", 0.9f);
+        if(n%5!=0)AudioManager.Play2D("wave_horn", 0.9f);
         if (n % 5 == 0)
         {
             SpawnBoss(n % 10 == 0 ? ZombieType.Warlord : ZombieType.Brute);
@@ -410,9 +473,9 @@ public class GameManager : MonoBehaviour
 
     IEnumerator BossSlowMotion()
     {
-        Time.timeScale = 0.25f;
+        CombatTime.SetScale(0.25f);
         yield return new WaitForSecondsRealtime(1.3f);
-        if (!gameEnded && !isPaused && !ChoosingBoon) Time.timeScale = 1f;
+        if (!gameEnded && !isPaused && !ChoosingBoon) CombatTime.SetScale(1f);
     }
 
     public void RegisterArrowFired() => ArrowsFired++;
@@ -467,9 +530,9 @@ public class GameManager : MonoBehaviour
 
     IEnumerator SlowToStop()
     {
-        Time.timeScale = 0.35f;
+        CombatTime.SetScale(0.35f);
         yield return new WaitForSecondsRealtime(1.6f);
-        Time.timeScale = 0f;
+        CombatTime.SetScale(0f);
     }
 
     // =======================
@@ -486,7 +549,7 @@ public class GameManager : MonoBehaviour
     public void Pause()
     {
         if (gameEnded) return;
-        Time.timeScale = 0f;
+        CombatTime.SetScale(0f);
         isPaused = IsPaused = true;
         LockCursor(false);
         PauseChanged?.Invoke(true);
@@ -494,7 +557,7 @@ public class GameManager : MonoBehaviour
 
     public void Resume()
     {
-        Time.timeScale = ChoosingBoon ? 0f : 1f;
+        CombatTime.SetScale(ChoosingBoon ? 0f : 1f);
         isPaused = IsPaused = false;
         LockCursor(true);
         PauseChanged?.Invoke(false);
@@ -512,13 +575,13 @@ public class GameManager : MonoBehaviour
 
     public void RestartGame()
     {
-        Time.timeScale = 1f;
+        CombatTime.SetScale(1f);
         SceneManager.LoadScene("Semi-Final", LoadSceneMode.Single);
     }
 
     public void QuitGame()
     {
-        Time.timeScale = 1f;
+        CombatTime.SetScale(1f);
         LockCursor(false);
         SceneManager.LoadScene("MainMenu", LoadSceneMode.Single);
     }

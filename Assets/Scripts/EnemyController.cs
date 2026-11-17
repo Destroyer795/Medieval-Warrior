@@ -37,7 +37,7 @@ public class EnemyController : MonoBehaviour
     public float HealthFraction => MaxHealth > 0 ? Mathf.Clamp01(Health / MaxHealth) : 0f;
     public Vector3 HeadPosition => transform.position + Vector3.up * 1.9f * transform.localScale.y;
 
-    enum State { Emerging, Hunt, Circle, Attack, Kite, Fuse, Charge, Dead }
+    enum State { Emerging, Hunt, Circle, Attack, Kite, Fuse, Charge, Dead, Staggered }
     State state = State.Hunt;
 
     Animator animator;
@@ -50,6 +50,9 @@ public class EnemyController : MonoBehaviour
     RevenantVisual revenant;
     float guardBrokenUntil;
     Vector3? weaponImpact;
+    Vector3? weaponBloodDirection;
+    float staggerUntil;
+    public bool IsStaggered=>state==State.Staggered&&Time.time<staggerUntil;
     public bool IsAttacking=>state==State.Attack;
     public float AttackElapsed=>stateTimer;
     public int AttackStyle {get;private set;}
@@ -201,6 +204,11 @@ public class EnemyController : MonoBehaviour
         if (playerHealth != null && playerHealth.IsDead) { Idle(); return; }
 
         stateTimer += Time.deltaTime;
+        if(state==State.Staggered)
+        {
+            if(Time.time>=staggerUntil)SetState(type==ZombieType.Spitter?State.Kite:State.Hunt);
+            return;
+        }
         groanTimer -= Time.deltaTime;
         if (groanTimer <= 0f)
         {
@@ -227,13 +235,13 @@ public class EnemyController : MonoBehaviour
 
     void SetState(State s)
     {
-        if(state==State.Attack&&(s==State.Hunt||s==State.Circle||s==State.Kite)&&animator!=null&&animator.isInitialized)
+        if(state==State.Attack&&(s==State.Hunt||s==State.Circle||s==State.Kite||s==State.Staggered)&&animator!=null&&animator.isInitialized)
             animator.CrossFadeInFixedTime("Locomotion",.07f);
         state = s;
         stateTimer = 0f;
         hitDealt = false;
         weaponScanTime = 0;
-        if (navAgent != null && navAgent.enabled && navAgent.isOnNavMesh) navAgent.isStopped = s == State.Attack || s == State.Fuse || s == State.Charge;
+        if (navAgent != null && navAgent.enabled && navAgent.isOnNavMesh) navAgent.isStopped = s == State.Attack || s == State.Fuse || s == State.Charge || s==State.Staggered;
     }
 
     void Idle()
@@ -638,7 +646,7 @@ public class EnemyController : MonoBehaviour
 
     // Environmental damage and nonlethal hits continue the brain uninterrupted.
     // Only weapon contacts go through the physical guard rules.
-    public bool ReceiveWeaponHit(float amount,Vector3 direction,float knockback,Vector3 point,bool bash=false)
+    public bool ReceiveWeaponHit(float amount,Vector3 direction,float knockback,Vector3 point,bool bash=false,Vector3? bloodDirection=null)
     {
         if(IsDead||amount<=0||state==State.Emerging&&stateTimer<.4f)return false;
         bool frontal=Vector3.Dot(transform.forward,-Flat(direction).normalized)>.40f;
@@ -650,7 +658,8 @@ public class EnemyController : MonoBehaviour
         }
         if(!IsDead&&amount>0&&revenant!=null)revenant.Injuries.AddHit(point,direction);
         weaponImpact=revenant!=null?revenant.Injuries.LastBloodPoint:point;
-        try{TakeDamage(amount,direction,knockback);}finally{weaponImpact=null;}
+        weaponBloodDirection=bloodDirection;
+        try{TakeDamage(amount,direction,knockback);}finally{weaponImpact=null;weaponBloodDirection=null;}
         return true;
     }
     public bool GuardsContact(Vector3 direction,Vector3 point)
@@ -670,7 +679,7 @@ public class EnemyController : MonoBehaviour
         LastHitTime = Time.time;
         flashTimer = 1f;
         Damaged?.Invoke(this, amount, HeadPosition);
-        FX.Blood(weaponImpact??transform.position+Vector3.up*1.2f*transform.localScale.y,hitDirection+Vector3.up*.3f,Mathf.Clamp(amount,.6f,2.5f));
+        FX.Blood(weaponImpact??transform.position+Vector3.up*1.2f*transform.localScale.y,weaponBloodDirection??hitDirection+Vector3.up*.3f,Mathf.Clamp(amount,.6f,2.5f));
 
         if (Health <= 0f)
         {
@@ -734,13 +743,14 @@ public class EnemyController : MonoBehaviour
     float burnUntil, burnDps, emberTimer, burnAccum;
     GameObject burningFlames;
 
-    public void Ignite(float seconds, float dps)
+    public void Ignite(float seconds, float dps, Color? tint=null)
     {
         if (IsDead || seconds <= 0f || dps <= 0f) return;
         if (Time.time > burnUntil) AudioManager.PlayAt("explosion", transform.position, 0.15f, 0.3f);
         burnUntil = Mathf.Max(burnUntil, Time.time + seconds);
         burnDps = Mathf.Max(burnDps, dps);
-        if (burningFlames == null) burningFlames = FX.AttachFlame(transform, Vector3.up * 0.9f, 1.6f);
+        if (burningFlames == null) burningFlames = FX.AttachFlame(transform, Vector3.up * 0.9f, 1.6f,tint:tint);
+        else if(tint.HasValue)FX.TintFlame(burningFlames,tint.Value);
     }
 
     public bool IsBurning => Time.time < burnUntil && !IsDead;
@@ -911,10 +921,20 @@ public class EnemyController : MonoBehaviour
         hasToken = false;
     }
 
-    // Legacy parry hook: damage feedback without interrupting the enemy.
-    public void Stagger(Vector3 from, float force)
+    // A deliberate opening earned by parrying or Thunder Guard. Ordinary damage
+    // never enters this state and keeps navigation/attack clocks uninterrupted.
+    public void Stagger(Vector3 from, float force,float duration=.65f)
     {
-        TakeDamage(0.01f, (transform.position - from).normalized, force);
+        if(IsDead||Health<=0||state==State.Emerging)return;
+        staggerUntil=Mathf.Max(staggerUntil,Time.time+Mathf.Clamp(duration,.1f,1.2f));
+        guardBrokenUntil=Mathf.Max(guardBrokenUntil,staggerUntil);ReleaseToken();
+        SetState(State.Staggered);attackTimer=Mathf.Max(attackTimer,.35f);
+        if(animator!=null&&animator.isInitialized)
+        {
+            if(pAttack)animator.ResetTrigger(hAttack);
+            animator.CrossFadeInFixedTime("Locomotion",.055f);
+        }
+        if(revenant!=null)revenant.React((transform.position-from).normalized*Mathf.Max(1,force));
     }
 }
 

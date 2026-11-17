@@ -7,6 +7,7 @@ public class Arrow : MonoBehaviour
     float damage, knockback;
     Transform owner;
     bool stuck, fire, falling, stuckInEnemy;
+    bool splintered;
     EnemyController stuckIn;
     Vector3 fallVelocity, spin;
     int pierce;
@@ -123,6 +124,7 @@ public class Arrow : MonoBehaviour
         }
         else
         {
+            BurstSplinters(hit.point,null);
             if (fire) FX.Embers(hit.point, 8);
             AudioManager.PlayAt("arrow_hit", hit.point, 0.8f);
             FX.Dust(hit.point, 0.25f, 5);
@@ -199,7 +201,9 @@ public class Arrow : MonoBehaviour
     {
         bool headshot = point.y > enemy.transform.position.y + 1.45f * enemy.transform.localScale.y;
         float dmg = damage * (headshot ? 2f : 1f);
-        if(!enemy.ReceiveWeaponHit(dmg, velocity.normalized, knockback,point))return false;
+        if(!enemy.ReceiveWeaponHit(dmg, velocity.normalized, knockback,point)){BurstSplinters(point,enemy);return false;}
+        BurstSplinters(point,enemy);
+        if(headshot)FX.Impact(velocity.normalized,.28f,.055f);
         if (fire)
         {
             FX.Embers(point, 12);
@@ -216,5 +220,10 @@ public class Arrow : MonoBehaviour
         if (GameManager.instance != null) GameManager.instance.RegisterArrowHit(enemy, headshot);
         GameHUD.HitMarker(headshot);
         return true;
+    }
+    void BurstSplinters(Vector3 point,EnemyController primary)
+    {
+        if(splintered||!Boons.SplinterVolley)return;
+        splintered=true;CombatBoons.Splinters(point,velocity.normalized,primary,damage,fire);
     }
 }

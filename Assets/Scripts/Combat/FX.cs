@@ -8,7 +8,7 @@ public static class FX
     static Material flameMat;
     static MonoBehaviour runner;
 
-    public static GameObject AttachFlame(Transform parent, Vector3 localPosition, float size, bool addLight = false)
+    public static GameObject AttachFlame(Transform parent, Vector3 localPosition, float size, bool addLight = false, Color? tint = null)
     {
         var root = new GameObject("Burning Flames");
         root.transform.SetParent(parent, false);
@@ -55,7 +55,18 @@ public static class FX
             light.renderMode = LightRenderMode.ForceVertex;
         }
         ps.Play();
+        if(tint.HasValue)TintFlame(root,tint.Value);
         return root;
+    }
+
+    public static void TintFlame(GameObject flame,Color color)
+    {
+        if(flame==null)return;
+        foreach(var ps in flame.GetComponentsInChildren<ParticleSystem>())
+        {
+            var main=ps.main;main.startColor=Color.white;
+            Gradient(ps,color,new Color(color.r*.3f,color.g*.2f,color.b*.6f,0));
+        }
     }
 
     public static void Extinguish(GameObject flame)
@@ -127,8 +138,9 @@ public static class FX
         var ps = Make("Blood", pos, 0.1f, 0.9f);
         var main = ps.main;
         main.startLifetime = new ParticleSystem.MinMaxCurve(0.35f, 0.8f);
-        main.startSpeed = new ParticleSystem.MinMaxCurve(2f, 6f);
-        main.startSize = new ParticleSystem.MinMaxCurve(0.08f, 0.22f);
+        amount=Mathf.Clamp(amount,.3f,3f);
+        main.startSpeed = new ParticleSystem.MinMaxCurve(2.4f, 6.5f);
+        main.startSize = new ParticleSystem.MinMaxCurve(0.04f, 0.13f);
         main.gravityModifier = 1.6f;
         Color c = zombie ? new Color(0.35f, 0.42f, 0.08f, 1f) : new Color(0.6f, 0.03f, 0.03f, 1f);
         main.startColor = c;
@@ -139,9 +151,15 @@ public static class FX
         ps.transform.rotation = Quaternion.LookRotation(dir.sqrMagnitude > 0.01f ? dir : Vector3.up);
         Gradient(ps, c, c * 0.5f);
         Burst(ps, Mathf.RoundToInt(14 * amount));
+        var mist=Make("Directional blood mist",pos,.08f,.48f);var mm=mist.main;
+        mm.startLifetime=new ParticleSystem.MinMaxCurve(.16f,.4f);mm.startSpeed=new ParticleSystem.MinMaxCurve(.7f,2.3f);
+        mm.startSize=new ParticleSystem.MinMaxCurve(.2f,.45f);mm.startColor=new Color(c.r,c.g,c.b,.35f);
+        var cone=mist.shape;cone.shapeType=ParticleSystemShapeType.Cone;cone.angle=22;cone.radius=.04f;
+        mist.transform.rotation=ps.transform.rotation;Gradient(mist,new Color(c.r,c.g,c.b,.35f),new Color(c.r,c.g,c.b,0));
+        Burst(mist,Mathf.RoundToInt(4*amount));
     }
 
-    public static void Sparks(Vector3 pos, Vector3 normal)
+    public static void Sparks(Vector3 pos, Vector3 normal, float strength=1)
     {
         var ps = Make("Sparks", pos, 0.1f, 0.5f);
         var main = ps.main;
@@ -151,10 +169,38 @@ public static class FX
         main.gravityModifier = 1f;
         main.startColor = new Color(1f, 0.85f, 0.4f);
         var shape = ps.shape; shape.shapeType = ParticleSystemShapeType.Cone; shape.angle = 40f;
-        ps.transform.rotation = Quaternion.LookRotation(normal);
+        ps.transform.rotation = Quaternion.LookRotation(normal.sqrMagnitude>.001f?normal:Vector3.up);
         var r = ps.GetComponent<ParticleSystemRenderer>(); r.renderMode = ParticleSystemRenderMode.Stretch; r.velocityScale = 0.05f; r.lengthScale = 1.5f;
         Gradient(ps, new Color(1f, 0.9f, 0.5f, 1f), new Color(1f, 0.3f, 0.05f, 1f));
-        Burst(ps, 18);
+        Burst(ps, Mathf.Clamp(Mathf.RoundToInt(18*strength),8,48));
+    }
+
+    public static void ParryFlash(Vector3 point,Vector3 direction)
+    {
+        Sparks(point,direction,2.3f);Sparkle(point,new Color(1f,.94f,.7f),12);
+        var go=new GameObject("Perfect parry flash");go.transform.position=point;
+        var light=go.AddComponent<Light>();light.color=new Color(1,.9f,.65f);light.intensity=3;light.range=2.4f;light.shadows=LightShadows.None;
+        EnsureRunner();runner.StartCoroutine(ExpireFlash(go));
+    }
+    static IEnumerator ExpireFlash(GameObject go){yield return new WaitForSecondsRealtime(.09f);if(go!=null)Object.Destroy(go);}
+
+    public static void Shockwave(Vector3 point,float radius)
+    {
+        var ps=Make("Thunder Guard",point,.1f,.55f);var main=ps.main;
+        main.startLifetime=.28f;main.startSpeed=radius/.28f;main.startSize=.12f;main.startColor=new Color(.55f,.8f,1f);
+        var shape=ps.shape;shape.shapeType=ParticleSystemShapeType.Circle;shape.radius=.25f;
+        ps.transform.rotation=Quaternion.Euler(90,0,0);Gradient(ps,new Color(.75f,.9f,1),new Color(.2f,.4f,1,0));Burst(ps,60);
+        Sparks(point,Vector3.up,1.5f);
+    }
+    public static void Splinters(Vector3 point,Vector3 direction)
+    {
+        var ps=Make("Wooden shrapnel",point,.08f,.7f);var main=ps.main;
+        main.startLifetime=new ParticleSystem.MinMaxCurve(.2f,.65f);main.startSpeed=new ParticleSystem.MinMaxCurve(3,9);
+        main.startSize=new ParticleSystem.MinMaxCurve(.035f,.09f);main.startColor=new Color(.42f,.27f,.12f);main.gravityModifier=1.8f;
+        var shape=ps.shape;shape.shapeType=ParticleSystemShapeType.Sphere;shape.radius=.05f;
+        ps.transform.rotation=Quaternion.LookRotation(direction.sqrMagnitude>.001f?direction:Vector3.up);
+        var renderer=ps.GetComponent<ParticleSystemRenderer>();renderer.renderMode=ParticleSystemRenderMode.Stretch;renderer.lengthScale=2.5f;renderer.velocityScale=.04f;
+        Burst(ps,24);
     }
 
     public static void Dust(Vector3 pos, float size = 1f, int count = 12, Color? color = null)
@@ -240,20 +286,21 @@ public static class FX
         mr.sharedMaterial = ParticleMat;
         mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
         EnsureRunner();
-        runner.StartCoroutine(FadeSwipe(go, mr, step == 2));
+        bool phantom=step==2&&Boons.ReapersCleave;
+        runner.StartCoroutine(FadeSwipe(go, mr, step == 2,phantom));
     }
 
-    static IEnumerator FadeSwipe(GameObject go, MeshRenderer mr, bool heavy)
+    static IEnumerator FadeSwipe(GameObject go, MeshRenderer mr, bool heavy,bool phantom)
     {
         float life = heavy ? 0.18f : 0.14f;
         for (float t = 0; t < life && go != null; t += Time.deltaTime)
         {
             float k = t / life;
             float opacity = 1f - Mathf.SmoothStep(0f, 1f, k);
-            swipeBlock.SetColor("_TintColor", new Color(1f, 0.95f, 0.85f, opacity * (heavy ? 0.9f : 0.75f)));
-            swipeBlock.SetColor("_Color", new Color(1f, 0.95f, 0.85f, opacity * 0.75f));
+            Color tint=phantom?CombatBoons.PhantomColor:new Color(1,.95f,.85f);
+            tint.a=opacity*(heavy?.9f:.75f);swipeBlock.SetColor("_TintColor",tint);swipeBlock.SetColor("_Color",tint);
             mr.SetPropertyBlock(swipeBlock);
-            go.transform.localScale = Vector3.one * Mathf.Lerp(0.9f, 0.97f, k);
+            go.transform.localScale = Vector3.one * Mathf.Lerp(0.9f, 0.97f, k)*(phantom?1.4f:1);
             yield return null;
         }
         if (go != null) Object.Destroy(go);
@@ -293,6 +340,15 @@ public static class FX
     }
 
     // ------------------------------------------------------------ game feel
+
+    public static void HitStop(float seconds)=>CombatTime.HitStop(seconds);
+    public static void Impact(Vector3 direction,float strength,float hitStop=0)
+    {
+        Shake(strength);
+        var camera=Camera.main!=null?Camera.main.GetComponent<CameraFollow>():null;
+        if(GameSettings.CameraShake&&camera!=null)camera.AddImpact(direction,strength);
+        if(hitStop>0)HitStop(hitStop);
+    }
 
     public static void Shake(float amount)
     {

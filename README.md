@@ -20,7 +20,7 @@ The game continues to use Unity's built-in render pipeline.
 | Equipment | An upward-arched, battle-worn steel heater and a smaller right-hip quiver with spring suspension, arm/torso collision checks and physical arrows that follow the ammunition count. |
 | Camera and performance | Raw mouse look updates before movement, with responsive follow and reusable obstruction-query buffers. Cached collision geometry, bind transforms and cloth contact data reduce garment-simulation work. Gamepad look retains smoothing. |
 | Runner AI | Random left/right flanks, varied routes and sprint bursts, rear-quarter interception, a short committed strike and immediate breakaway. Runners strike only from the rear; turning to face a winding-up Runner cancels its attack. |
-| Damage reactions | All eight zombie types continue their current movement, attack, charge or fuse after nonlethal damage. Forced stagger, knockback and global melee hit-stop have been removed; damage feedback and death behavior remain. |
+| Damage reactions | Ordinary nonlethal hits preserve all eight zombie types' movement and attack clocks. Parries and Thunder Guard create deliberate stagger openings; confirmed heavy finishers and arrow criticals add brief hit-stop. |
 | Zombie roster | Eight Blender forms with distinct gaunt, muscular and bloated builds. Curved cuirasses, corrected palm/knuckle frames, continuous trousers, matte surfaces, anatomical wounds and blood at actual hits. Nine bone-driven hit volumes support strikes to exposed limbs and heads. The roster has 42 generic clips and two distance meshes per form. |
 | Spitter acid | Each impact creates an irregular, ground-following puddle with wet shading, surface bubbles and satellite splashes. The damaging area follows the visible main puddle's outline and spread. |
 | Customization and preview | Coordinated linen/metal/leather presets, preserved saved customization, a sharper antialiased character preview and updated art credits. |
@@ -115,6 +115,21 @@ Three difficulties (Squire / Knight / Warlord). High scores and best wave are sa
 way through Defend the Castle, and every minute of Last Stand: Vigour, Swift Draw, Keen Edge,
 Second Wind, Piercing Arrows, Fire Arrows (fully drawn shots set zombies ablaze), Great Quiver,
 Bulwark, Vampiric Blade, Fleet Foot and Bloodlust. They stack and last until the match ends.
+
+Four transformative boons add new combinations: **Thunder Guard** stuns nearby
+undead on a parry/perfect block; **Reaper's Cleave** widens the third sword strike
+and ignites phantom flame; **Splinter Volley** adds a cluster-damaging shrapnel
+burst to arrows, including piercing and fire arrows; **Vampiric Riposte** restores
+six health on a successful parry. Each transformation is a single-stack upgrade.
+
+**Combat feel and sound** — heavy finishers, arrow criticals and parries use
+55–75ms impact stops, directional camera kick, blood mist and sharper shield sparks.
+Pause and boon selection retain control of time. The undead now use irregular
+throat-rattle, breath and wet foley synthesis; layered steel, flesh, wood and mail
+give weapons weight. Positional voices vary subtly in pitch. The menu music is
+unchanged, verified by SHA-256. Later waves thicken fog and shift lighting toward
+a Blood Moon tone; champion waves announce their threat with a boss horn and banner.
+See [the audio source guide](ArtSource/Audio/README.md) for regeneration and menu protection.
 
 **UI** – medieval gold-and-iron interface: ornate health bar with damage trail, stamina bar,
 heraldic shield in your colours, objective plaque, combo meter, boss bar, weapon slots and arrow
@@ -258,11 +273,13 @@ topology and UV inspection on all 72 render/collision meshes. See the
 
 ## Validation and art regeneration
 
-The latest complete run passed **365 gameplay checks**, with no gameplay errors or
+The latest complete run passed **391 gameplay checks**, with no gameplay errors or
 exceptions. The Revenants review also checks all eight meshes, walking sole
 contacts, live surface streams and sword trajectories. The earlier warrior review
 passed 48 combat/pose checks and its hand topology audit. Saved reports:
 
+- [Horror audio, combat feedback and boon synergies](Docs/validation/2026-11-17-combat-audio.md)
+- [Complete 391-check gameplay report](Docs/validation/2026-11-17-combat-audio-gameplay.txt)
 - [Gameplay regression](Docs/validation/2026-11-16-gameplay.txt)
 - [Gameplay regression with the custom castle kit](Docs/validation/2026-11-16-buildings-gameplay.txt)
 - [Building geometry, placement, collision and navigation](Docs/validation/2026-11-16-buildings.md)

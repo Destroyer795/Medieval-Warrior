@@ -97,12 +97,11 @@ public class PlayerHealth : MonoBehaviour
         bool melee = enemy != null && !unblockable && Vector3.Distance(attacker.position, transform.position) < 4f;
         bool blocked = false;
 
-        if (isParrying && melee)
+        if (isParrying && melee && Vector3.Dot(transform.forward,(attacker.position-transform.position).normalized)>blockAngleThreshold)
         {
             if (parryEffect != null) parryEffect.Play();
             enemy.TakeDamage(1f, (attacker.position - transform.position).normalized, 7f);
-            FX.Sparks(transform.position + Vector3.up * 1.2f + transform.forward * 0.6f, transform.forward);
-            AudioManager.PlayAt("shield_block", transform.position, 1f);
+            SuccessfulParry(enemy);
             GameHUD.Toast("Parried!", UIKit.Gold, "swords");
             return;
         }
@@ -117,7 +116,7 @@ public class PlayerHealth : MonoBehaviour
                 AudioManager.PlayAt("shield_block", transform.position, 1f);
                 if (perfect)
                 {
-                    if (enemy != null) enemy.Stagger(transform.position, 8f);
+                    SuccessfulParry(enemy);
                     GameHUD.Toast("Perfect block!", UIKit.Gold, "shield");
                     Feats.Add("perfectblocks");
                     return;
@@ -144,6 +143,14 @@ public class PlayerHealth : MonoBehaviour
         }
         FX.Blood(transform.position + Vector3.up * 1.2f, attacker != null ? transform.position - attacker.position : Vector3.up, 1f, false);
         FX.Shake(Mathf.Clamp(amount / 30f, 0.15f, 0.8f));
+    }
+
+    void SuccessfulParry(EnemyController enemy)
+    {
+        Vector3 contact=transform.position+Vector3.up*1.2f+transform.forward*.6f;
+        if(enemy!=null)enemy.Stagger(transform.position,8f,enemy.isBoss?.4f:.65f);
+        FX.ParryFlash(contact,transform.forward);AudioManager.PlayAt("parry",contact,1f);
+        FX.Impact(transform.forward,.65f,.075f);CombatBoons.Parry(this,contact);
     }
 
     // Damage over time (acid pools): no hurt sound/knockback spam.

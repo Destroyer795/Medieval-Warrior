@@ -39,6 +39,7 @@ public class CameraFollow : MonoBehaviour
     private Camera cam;
     float orbitYaw, orbitPitch, yawVelocity, pitchVelocity, boomDistance, boomVelocity;
     Vector3 followPoint;
+    Vector3 impactAngles;
     RaycastHit[] collisionHits=new RaycastHit[32];
 
     // Input heading is independent of camera follow lag and trauma shake.
@@ -60,11 +61,16 @@ public class CameraFollow : MonoBehaviour
     }
 
     public void AddShake(float amount) => trauma = Mathf.Clamp01(trauma + amount);
+    public void AddImpact(Vector3 direction,float strength)
+    {
+        var local=Quaternion.Inverse(Quaternion.Euler(orbitPitch,orbitYaw,0))*direction.normalized;
+        impactAngles=Vector3.ClampMagnitude(impactAngles+new Vector3(-1.8f,local.x*2.8f,-local.x*2f)*strength,6);
+    }
 
     void Update()
     {
         if (target == null) return;
-        bool paused = Time.timeScale < 0.01f;
+        bool paused = Time.timeScale < 0.01f&&!CombatTime.IsHitStopped;
         if (paused) return;
         float dt = Mathf.Min(Time.unscaledDeltaTime, 0.05f);
 
@@ -99,7 +105,7 @@ public class CameraFollow : MonoBehaviour
 
     void LateUpdate()
     {
-        if(target==null||Time.timeScale<.01f)return;
+        if(target==null||Time.timeScale<.01f&&!CombatTime.IsHitStopped)return;
         float dt=Mathf.Min(Time.unscaledDeltaTime,.05f),e=aimBlend*aimBlend*(3-2*aimBlend);
         Quaternion rotation = Quaternion.Euler(orbitPitch, orbitYaw, 0);
         Vector3 targetPoint = target.position + Vector3.up * 1.5f;
@@ -123,6 +129,8 @@ public class CameraFollow : MonoBehaviour
         else boomDistance = Mathf.SmoothDamp(boomDistance, clear, ref boomVelocity, 0.18f, Mathf.Infinity, dt);
         transform.position = focusPoint + back * Mathf.Min(boomDistance, clear);
         transform.rotation = rotation;
+        transform.rotation*=Quaternion.Euler(impactAngles);
+        impactAngles*=Mathf.Exp(-20*dt);
 
         // SHAKE
         if (trauma > 0f)

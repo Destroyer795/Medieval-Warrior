@@ -226,14 +226,29 @@ how to add a zombie type / weapon / UI screen, and how to regenerate the world o
 The houses, defensive walls, towers, royal keep, bridges, doors and windows now use
 custom Blender geometry with bevelled masonry, timber framing, individual roof
 tiles, arch stonework and iron details. Three LODs share a 4K PBR atlas using the
-Built-in Standard shader. Separate closed collision shells retain deck/wall-walk
+Built-in Standard lighting model. Separate closed collision shells retain deck/wall-walk
 heights and keep camera, arrow and movement contacts independent of rendering detail.
+Half-timbered houses now use fully matte coarse lime plaster, cracked aged timber,
+unglazed weathered clay, and contact AO baked for every house/LOD. Their body
+materials disable specular highlights and environment reflections to eliminate
+the plastic sheen.
+Fortifications and foundations now add scanned stone PBR detail, 35 mm parallax
+relief, terrain-height dirt, crevice moss and vertical water staining. Baked vertex
+and terrain-contact AO ground the architecture and the bevelled arrow supply crates.
+See the [environment finishing pipeline](ArtSource/Buildings/Weathering.md).
 
 The existing prefab GUIDs and original mesh-local bounds/pivots are retained,
 including direct mesh overrides in the additive background scene. No terrain pads
 or placed building transforms are regenerated during import. The editable source,
 exact grid dimensions, budgets and rebuild commands are documented in
 [ArtSource/Buildings](ArtSource/Buildings/README.md).
+
+Village houses now have runnable alleys instead of overlapping or cramped gaps.
+The spacing pass opens 13 blocked/narrow house pairs, with a minimum 2.04m between
+house envelopes, and clears props from the resulting paths. Local ground pads,
+dirt paths, contact shading and navigation follow the revised layout. All 25 close
+passages passed capsule clearance, movement in both directions, and connected
+NavMesh routes. See the [pathway validation](Docs/validation/2026-11-17-house-pathways.md).
 
 Verification passed **8,055 building checks**, **260 navigation vicinity samples**
 and all **365 gameplay checks**. The saved Blender master independently passed
@@ -251,6 +266,7 @@ passed 48 combat/pose checks and its hand topology audit. Saved reports:
 - [Gameplay regression](Docs/validation/2026-11-16-gameplay.txt)
 - [Gameplay regression with the custom castle kit](Docs/validation/2026-11-16-buildings-gameplay.txt)
 - [Building geometry, placement, collision and navigation](Docs/validation/2026-11-16-buildings.md)
+- [Scanned masonry, weathering, baked contact and supply crates](Docs/validation/2026-11-17-environment-weathering.md)
 - [Revenant mesh and pose review](Docs/validation/2026-11-16-revenants.txt)
 - [Editable Blender action validation](Docs/validation/2026-11-16-revenant-source.json)
 - [Combat, defense and wrist clearance](Docs/validation/2026-11-08-combat-clearance.txt)
@@ -276,7 +292,7 @@ remain ignored; selected screenshots and verification reports are kept under `Do
 
 ## Credits & licences
 
-- Architecture: custom Blender castle kit and procedural PBR textures, authored for this project. The original *Medieval Castle* pack by Advance Studios remains as the dimensional/layout reference, with its prefab identities and licence retained. [Building source and rebuild instructions](ArtSource/Buildings/README.md).
+- Architecture: custom Blender castle kit and house atlas, with CC0 *Castle Wall Slates* and *Rock Wall 02* scans by Rob Tuytel / Poly Haven for the masonry finish. The original *Medieval Castle* pack by Advance Studios remains as the dimensional/layout reference, with its prefab identities and licence retained. [Building source, credits and rebuild instructions](ArtSource/Buildings/Weathering.md).
 - Knight animation rig and clips: *Toon RTS* demo by Polygon Blacksmith.
   Zombie: *Free Zombie* pack. (Unity Asset Store free assets.)
 - Terrain textures and sky HDRI: [Poly Haven](https://polyhaven.com) (CC0), colour-graded for the game.

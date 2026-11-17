@@ -157,11 +157,56 @@ material supports instancing; separate closed low-detail physics shells are used
 at every LOD. See [the building source guide](../ArtSource/Buildings/README.md) for
 exact dimensions, triangle budgets and the 0.2 mm closed CastleTop slab exception.
 
+For house material changes, run `buildings.py -- --only Textures` followed by
+`BuildingBuilder.RefreshSurfacesAndReview`. `building_surfaces.py` generates coarse
+stucco, aged cracked wood, matte clay and geometry-derived contact AO at every LOD.
+`BuildingSurfaces.cs` creates six Standard house-body materials with both specular
+highlights and glossy environment reflections disabled. Smoothness is zero for
+the dry atlas cells; iron/glass on separate detail renderers keep their own response.
+Per-house/LOD occlusion maps use the existing UV0 charts. This refresh preserves
+mesh/collider assets, both UV channels, transforms and NavMesh data. The report is
+`ArtSource/Buildings/surface-audit.json`; the review includes a world-lighting view.
+
+The current masonry finishing stage adds `environment_finishes.py`, with scanned
+CC0 maps pinned by `download_building_scans.py`, baked vertex AO and an authored
+supply crate. `WeatheredArchitecture.shader` uses the Built-in Standard lighting
+model with metric cylindrical/planar projection and distance-limited POM. The
+`ApplyEnvironmentFinishAndReview` utility installs module material variants,
+retains crate mesh/prefab/collision identities, bakes sparse terrain-contact shading
+and records close-ups. `EnvironmentSurfaceLighting` binds the terrain-height map
+once per scene load; it has no Update loop. Ground contact geometry has no collider
+and never enters the physics NavMesh bake. Reapply this stage after rebuilding the
+world or changing terrain/layout. Full commands, source attribution and performance
+limits are in [Weathering.md](../ArtSource/Buildings/Weathering.md).
+
 Use this targeted importer/rebake when changing architecture. The broader environment
 builder also rebuilds terrain pads and re-seats buildings. `RebakeNavigation`
 preserves the existing NavMeshData GUID and player/spawn transforms. Do not export
 a new reference baseline from already-replaced prefabs. Vendor FBXs/licences remain
 as layout references; the replacement geometry and atlas images are project-authored.
+
+The village now has a separate, explicit house-spacing revision in
+`Tools/ArtPipeline/Buildings/path-layout.json`. `BuildingPaths.cs` opens the 13
+originally narrow/overlapping house pairs, using oriented house bounds rather than
+centre spacing. Minimum separation is 2.04m including roof edges. Only existing
+house roots translate in XZ; elevations, rotation, scale and fortifications stay
+fixed. `BuildingReview` applies these recorded translations to root and descendant
+mesh expectations, while retaining the immutable source-art reference and all
+other compatibility checks.
+
+Run **Buildings → Fix house pathways and rebake navigation** (batch method:
+`BuildingBuilder.FixHousePaths`) to refresh local pads, attached plinths/dressing,
+dirt paths, prop clearance, terrain contact AO and navigation. Existing supply-crate
+pickup children and respawn settings are retained. The normal environment rebuild
+calls `PrepareHousePassagesForEnvironment` before baking navigation so newly
+scattered rocks, bushes and crates respect the same reserved corridors.
+`BuildingBuilder.VerifyHousePaths` performs clearance, bidirectional sprint-step
+collision tests and direct NavMesh routes through 25 alleys, also verifying they
+connect to the player start. The player uses a Rigidbody capsule at runtime;
+the editor locomotion probe uses an actual CharacterController with matching
+radius/height and slope limit, supplemented by the full gameplay smoke suite.
+Results are in `ArtSource/Buildings/pathways-audit.json` and
+[the pathway validation record](validation/2026-11-17-house-pathways.md).
 
 ### Run the automated play-test
 `Medieval Warrior → Run Smoke Test`, or in batch:

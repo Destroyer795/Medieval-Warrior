@@ -7,7 +7,11 @@ Advance Studios prefabs. The vendor FBXs remain as dimensional references; Unity
 does not import the `.blend` file at runtime or require Blender to play/build.
 
 The geometry, atlas images and Python construction are authored for this project.
-The original pack's prefab GUIDs, scene layout and associated licence remain in use.
+The original pack's prefab GUIDs and associated licence remain in use. The village
+layout now includes the reviewed house-spacing revision described below.
+The masonry finish now adds scanned CC0 Poly Haven PBR maps, metric parallax relief,
+terrain-aware weathering and baked vertex/ground contact. See the
+[weathering pipeline and source credits](Weathering.md).
 
 ## Grid, axes and compatibility
 
@@ -16,6 +20,26 @@ The baseline in [`reference.json`](../../Tools/ArtPipeline/Buildings/reference.j
 contains exact mesh-local bounds, pivots, child matrices, prefab/component IDs and
 scene mesh transforms. The legacy import uses `globalScale: 100`; its resulting
 Unity mesh coordinates, rather than the FBX's nominal units, are authoritative.
+
+The later pathway fix translates 28 of the 37 placed houses horizontally to open
+13 originally obstructed or narrow house pairs. House envelopes, including eaves
+and doorway details, are separated by at least 2.04 metres. Rotations, scales,
+vertical placement, fortification/bridge placement and all asset IDs remain intact.
+[`path-layout.json`](../../Tools/ArtPipeline/Buildings/path-layout.json) records
+these intentional translations against the unchanged original baseline; review
+continues to reject unrecorded transform changes and non-house layout overrides.
+
+Use **Medieval Warrior → Buildings → Fix house pathways and rebake navigation**
+or run `BuildingBuilder.FixHousePaths` in Unity batch mode. This seats local terrain
+pads, moves foundation plinths and nearby dressing, clears blocking props, paints
+walkable dirt lanes, refreshes terrain-contact AO and preserves the NavMesh asset
+GUID while rebaking it. Repeating the command retains the reviewed positions.
+The regular environment rebuild also reserves these alleys when scattering props.
+`VerifyHousePaths` tests 25 close house passages with the actual 0.3m player capsule
+radius: 1,568 clearance probes, sprint-sized movement steps in both directions,
+direct navigation through each alley, and connectivity from the player start.
+See [`pathways-audit.json`](pathways-audit.json) and the
+[pathway validation record](../../Docs/validation/2026-11-17-house-pathways.md).
 
 | Module | Local bounding dimensions X × Y × Z | Connection convention |
 |---|---|---|
@@ -63,7 +87,10 @@ Representative triangle budgets, per reusable module:
 | Bridge bay | <10k | <2k | <600 |
 
 LOD screen thresholds are 0.38, 0.13 and 0.008. Geometry is shared across instances;
-all meshes use one instancing-enabled Built-in **Standard** material. LOD children
+all meshes share the architectural atlas and a Built-in **Standard lighting model**
+surface shader. Houses use six instancing-enabled
+dry material variants (one per form/LOD) with their own contact AO; other modules use
+shared variants per module for metric stone projection. LOD children
 have no colliders. Physics uses closed, welded, low-detail static MeshCollider
 proxies, retaining deck surfaces, merlons, arches and roof silhouettes. Houses have
 closed wall/floor shells around an entrance behind the retained hinged door. The keep's
@@ -80,12 +107,49 @@ procedural originals with chisel pits, wood grain, mineral variation and weather
 | Albedo.png | sRGB, mipmapped | `_MainTex` |
 | Normal.png | Normal Map, linear, mipmapped | `_BumpMap` |
 | Masks.png | Linear RGBA, mipmapped | R metallic, G occlusion, B height reserve, A smoothness |
+| HouseAO/*.png | Linear, mipmapped | Geometry-derived per-house/LOD `_OcclusionMap` |
+| Masonry/* | Albedo sRGB; normals typed Normal; packed maps linear | Scanned stone/rock albedo, normal, AO/height/smoothness |
 
 UV0 has separate, non-overlapping planar face charts within the appropriate atlas
 cell. UV1 independently packs orthonormal face charts across the unit square for
 lightmapping. Charts are padded and never stretched to fill their rectangles.
 Different **assets** share the same atlas cells intentionally. No vendor bitmap or
-mesh vertices are copied into the new assets.
+mesh vertices from the original castle pack are copied into the new assets.
+
+## Dry half-timbered house finish
+
+Plaster, structural timber, oak planks and red clay have **zero smoothness** in the
+packed mask. Plaster uses multiscale trowel relief, aggregate, grit and pinholes.
+Timber has warped longitudinal fibres, knots, deep irregular cracks, bleached ridges
+and water-darkened patches. Clay is unglazed, granular and mottled with mineral
+deposits, erosion and environmental staining. The historical internal palette name
+`Oiled dark oak` remains a stable source identifier; its finish is now dry aged timber.
+
+All six house-body materials set `_SpecularHighlights` and `_GlossyReflections` to
+zero and enable the matching Standard shader OFF keywords. Separate window/door
+materials retain the iron/glass response. The editable Blender palette also sets
+roughness to 1 and specular IOR level to 0 for the dry surfaces. Packed masks use
+`CHANNEL_PACKED` alpha handling so zero smoothness never destroys their RGB data.
+
+`building_surfaces.py` casts 20 cosine-weighted BVH rays from each mesh vertex and
+face centre, with a 0.065 local-unit radius. It rasterises contact occlusion into
+each LOD's existing UV0 charts, including roof overlaps and timber/plaster joints.
+Centre samples keep open faces bright. Maps are 2048² / 1024² / 512² for LOD0/1/2,
+with padded charts and micro-occlusion combined into G. Bakes isolate each house
+from the other source collections. Geometry, colliders and both UV layouts stay intact.
+
+For a material-only revision:
+
+```powershell
+blender --background --python-exit-code 1 --python Tools/ArtPipeline/buildings.py -- --only Textures
+Unity.exe -batchmode -quit -projectPath . -executeMethod BuildingBuilder.RefreshSurfacesAndReview -logFile buildings-surfaces.log
+```
+
+The Unity menu **Buildings → Refresh matte house surfaces** updates materials on
+prefabs and direct scene overrides without rebuilding meshes or navigation.
+The batch review also records a view under the existing world lighting. See
+[`surface-audit.json`](surface-audit.json) and
+[`House_WorldLighting.png`](Review/House_WorldLighting.png).
 
 ## Rebuild and integrate
 
@@ -93,8 +157,11 @@ From the repository root, using Blender 4.5 LTS and Unity 6000.3.2f1:
 
 ```powershell
 blender --background --python Tools/ArtPipeline/buildings.py
+blender --background --python Tools/ArtPipeline/download_building_scans.py
+blender --background --python Tools/ArtPipeline/environment_finishes.py
 blender --background --python Tools/ArtPipeline/audit_buildings.py
 Unity.exe -batchmode -quit -projectPath . -executeMethod BuildingBuilder.BuildAndReview -logFile buildings-import.log
+Unity.exe -batchmode -quit -projectPath . -executeMethod BuildingBuilder.ApplyEnvironmentFinishAndReview -logFile environment-finish.log
 Unity.exe -batchmode -quit -projectPath . -executeMethod BuildingBuilder.RebakeNavigation -logFile buildings-navigation.log
 Unity.exe -batchmode -projectPath . -executeMethod SmokeTest.RunBatch -shotDir Artifacts/Buildings/Smoke -logFile buildings-smoke.log
 ```
@@ -119,7 +186,7 @@ it refuses to overwrite the baseline after integration. Do not run it as a norma
 rebuild step. Commit `reference.json`, `manifest.json`, source, textures, generated
 Unity assets, changed prefabs/scenes and reports. Ignore binary buffers/backups.
 
-`Review` checks original bounds, component IDs, world matrices, mesh references,
+`Review` checks original bounds, component IDs, reviewed world matrices, mesh references,
 LOD budgets, normals, UV channels and collision contacts. It exercises raycasts,
 camera sphere casts and actual `CharacterController.Move` on every bridge bay and
 the wall walk. `RebakeNavigation` reuses the existing NavMeshData GUID and verifies

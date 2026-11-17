@@ -13,6 +13,15 @@ Run **Medieval Warrior → Buildings → Import Blender kit and review** followe
 **Rebake navigation and verify routes**. The importer keeps original prefab GUIDs,
 mesh-local pivots/bounds and placed transforms. See the [building source guide](../../ArtSource/Buildings/README.md)
 for exact commands, grid conventions, budgets, UV layouts and verification evidence.
+`building_surfaces.py` supplies dry stucco, aged cracked timber, weathered unglazed
+clay and per-house/LOD contact AO. `buildings.py -- --only Textures` refreshes the
+packed master and images; `BuildingBuilder.RefreshSurfacesAndReview` updates only
+materials and captures the finish in the existing game lighting.
+The final environment stage is `environment_finishes.py`: it packs verified CC0
+photogrammetry maps, bakes vertex AO and authors the bevelled supply crate. Fetch
+raw sources with `download_building_scans.py`, then run the Blender stage and
+`BuildingBuilder.ApplyEnvironmentFinishAndReview`. See [the finishing guide](../../ArtSource/Buildings/Weathering.md)
+for the POM shader, ground-contact bake, exact commands and source licences.
 
 The Marchwarden warrior and equipment use Blender 4.5 LTS instead of
 these Python dependencies. See [the editable art source](../../ArtSource/Marchwarden/README.md)

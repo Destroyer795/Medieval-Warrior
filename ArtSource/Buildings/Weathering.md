@@ -57,9 +57,9 @@ instead of multiplying duplicate estimates into excessively dark facades.
 
 The scene bake casts eight upward hemisphere rays near the actual architecture
 and crates. It samples terrain height and collider geometry, omitting raised
-objects from ground-contact placement. After opening the village alleys, the bake uses **99,884 terrain
+objects from ground-contact placement. After the village slope/prop fixes, the bake uses **99,898 terrain
 probes**. A filtered 2048² contact map is drawn by a sparse terrain-conforming mesh
-of **32,004 triangles**. This mesh has no collider, casts no shadows, uses the
+of **31,914 triangles**. This mesh has no collider, casts no shadows, uses the
 Ignore Raycast layer, and does not enter physics-based NavMesh collection.
 
 Soft directional shadow filtering stays enabled. Shadow bias is reduced to 0.015,

@@ -41,6 +41,17 @@ direct navigation through each alley, and connectivity from the player start.
 See [`pathways-audit.json`](pathways-audit.json) and the
 [pathway validation record](../../Docs/validation/2026-11-17-house-pathways.md).
 
+The subsequent slope pass surveyed 56 corridors, softened three steep walking
+strips using 1,603 local height samples, and cleared 72 props from wider village
+routes. All surveyed walking surfaces are now below 32 degrees, compared with
+44.6/42.1 degrees at the two worst original inclines. House/fortification transforms
+and existing prefab identities remain fixed. Route junctions use actual collision
+hulls; supply crates retain their pickup children after being moved aside.
+`SoftenHouseSlopes` and `ClearVillageRoutes` refresh the local terrain/contact and
+navigation assets without rebuilding the whole environment. The current geometry
+survey is [`slope-audit.json`](slope-audit.json); runtime movement is verified using
+the real Rigidbody player rather than only a CharacterController probe.
+
 | Module | Local bounding dimensions X × Y × Z | Connection convention |
 |---|---|---|
 | House A | 1.253385 × 1.621652 × 2.000000 | Gabled ends at Z ±1; preserve separate door/window nodes |

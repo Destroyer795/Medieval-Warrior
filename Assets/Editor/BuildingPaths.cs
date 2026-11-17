@@ -191,13 +191,13 @@ public static partial class BuildingBuilder
             throw new Exception("House spacing needs a manual layout review: "+house.name);
     }
 
-    static List<HouseLane> HouseLanes(HousePathInspection layout)
+    static List<HouseLane> HouseLanes(HousePathInspection layout,float maximumGap=HousePassageWidth+.45f)
     {
         var lanes=new List<HouseLane>();
         for(int i=0;i<layout.houses.Length;i++)for(int j=i+1;j<layout.houses.Length;j++)
         {
             var a=layout.houses[i];var b=layout.houses[j];float gap=PassageGap(a,b,out var d);
-            if(gap>HousePassageWidth+.45f)continue;
+            if(gap>maximumGap)continue;
             var side=new Vector2(-d.y,d.x);var ac=a.Corners();var bc=b.Corners();
             float lo=Mathf.Max(ac.Min(p=>Vector2.Dot(p,side)),bc.Min(p=>Vector2.Dot(p,side)));
             float hi=Mathf.Min(ac.Max(p=>Vector2.Dot(p,side)),bc.Max(p=>Vector2.Dot(p,side)));
@@ -322,7 +322,7 @@ public static partial class BuildingBuilder
         {
             var p=new Vector2(origin.x+(ix+x)*size.x/n,origin.z+(iz+z)*size.z/n);
             float distance=lanes.Min(l=>SegmentDistance(p,l.start,l.end));if(distance>1.35f)continue;
-            float target=(1-Mathf.SmoothStep(.55f,1.35f,distance))*.8f;
+            float target=(1-Mathf.SmoothStep(0,1,Mathf.InverseLerp(.55f,1.35f,distance)))*.8f;
             float w=alpha[z,x,dirt]>=target?0:(target-alpha[z,x,dirt])/Mathf.Max(.0001f,1-alpha[z,x,dirt]);
             for(int layer=0;layer<alpha.GetLength(2);layer++)alpha[z,x,layer]=Mathf.Lerp(alpha[z,x,layer],layer==dirt?1:0,w);
         }
@@ -347,7 +347,7 @@ public static partial class BuildingBuilder
     // new random rocks, shrubs and supply crates out of the same reserved alleys.
     public static void PrepareHousePassagesForEnvironment(Scene game,Terrain terrain)
     {
-        var layout=ReadLoadedHouseLayout(game);var lanes=HouseLanes(layout);if(lanes.Count==0)return;
+        var layout=ReadLoadedHouseLayout(game);var lanes=VillageRoutes(layout,terrain);if(lanes.Count==0)return;
         Physics.SyncTransforms();ClearLaneProps(terrain,layout,lanes);PaintHousePaths(terrain,lanes);
     }
 

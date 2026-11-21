@@ -1,8 +1,9 @@
-# Procedural SFX + music for Medieval Warrior. Everything synthesised, no samples.
+# Combat effects, music and recorded trumpet cues for Medieval Warrior.
 import sys, wave
 import hashlib, json, shutil, subprocess, tempfile
 from pathlib import Path
 from horror_audio import build_bank
+from trumpet_cues import write_cues
 import numpy as np
 from scipy import signal
 
@@ -14,12 +15,6 @@ SR = 44100
 rng = np.random.default_rng(7)
 
 def t(d): return np.arange(int(SR * d)) / SR
-def env(n, a, r, sustain=None):
-    e = np.ones(n)
-    na = max(1, int(a * SR)); e[:na] = np.linspace(0, 1, na)
-    if r > 0:
-        nr = min(n, int(r * SR)); e[-nr:] *= np.linspace(1, 0, nr) ** 2
-    return e
 def expdecay(n, k): return np.exp(-np.arange(n) / SR * k)
 def noise(d): return rng.uniform(-1, 1, int(SR * d))
 def bp(x, lo, hi, order=2): return signal.sosfilt(signal.butter(order, [lo, hi], 'bandpass', fs=SR, output='sos'), x)
@@ -69,21 +64,7 @@ save('ui_click', lp(noise(0.05), 2500) * expdecay(int(SR * 0.05), 90) + 0.4 * np
 save('ui_hover', np.sin(2 * np.pi * 1200 * t(0.06)) * expdecay(int(SR * 0.06), 60), peak=0.2)
 save('no_ammo', pluck(330, 0.15, 0.95, 0.3) * expdecay(int(SR * 0.15), 30), peak=0.4)
 
-def horn(notes, dur=0.55):
-    out = []
-    for f, d in notes:
-        n = int(SR * d * dur / 0.55)
-        vib = 1 + 0.006 * np.sin(2 * np.pi * 5.5 * np.arange(n) / SR)
-        ph = 2 * np.pi * np.cumsum(f * vib) / SR
-        tone = signal.sawtooth(ph) * 0.6 + signal.square(ph) * 0.15
-        brightness = np.linspace(800, 2600, n) ** 1
-        tone = lp(tone, 2200) * env(n, 0.06, 0.15)
-        out.append(tone)
-    return np.concatenate(out)
-save('wave_horn', horn([(147, 0.5), (220, 0.5), (220, 1.4)]))
-save('victory', horn([(196, 0.25), (247, 0.25), (294, 0.25), (392, 1.2)]) + 0.0)
-save('defeat', horn([(196, 0.6), (185, 0.6), (147, 1.6)]))
-save('boss_horn', horn([(98, 0.8), (98, 0.3), (131, 1.6)]))
+write_cues(OUT)
 
 # --- ambience: wind + occasional birds (loopable, 24s)
 D = 24

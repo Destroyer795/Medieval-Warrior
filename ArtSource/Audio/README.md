@@ -1,7 +1,8 @@
 # Combat and horror audio
 
-All effects are procedurally synthesized; no recorded or third-party samples are
-used. Rebuild from the repository root with Python 3.10+ and NumPy/SciPy installed:
+Combat effects use procedural synthesis. The four trumpet cues use acoustic
+recordings. Rebuild from the repository root with Python 3.10+ and NumPy/SciPy
+installed.
 
 ```powershell
 python Tools/ArtPipeline/sfx.py Assets/Resources/Audio
@@ -22,9 +23,8 @@ cues distinguish defensive timing and the transformative boons.
 
 The output is mono 16-bit PCM at 44.1kHz, suitable for positional playback, with
 high-pass/DC cleanup, softened peaks, short boundary fades and 0.9 peak headroom.
-The existing UI, horn and meadow recipes are retained. The separate
-`extra_audio.py` still owns the battle drum loop and footsteps. Forty WAV files
-are present in the complete committed bank; a fresh run of `sfx.py` creates 35.
+The separate `extra_audio.py` generates the battle drum loop and footsteps.
+A fresh run of `sfx.py` creates 35 files.
 `AudioManager.PlayAt` varies pitch by at most ±8% relative to the archetype's base
 register; UI and music playback keep their requested pitch.
 
@@ -40,6 +40,40 @@ briefly lower the battle/ambience bed; menu music is excluded from this ducking.
 clearance noise. The old 110Hz musical pluck is no longer used by the effects
 generator. Its copy in the frozen menu recipe remains untouched.
 
+## Recorded trumpets
+
+`wave_horn`, `boss_horn`, `victory` and `defeat` use original phrases built from
+Versilian Studios' VSCO 2 Community Edition trumpet recordings. Sam Gossner and
+Simon Dalzell recorded the library, with sample cutting by Elan Hickler /
+Soundemote. The publisher released it under CC0 1.0. [Source
+recordings](https://github.com/sgossner/VSCO-2-CE/tree/440300901dfe9275fd84e0b7763af1f8443ae62e/Brass/Trumpet)
+and [license](https://github.com/sgossner/VSCO-2-CE/blob/440300901dfe9275fd84e0b7763af1f8443ae62e/LICENSE).
+
+The takes in `Trumpet/` are 44.1 kHz mono excerpts of the stereo originals. Their
+names give the sounding pitch. The upstream filenames use octave numbers one
+lower. The cue renderer sets the phrases and levels, shapes releases, and blends a
+short reflection tail. The boss call uses the adjacent recorded D for its D-flat.
+
+| Local take | Upstream file |
+| --- | --- |
+| `G4-short-a.wav` | `stac/Sum_SHTrumpet_stac_G3_v2_rr1.wav` |
+| `G4-short-b.wav` | `stac/Sum_SHTrumpet_stac_G3_v2_rr2.wav` |
+| `Bb4-short.wav` | `stac/Sum_SHTrumpet_stac_A#3_v2_rr1.wav` |
+| `D5-short.wav` | `stac/Sum_SHTrumpet_stac_D4_v2_rr1.wav` |
+| `F5-short.wav` | `stac/Sum_SHTrumpet_stac_F4_v2_rr1.wav` |
+| `G4-vibrato.wav` | `susvib/Sum_SHTrumpet_susvib_G3_v2_rr1.wav` |
+| `D5-vibrato.wav` | `susvib/Sum_SHTrumpet_susvib_D4_v2_rr1.wav` |
+| `F5-vibrato.wav` | `susvib/Sum_SHTrumpet_susvib_F4_v2_rr1.wav` |
+| `Bb4-soft.wav` | `sus/Sum_SHTrumpet_sus_A#3_v1_rr1.wav` |
+| `G4-strong.wav` | `sus/Sum_SHTrumpet_sus_G3_v3_rr1.wav` |
+| `D5-strong.wav` | `sus/Sum_SHTrumpet_sus_D4_v3_rr1.wav` |
+
+Run the trumpet renderer on its own with NumPy to rebuild these four WAVs.
+
+```powershell
+python Tools/ArtPipeline/trumpet_cues.py Assets/Resources/Audio
+```
+
 ## Protected menu theme
 
 The shipped `music_menu.wav` is never opened for writing during regeneration.
@@ -54,7 +88,7 @@ the menu file is absent does the wrapper run this frozen recipe in a temporary
 folder and copy just the resulting menu WAV. It never copies those legacy effects
 into the game bank. A clean-room rebuild reproduced the shipped menu hash exactly.
 
-The generated [synthesis audit](synthesis-audit.json) records sample rate, duration,
+The generated [audio audit](synthesis-audit.json) records sample rate, duration,
 peak, RMS, DC and SHA-256 for each clip. The Unity editor command **Medieval Warrior
-→ Combat → Verify audio bank and protected menu** checks all 40 imported clips,
-the four new cue references and the protected WAV hash.
+→ Combat → Verify audio bank and protected menu** checks the imported clips,
+required combat and trumpet cues, and the protected WAV hash.

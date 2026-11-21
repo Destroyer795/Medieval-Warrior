@@ -11,6 +11,10 @@ public class AudioManager : MonoBehaviour
     float musicScale = 1f, battleTarget, battleLevel;
     static float nextAmbientVoice;
     float creatureFocusUntil,creatureFocus;
+    static readonly string[] combatBank={"sword_swing","sword_hit","shield_block","bow_draw","bow_release","arrow_hit","arrow_flesh","dodge","player_hurt",
+        "zombie_groan0","zombie_groan1","zombie_groan2","zombie_attack","zombie_die","brute_roar","spit","splat","bloater_fuse","explosion","emerge",
+        "parry","thunder_guard","phantom_cleave","splinter","boss_horn","wave_horn","victory","defeat","ambient_meadow","music_battle",
+        "ambient_last_stand","last_stand_rain","last_stand_thunder","music_last_stand"};
 
     static AudioManager Instance
     {
@@ -38,11 +42,30 @@ public class AudioManager : MonoBehaviour
 
     public static void WarmCombatBank()
     {
-        foreach(string name in new[]{"sword_swing","sword_hit","shield_block","bow_draw","bow_release","arrow_hit","arrow_flesh","dodge","player_hurt",
-            "zombie_groan0","zombie_groan1","zombie_groan2","zombie_attack","zombie_die","brute_roar","spit","splat","bloater_fuse","explosion","emerge",
-            "parry","thunder_guard","phantom_cleave","splinter","boss_horn"})
+        using var timing=BattleLoadMetrics.Measure("Combat audio synchronous warmup");
+        foreach(string name in combatBank)
         {
             var clip=Instance.Clip(name);if(clip!=null)clip.LoadAudioData();
+        }
+    }
+    public static System.Collections.IEnumerator PreloadCombatBank(System.Action<float> progress)
+    {
+        var manager=Instance;
+        for(int i=0;i<combatBank.Length;i++)
+        {
+            string name=combatBank[i];
+            if(!manager.clips.TryGetValue(name,out var clip)||clip==null)
+            {
+                var request=Resources.LoadAsync<AudioClip>("Audio/"+name);yield return request;
+                clip=request.asset as AudioClip;manager.clips[name]=clip;
+            }
+            if(clip!=null)
+            {
+                if(clip.loadState==AudioDataLoadState.Unloaded)clip.LoadAudioData();
+                while(clip.loadState==AudioDataLoadState.Loading)yield return null;
+            }
+            progress?.Invoke((i+1f)/combatBank.Length);
+            yield return null;
         }
     }
 

@@ -103,8 +103,9 @@ tower seated on its own levelled, cobbled pad. 2K terrain textures, three kinds 
 grass, flowers, forests, a mountain ring and roads that run to the real gates.
 
 **Game modes**
-- **Defend the Castle** – slay a set number of undead (by difficulty); the Warlord leads the
-  final assault.
+
+- **Defend the Castle** – protect the sanctuary gate at the foot of the Keep. Walkers and Brutes batter the doors while Runners and Swordsmen hunt the knight. Spitters cover the steps in acid. Shoot or slash the red pitch barrels at village junctions to break up a column, or draw your bow beside either gate brazier to light the arrow. A raised shield can hold an alley, and a bash pushes the front rank back.
+  At three-quarters of the kill quota, the Dread Warlord marches in with four guards. Finish the quota and slay him while the knight and gate survive. Gate integrity is worth up to 3,000 bonus points.
 - **Endless Horde** – escalating waves; every 5th wave brings a Brute champion, every 10th the
   Warlord alongside it. Wounds are tended between waves. Draft one of three powers
   after every wave; every third wave brings Blood Moon, Toxic Fog or a Cursed Totem.

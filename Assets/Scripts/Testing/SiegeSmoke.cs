@@ -44,7 +44,6 @@ public partial class SmokeTestDriver
         var barrels = gate.GetComponentsInChildren<ExplosiveBarrel>();
         Check(braziers.Length == 2 && barrels.Length >= 3, "both gate braziers and distributed pitch barrels are present");
         Check(gate.GetComponent<BoxCollider>().enabled, "sanctuary door has a physical hit surface");
-        CaptureFrom("siege_gate", gate.Approach + gate.Outward * 9 + Vector3.up * 3, gate.transform.position + Vector3.up * 1.8f);
 
         EnemyController Deploy(ZombieType type, Vector3 pos)
         {
@@ -59,6 +58,13 @@ public partial class SmokeTestDriver
         float deadline = Time.realtimeSinceStartup + 6;
         while (gate.Health == before && Time.realtimeSinceStartup < deadline) yield return null;
         Check(gate.Health < before, "a Walker lands an animated gate strike while the knight is at the road");
+        Check(FindObjectsByType<TMPro.TextMeshProUGUI>(FindObjectsSortMode.None)
+            .Any(label => label.text == "THE KEEP GATE IS UNDER ATTACK!"), "the gate strike displays the priority warning");
+        var voices = FindFirstObjectByType<AudioManager>().GetComponentsInChildren<AudioSource>();
+        Check(voices.Any(v => v.isPlaying && v.clip != null && v.clip.name == "keep_impact") &&
+            voices.Any(v => v.isPlaying && v.clip != null && v.clip.name == "shield_block"),
+            "the gate impact and warning clang play on separate voices");
+        CaptureFrom("siege_gate", gate.Approach + gate.Outward * 9 + Vector3.up * 3, gate.transform.position + Vector3.up * 1.8f);
         breacher.ReceiveWeaponHit(.25f, gate.Outward, 0, breacher.transform.position + Vector3.up);
         yield return Wait(.65f);
         var agent = breacher.GetComponent<NavMeshAgent>();
@@ -140,8 +146,12 @@ public partial class SmokeTestDriver
         gate.Strike(gate.Health);
         Check(gm.State == GameManager.MatchState.Lost && gate.Health == 0 && !health.IsDead, "a breached gate loses the match with the knight alive");
         gm.enabled = true;
+        var difficulty = GameSettings.Difficulty;
+        GameSettings.Difficulty = Difficulty.Warlord;
         yield return SiegeBattle();
         gm = GameManager.instance;
+        Check(gm.Gate != null && gm.Gate.MaxHealth == 850f, "Warlord difficulty scales the sanctuary to 850 HP");
+        GameSettings.Difficulty = difficulty;
         health = FindFirstObjectByType<PlayerHealth>();
         health.TakeDamage(9999f, null, 0, true);
         yield return Wait(3);

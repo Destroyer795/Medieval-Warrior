@@ -155,6 +155,24 @@ pressure, keeping bounded darkening for readable silhouettes. Champion waves pla
 one boss stinger instead of overlapping wave/boss horns. Scene exit restores captured
 settings without overwriting the next scene's menu lighting.
 
+### Defend the Castle
+
+The match owns a `KeepGate` and its defenses from the beginning of play until scene unload. The physical doors follow the Keep prefab’s `Double Door Frame` in `Background`. `EnvironmentBuilder` places the `Environment/Siege Road Gate` marker at the outer wall opening used by the first road. The gate samples the connected side of that passage for the assault formation. Its melee approach, village deployments and artillery stations must all share a complete NavMesh path with the knight’s starting position.
+
+| Difficulty | Gate HP | Kill quota | Final assault begins |
+| --- | ---: | ---: | ---: |
+| Squire | 1,250 | 20 | 15 kills |
+| Knight | 1,000 | 30 | 23 kills |
+| Warlord | 850 | 45 | 34 kills |
+
+Walkers and Brutes approach the doorway and deal structural damage on the contact frame of their attack. A weapon hit or a shield across their approach within three metres draws them onto the knight for 3.5 seconds. Runners seek the rear flank. Ordinary Swordsmen take a side approach. Spitters occupy open firing positions and lob bile onto the steps. The existing projectile leaves a damaging acid pool for 4.5 seconds. At 75% of the quota the Warlord, two Bulwarks and two Swordsmen enter together at the road. The guard shares the breachers’ orders.
+
+`ExplosiveBarrel` positions come from the village lane survey in `Resources/Horde/Arena.json`. The search leaves clearance along intersecting routes. A sword stroke or arrow consumes the barrel once. Enemies within 5.5 metres and in line of sight take damage with distance falloff. Survivors stagger and move back along the NavMesh. Two `FireBrazier` components flank the approach. Within three metres, a draw picks up fire and keeps it through release. Each new draw checks its own position. A frontal shield stops the advance at contact, and the bash can displace several enemies in its forward cone.
+
+`GameHUD` shows gate integrity, flashes on impact, and marks the Keep from across the village. The warning clang and banner repeat at most once every six seconds during sustained damage. `AudioManager.GateImpact` plays the positional timber thud and hinge strain. The siege ends in defeat if the knight dies or the gate breaks. Victory requires the quota and a confirmed kill of this assault’s Warlord. The match adds `round(3000 × remaining HP / maximum HP)` before submitting the score and displaying the result.
+
+`SiegeSmoke` exercises both loss conditions, connected routes, structural strikes, artillery, shield bracing and weapon interactions in Play Mode. The full smoke run also checks the final formation, the victory bonus and cleanup when switching modes. To run only the siege scenarios, create `Artifacts/SiegeReviewOnly.txt` in the test project before launching `SmokeTest.RunBatch`. Remove that marker to restore the full suite.
+
 ### Endless Horde director and signature builds
 
 Endless Horde adds three repeatable signature ranks to the draft table. Its first

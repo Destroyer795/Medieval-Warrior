@@ -11,6 +11,11 @@ public sealed class KeepGate : MonoBehaviour
     public Vector3 Approach { get; private set; }
     public Vector3 Road { get; private set; }
     public Vector3 Outward => transform.forward;
+    FireBrazier leftBrazier, rightBrazier;
+    readonly System.Collections.Generic.List<Vector3> barrelSites = new System.Collections.Generic.List<Vector3>();
+    public bool CanLightArrow(Vector3 at) =>
+        (leftBrazier != null && leftBrazier.InReach(at)) || (rightBrazier != null && rightBrazier.InReach(at));
+
     readonly System.Collections.Generic.List<Vector3> lanes = new System.Collections.Generic.List<Vector3>();
     readonly System.Collections.Generic.List<Vector3> batteries = new System.Collections.Generic.List<Vector3>();
     public System.Collections.Generic.IReadOnlyList<Vector3> Lanes => lanes;
@@ -51,6 +56,7 @@ public sealed class KeepGate : MonoBehaviour
         // Keep the original gatehouse crest and portcullis visible over its timber leaves.
         gate.AddLeaves(width, height);
         gate.PlanApproaches();
+        gate.PlaceDefenses();
         return gate;
     }
 
@@ -90,6 +96,20 @@ public sealed class KeepGate : MonoBehaviour
         hull.size = new Vector3(width, height, .25f);
     }
 
+    void PlaceDefenses()
+    {
+        FireBrazier Flank(float side)
+        {
+            var probe = Approach + Outward * 3 + transform.right * side * 2.7f;
+            return TryReach(Approach, probe, 4f, out var at) ? FireBrazier.Place(transform, at) : null;
+        }
+        leftBrazier = Flank(-1);
+        rightBrazier = Flank(1);
+        foreach (Vector3 site in barrelSites) ExplosiveBarrel.Place(transform, site);
+        var roadSide = Road + Vector3.Cross(Vector3.up, (Approach - Road).normalized) * 1.6f;
+        if (TryReach(Road, roadSide, 2f, out var entry)) ExplosiveBarrel.Place(transform, entry);
+    }
+
     void PlanApproaches()
     {
         var data = Resources.Load<TextAsset>("Horde/Arena");
@@ -102,7 +122,10 @@ public sealed class KeepGate : MonoBehaviour
                 float range = Vector3.Distance(Approach, center);
                 if (range < 10 || range > 44 || lane.width > 4.6f ||
                     lanes.Exists(p => (p - center).sqrMagnitude < 12 * 12)) continue;
-                if (TryReach(Approach, center, 3f, out var junction)) lanes.Add(junction);
+                if (!TryReach(Approach, center, 3f, out var junction)) continue;
+                lanes.Add(junction);
+                if (barrelSites.Count < 4 && TryBarrelSite(lane, arena.lanes, out var site))
+                    barrelSites.Add(site);
             }
         }
         // Keep a clear arc into the steps. Prefer lower plaza ground with room to deploy.
@@ -117,6 +140,35 @@ public sealed class KeepGate : MonoBehaviour
                 !BileGlob.ClearArc(at + Vector3.up * 1.7f, target)) continue;
             batteries.Add(at);
         }
+    }
+
+    bool TryBarrelSite(HordeDirector.Lane lane, HordeDirector.Lane[] routes, out Vector3 site)
+    {
+        // Tuck barrels into the mouth of an alley. Leave clearance for a running knight
+        // on every intersecting lane as well as space for an agent to pass the barrel.
+        Vector3 along = Vector3.ProjectOnPlane(lane.end - lane.start, Vector3.up).normalized;
+        Vector3 side = Vector3.Cross(Vector3.up, along);
+        for (int i = 0; i < 12; i++)
+        {
+            bool far = (i & 2) == 0;
+            var mouth = far ? lane.end : lane.start;
+            var probe = mouth + along * (far ? 1 : -1) * (1 + i / 4) +
+                side * ((i & 1) == 0 ? 1.35f : -1.35f);
+            if (!TryReach(Approach, probe, 1.0f, out site)) continue;
+            bool clear = true;
+            foreach (var route in routes)
+            {
+                Vector3 segment = Vector3.ProjectOnPlane(route.end - route.start, Vector3.up);
+                Vector3 offset = Vector3.ProjectOnPlane(site - route.start, Vector3.up);
+                float t = Mathf.Clamp01(Vector3.Dot(offset, segment) / Mathf.Max(.01f, segment.sqrMagnitude));
+                if ((offset - segment * t).sqrMagnitude >= 1.5f * 1.5f) continue;
+                clear = false;
+                break;
+            }
+            if (clear) return true;
+        }
+        site = default;
+        return false;
     }
 
     internal Vector3 Battery(int index) => batteries.Count == 0 ? Approach + Outward * 8 :
@@ -158,7 +210,7 @@ public sealed class KeepGate : MonoBehaviour
             match.IsPaused || match.ChoosingBoon) return;
         Health = Mathf.Max(0, Health - amount);
         bool warn = Time.time >= nextWarning;
-        if (Time.time - LastImpact >= .16f) AudioManager.GateImpact(Approach, warn);
+        if (warn || Time.time - LastImpact >= .16f) AudioManager.GateImpact(Approach, warn);
         LastImpact = Time.time;
         if (warn)
         {

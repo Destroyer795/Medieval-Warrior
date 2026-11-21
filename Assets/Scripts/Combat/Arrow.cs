@@ -124,6 +124,12 @@ public class Arrow : MonoBehaviour
         }
         else
         {
+            if (hit.collider.TryGetComponent<ExplosiveBarrel>(out var barrel))
+            {
+                barrel.Detonate();
+                Destroy(gameObject);
+                return;
+            }
             var totem=hit.collider.GetComponentInParent<HordeTotem>();
             if(totem!=null)totem.ReceiveHit(damage,hit.point);
             BurstSplinters(hit.point,null);

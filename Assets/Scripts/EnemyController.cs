@@ -82,6 +82,7 @@ public class EnemyController : MonoBehaviour
     NavMeshPath runnerPath;
     internal bool SiegeEscort { get; set; }
     float divertedUntil;
+    Vector3 repelVelocity;
     KeepGate siegeGate;
     bool objectiveSwing;
     Vector3 bombardTarget;
@@ -241,19 +242,27 @@ public class EnemyController : MonoBehaviour
         stateTimer += Time.deltaTime * (HasAttackMotion(state) ? AttackSpeed : 1f);
         if(state==State.Staggered)
         {
+            if (repelVelocity.sqrMagnitude > .0025f)
+            {
+                Vector3 motion = repelVelocity * ((1 - Mathf.Exp(-9 * Time.deltaTime)) / 9);
+                if (NavMesh.Raycast(navAgent.nextPosition, navAgent.nextPosition + motion, out var edge, navAgent.areaMask))
+                    motion = Vector3.ClampMagnitude(motion, Mathf.Max(0, edge.distance - .05f));
+                navAgent.Move(motion);
+                repelVelocity *= Mathf.Exp(-9 * Time.deltaTime);
+            }
             if(Time.time>=staggerUntil)SetState(type==ZombieType.Spitter?State.Kite:State.Hunt);
             return;
         }
 
+        if (siegeGate != null && GameManager.instance.State != GameManager.MatchState.Playing) { Idle(); return; }
+        if (type == ZombieType.Warlord && !enraged && HealthFraction < 0.5f) Enrage();
+        if (enraged && Time.time > nextSummon) { Summon(2); nextSummon = Time.time + 18f; }
+
         if (siegeGate != null)
         {
-            if (GameManager.instance.State != GameManager.MatchState.Playing) { Idle(); return; }
             if (IsBreacher && ShieldInLane(3f)) DivertToKnight();
             if ((state == State.Hunt || state == State.Circle || state == State.Kite) && UpdateSiegeOrder()) return;
         }
-
-        if (type == ZombieType.Warlord && !enraged && HealthFraction < 0.5f) Enrage();
-        if (enraged && Time.time > nextSummon) { Summon(2); nextSummon = Time.time + 18f; }
 
         switch (state)
         {
@@ -1100,6 +1109,13 @@ public class EnemyController : MonoBehaviour
 
     // A deliberate opening earned by parrying or Thunder Guard. Ordinary damage
     // never enters this state and keeps navigation/attack clocks uninterrupted.
+    internal void Repel(Vector3 origin, float distance)
+    {
+        Stagger(origin, distance, .72f);
+        if (state != State.Staggered) return;
+        repelVelocity = Flat(transform.position - origin).normalized * (9f * distance * (1 - .7f * Stats.knockbackResist));
+    }
+
     public void Stagger(Vector3 from, float force,float duration=.65f)
     {
         if(IsDead||Health<=0||state==State.Emerging)return;

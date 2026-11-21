@@ -53,6 +53,10 @@ public class PlayerControlSpeed : MonoBehaviour
     public float DrawAmount { get; private set; }
     public bool IsAiming { get; private set; }
     public bool IsDrawing { get; private set; }
+    bool brazierArrow;
+    bool NearBrazier => GameManager.instance != null && GameManager.instance.Gate != null &&
+        GameManager.instance.Gate.CanLightArrow(transform.position);
+    public bool BurningNock => IsDrawing && (brazierArrow || (Boons.FireArrows && DrawAmount > .95f));
     public int ComboStep { get; private set; }
     public bool Exhausted => exhausted;
 
@@ -613,6 +617,14 @@ public class PlayerControlSpeed : MonoBehaviour
 
         foreach (Collider hit in hitColliders)
         {
+            if (hit.TryGetComponent<ExplosiveBarrel>(out var barrel) &&
+                Vector3.Dot(transform.forward, (barrel.transform.position - transform.position).normalized) > .3f &&
+                CombatBoons.ClearLine(transform.position + Vector3.up, hit.ClosestPoint(hitPosition), barrel.transform))
+            {
+                barrel.Detonate();
+                landedHits++;
+                continue;
+            }
             var totem=hit.GetComponentInParent<HordeTotem>();
             if(totem!=null&&!hitTotem&&Vector3.Dot(transform.forward,(totem.Target-transform.position).normalized)>.1f&&
                 CombatBoons.ClearLine(transform.position+Vector3.up,hit.ClosestPoint(hitPosition),totem.transform))
@@ -654,13 +666,18 @@ public class PlayerControlSpeed : MonoBehaviour
         FX.Shake(0.25f);
         if (rb != null) rb.AddForce(transform.forward * 4f, ForceMode.VelocityChange);
         bool any = false;
+        bool bracing = GameManager.instance != null && GameManager.instance.Gate != null;
+        var struck = bracing ? new HashSet<EnemyController>() : null;
         foreach (var c in Physics.OverlapSphere(transform.position + transform.forward * 1.1f + Vector3.up, 1.6f))
         {
             var e = c.GetComponentInParent<EnemyController>();
             if (e == null || e.IsDead) continue;
             Vector3 dir = (e.transform.position - transform.position).normalized;
             if (Vector3.Dot(transform.forward, dir) < 0.2f) continue;
+            if (bracing && (!struck.Add(e) || !CombatBoons.ClearLine(transform.position + Vector3.up,
+                e.transform.position + Vector3.up, e.transform))) continue;
             e.ReceiveWeaponHit(0.5f, dir, 11f,e.transform.position+Vector3.up*1.15f,true);
+            if (bracing && !e.IsDead) e.Repel(transform.position, 2.4f);
             any = true;
         }
         if (any) { FX.Sparks(transform.position + transform.forward + Vector3.up * 1.2f, transform.forward); }
@@ -680,11 +697,13 @@ public class PlayerControlSpeed : MonoBehaviour
                 return;
             }
             IsDrawing = true;
+            brazierArrow = NearBrazier;
             DrawAmount = 0f;
             AudioManager.PlayAt("bow_draw", transform.position, 0.7f, 0.05f);
         }
         if (IsDrawing)
         {
+            brazierArrow |= NearBrazier;
             DrawAmount = Mathf.Min(1f, DrawAmount + Time.deltaTime * Boons.DrawSpeed / drawTime);
             if (!GameInput.AttackHeld)
             {
@@ -719,7 +738,8 @@ public class PlayerControlSpeed : MonoBehaviour
 
         Vector3 dir = (target - origin).normalized;
         Arrow.Fire(origin + dir * 0.2f, dir, Mathf.Lerp(24f, 58f, draw), Mathf.Lerp(1f, 3.4f, draw), Mathf.Lerp(2f, 9f, draw), transform,
-                   Boons.Pierce, Boons.FireArrows && draw > 0.95f);
+                   Boons.Pierce, brazierArrow || NearBrazier || (Boons.FireArrows && draw > 0.95f));
+        brazierArrow = false;
         AudioManager.PlayAt("bow_release", transform.position, 1f, 0.08f);
         if (GameManager.instance != null) GameManager.instance.RegisterArrowFired();
         if (rig != null) rig.Release();
@@ -736,6 +756,7 @@ public class PlayerControlSpeed : MonoBehaviour
     void CancelDraw()
     {
         debugHold = false;
+        brazierArrow = false;
         IsDrawing = false;
         DrawAmount = 0f;
     }
@@ -767,7 +788,8 @@ public class PlayerControlSpeed : MonoBehaviour
         Vector3 origin = rig != null ? rig.ArrowOrigin : transform.position + Vector3.up * 1.4f;
         Vector3 dir = (target - origin).normalized;
         Arrow.Fire(origin + dir * 0.2f, dir, Mathf.Lerp(24f, 58f, draw), Mathf.Lerp(1f, 3.4f, draw), Mathf.Lerp(2f, 9f, draw), transform,
-            Boons.Pierce, Boons.FireArrows && draw > 0.95f);
+            Boons.Pierce, brazierArrow || NearBrazier || (Boons.FireArrows && draw > 0.95f));
+        brazierArrow = false;
         if (GameManager.instance != null) GameManager.instance.RegisterArrowFired();
         if (rig != null) rig.Release();
     }
@@ -776,6 +798,7 @@ public class PlayerControlSpeed : MonoBehaviour
     public void DebugHoldDraw(float amount)
     {
         IsDrawing = amount > 0f;
+        brazierArrow = IsDrawing && NearBrazier;
         DrawAmount = Mathf.Clamp01(amount);
         debugHold = IsDrawing;
     }

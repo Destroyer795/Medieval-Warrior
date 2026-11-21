@@ -59,7 +59,8 @@ public class GameHUD : MonoBehaviour
 
     public static void Banner(string title, string subtitle, float duration)
     {
-        if (instance == null || Time.time < instance.gateWarningUntil) return;
+        if (instance == null || (instance.gm != null && instance.gm.Mode == GameMode.DefendTheCastle &&
+            Time.time < instance.gateWarningUntil)) return;
         instance.bannerTitle.text = title;
         instance.bannerSub.text = subtitle;
         instance.bannerSub.gameObject.SetActive(!string.IsNullOrEmpty(subtitle));
@@ -660,6 +661,12 @@ public class GameHUD : MonoBehaviour
         var director=gm!=null?gm.Horde:null;
         bool visible=director!=null&&director.Current!=HordeEvent.None&&gm.State==GameManager.MatchState.Playing&&!gm.ChoosingBoon;
         eventRoot.gameObject.SetActive(visible);eventMarker.gameObject.SetActive(false);
+        if (gm != null && gm.Gate != null && gm.State == GameManager.MatchState.Playing && !gm.IsPaused && !gm.ChoosingBoon)
+        {
+            if (player != null && (player.transform.position - gm.Gate.Approach).sqrMagnitude > 9 * 9)
+                ShowObjectiveMarker(gm.Gate.transform.position + Vector3.up * 3, "KEEP GATE", UIKit.Gold);
+            return;
+        }
         if(!visible)return;
         eventTitle.text=director.Title;eventTitle.color=director.EventColor;eventDetail.text=director.Objective;
         Vector3 target;string label;

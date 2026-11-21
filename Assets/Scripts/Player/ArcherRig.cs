@@ -333,7 +333,7 @@ public class ArcherRig : MonoBehaviour
             if (shaft.sqrMagnitude < 0.01f) shaft = aim;
             nocked.SetPositionAndRotation(pull, Quaternion.LookRotation(shaft, bow.up));
         }
-        bool burningNock = showArrow && pc.IsDrawing && pc.DrawAmount > 0.95f && Boons.FireArrows;
+        bool burningNock = showArrow && pc.BurningNock;
         if (burningNock && nockedFlame == null) nockedFlame = FX.AttachFlame(nocked, Vector3.forward * 0.9f, 0.5f);
         else if (!burningNock && nockedFlame != null) { FX.Extinguish(nockedFlame); nockedFlame = null; }
     }

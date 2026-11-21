@@ -49,6 +49,7 @@ public class EnemyController : MonoBehaviour
     Renderer[] renderers;
     MaterialPropertyBlock mpb;
     RevenantVisual revenant;
+    GraveDuelist duelist;
     float guardBrokenUntil;
     Vector3? weaponImpact;
     Vector3? weaponBloodDirection;
@@ -151,6 +152,18 @@ public class EnemyController : MonoBehaviour
         if (!initialised) Init(type, isBoss, false);
     }
 
+    internal void InitGraveDuelist(GraveDuelist opponent, PlayerHealth knight)
+    {
+        initialised = true;
+        duelist = opponent;
+        player = knight.transform;
+        playerHealth = knight;
+        type = ZombieType.Swordsman;
+        Stats = new ZombieStats { name = "Grave Knight", points = 750, knockbackResist = .35f };
+        MaxHealth = Health = opponent.StartingHealth;
+        health = Mathf.CeilToInt(Health);
+    }
+
     public void Init(ZombieType t, bool boss, bool emerge)
     {
         initialised = true;
@@ -221,6 +234,15 @@ public class EnemyController : MonoBehaviour
     void Update()
     {
         if (!initialised || IsDead) return;
+        if (duelist != null)
+        {
+            if (duelist.CanFight)
+            {
+                UpdateHordeEffects();
+                if (!IsDead) UpdateBurning();
+            }
+            return;
+        }
         if (awaitingRoyalVolley)
         {
             if (state == State.Emerging) UpdateEmerging();
@@ -783,7 +805,7 @@ public class EnemyController : MonoBehaviour
     // Only weapon contacts go through the physical guard rules.
     public bool ReceiveWeaponHit(float amount,Vector3 direction,float knockback,Vector3 point,bool bash=false,Vector3? bloodDirection=null)
     {
-        if(IsDead||awaitingRoyalVolley||amount<=0||state==State.Emerging&&stateTimer<.4f)return false;
+        if(IsDead||awaitingRoyalVolley||amount<=0||state==State.Emerging&&stateTimer<.4f||duelist!=null&&!duelist.CanFight)return false;
         if (siegeGate != null && IsBreacher) DivertToKnight();
         bool frontal=Vector3.Dot(transform.forward,-Flat(direction).normalized)>.40f;
         if(bash&&type==ZombieType.Bulwark&&frontal)guardBrokenUntil=Time.time+1.25f;
@@ -807,7 +829,7 @@ public class EnemyController : MonoBehaviour
 
     public void TakeDamage(float amount, Vector3 hitDirection, float knockback)
     {
-        if (IsDead || awaitingRoyalVolley || amount<=0 || state == State.Emerging && stateTimer < 0.4f) return;
+        if (IsDead || awaitingRoyalVolley || amount<=0 || state == State.Emerging && stateTimer < 0.4f || duelist != null && !duelist.CanFight) return;
 
         Health = HordeDirector.GuardHealth(this,Health-amount);
         if(Health>0&&revenant!=null)revenant.React(hitDirection);
@@ -884,7 +906,8 @@ public class EnemyController : MonoBehaviour
         if (grantRewards)
         {
             if (GameManager.instance != null) GameManager.instance.AddKill(this);
-            DropLoot();
+            if (duelist != null) duelist.DropSpoils();
+            else DropLoot();
         }
 
         gameObject.tag = "Untagged";
@@ -1119,6 +1142,7 @@ public class EnemyController : MonoBehaviour
     public void Stagger(Vector3 from, float force,float duration=.65f)
     {
         if(IsDead||Health<=0||state==State.Emerging)return;
+        if (duelist != null) duelist.InterruptAttack(duration);
         staggerUntil=Mathf.Max(staggerUntil,Time.time+Mathf.Clamp(duration,.1f,1.2f));
         guardBrokenUntil=Mathf.Max(guardBrokenUntil,staggerUntil);ReleaseToken();
         SetState(State.Staggered);attackTimer=Mathf.Max(attackTimer,.35f);

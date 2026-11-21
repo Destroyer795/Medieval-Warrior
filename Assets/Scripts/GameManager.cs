@@ -31,6 +31,20 @@ public class GameManager : MonoBehaviour
     public MatchState State { get; private set; } = MatchState.Intro;
     public bool IsPaused { get; private set; }
     public int Score { get; private set; }
+    public int GobletScoreMultiplier => Horde != null && Horde.GobletActive ? 2 : 1;
+    internal bool ReinforcementsPending => waveSpawned < waveToSpawn;
+    public float RecoveryRemaining { get; private set; }
+    public float AmbientSpawnRateMultiplier
+    {
+        get
+        {
+            if (LastStand != null && LastStand.GraveActive) return .2f;
+            if (Horde != null && Horde.GobletActive) return 2f;
+            return RecoveryRemaining > 0f ? .65f : 1f;
+        }
+    }
+    const float RecoveryDuration = 12f;
+    bool graveWasActive;
     public int Combo { get; private set; }
     public float ComboTimeLeft => Mathf.Max(0f, comboExpires - Time.time);
     public int ComboMultiplier => 1 + Mathf.Min(Combo, 20) / 5;
@@ -226,6 +240,8 @@ public class GameManager : MonoBehaviour
 
     void UpdateMode()
     {
+        if (Horde == null || !Horde.GobletActive)
+            RecoveryRemaining = Mathf.Max(0f, RecoveryRemaining - Time.deltaTime);
         var p = GameSettings.Profile;
         switch (Mode)
         {
@@ -270,17 +286,22 @@ public class GameManager : MonoBehaviour
 
         LastStand.Tick(TimeLeft, dt);
         if (playerHealth != null && playerHealth.IsDead) return;
+        if (graveWasActive && !LastStand.GraveActive) RecoveryRemaining = RecoveryDuration;
+        graveWasActive = LastStand.GraveActive;
         bool surge = LastStand.IsSurging;
         if (surge && previous > LastStandDirector.SurgeSeconds) spawnTimer = 0f;
         float progress = MatchTime / LastStandDirector.Duration;
         int cap = surge ? profile.maxAlive + 7 : Mathf.RoundToInt(Mathf.Lerp(5, profile.maxAlive + 4, progress));
         float interval = (surge ? 0.43f : Mathf.Lerp(2.2f, 0.9f, progress)) / profile.spawnRate;
 
-        if (!warlordSpawned && progress >= 0.6f)
+        if (!warlordSpawned && TimeLeft <= LastStandDirector.Duration - LastStandDirector.GraveAt)
         {
             warlordSpawned = true;
-            SpawnBoss(ZombieType.Warlord);
+            if (!LastStand.GraveSelected) SpawnBoss(ZombieType.Warlord);
         }
+        if (LastStand.GraveActive)
+            nextBruteTime = Mathf.Max(nextBruteTime, MatchTime + RecoveryDuration);
+        if (LastStand.RevealingGrave) return;
         if (MatchTime >= nextBruteTime && EnemyController.All.Count < cap)
         {
             nextBruteTime = MatchTime + Mathf.Lerp(70f, 26f, progress);
@@ -297,11 +318,17 @@ public class GameManager : MonoBehaviour
 
     void TickSpawner(int cap, float interval, float progress, bool waveCounted = false, bool surge = false)
     {
-        spawnTimer -= Time.deltaTime;
+        if (LastStand != null && LastStand.GraveActive)
+            cap = 3; // Includes the duelist. Survivors from before the reveal stay on the field.
+        else if (Horde != null && Horde.GobletActive)
+            cap = Mathf.CeilToInt(cap * 1.5f);
+        else if (RecoveryRemaining > 0f)
+            cap = Mathf.Max(2, Mathf.CeilToInt(cap * .75f));
+        spawnTimer -= Time.deltaTime * AmbientSpawnRateMultiplier;
         if (spawnTimer > 0f || EnemyController.All.Count >= cap) return;
         spawnTimer = interval * UnityEngine.Random.Range(0.7f, 1.3f);
-        Spawn(PickType(progress, surge));
-        if (waveCounted) waveSpawned++;
+        var spawned = Spawn(PickType(progress, surge));
+        if (waveCounted && spawned != null) waveSpawned++;
     }
 
     ZombieType PickType(float progress, bool surge = false)
@@ -357,7 +384,8 @@ public class GameManager : MonoBehaviour
 
     void CheckBoonMilestones()
     {
-        if (ChoosingBoon || gameEnded || (playerHealth != null && playerHealth.IsDead)) return;
+        if (ChoosingBoon || gameEnded || (LastStand != null && LastStand.GraveActive) ||
+            (playerHealth != null && playerHealth.IsDead)) return;
         if (Mode == GameMode.DefendTheCastle)
         {
             int due = currentKills >= targetKills * 2 / 3 ? 2 : currentKills >= targetKills / 3 ? 1 : 0;
@@ -534,6 +562,7 @@ public class GameManager : MonoBehaviour
     {
         if (DamageTaken <= damageAtWaveStart) Feats.Unlock("untouchable");
         State = MatchState.Intermission;
+        if (Horde.GobletActive || Horde.Current != HordeEvent.None) RecoveryRemaining = RecoveryDuration;
         Horde.ClearWave();
         IntermissionLeft = 9f;
         int bonus = 300 * Wave;
@@ -566,9 +595,10 @@ public class GameManager : MonoBehaviour
         if (Combo >= 15) Feats.Unlock("butcher");
         comboExpires = Time.time + Boons.ComboWindow;
         int points = (enemy != null && enemy.Stats != null ? enemy.Stats.points : 100) * ComboMultiplier;
-        if(enemy!=null&&Horde!=null)points*=Horde.ScoreMultiplier;
+        if (enemy != null && Horde != null) points *= Horde.ScoreMultiplier * GobletScoreMultiplier;
         if (enemy != null && enemy.isBoss) points *= 2;
         Score += points;
+        if (enemy != null && (enemy.isBoss || type == ZombieType.Brute)) RecoveryRemaining = RecoveryDuration;
         UpdateScoreUI();
         Killed?.Invoke(enemy, points);
         if (enemy != null && enemy == Boss)
@@ -592,7 +622,7 @@ public class GameManager : MonoBehaviour
     {
         if (State == MatchState.Dawn) return;
         ArrowsHit++;
-        if (headshot) { Headshots++; Score += 25; Feats.Add("headshots"); }
+        if (headshot) { Headshots++; Score += 25 * GobletScoreMultiplier; Feats.Add("headshots"); }
     }
 
     public void RegisterMeleeHit(EnemyController enemy) { }

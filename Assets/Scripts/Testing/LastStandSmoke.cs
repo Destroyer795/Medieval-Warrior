@@ -22,6 +22,7 @@ public partial class SmokeTestDriver
         var player = GameObject.FindWithTag("Player");
         Check(stand != null && player != null && gm.TimeLeft > 295f, "Last Stand starts with five minutes");
         if (stand == null || player == null) yield break;
+        stand.GraveSelected = true;
 
         var health = player.GetComponent<PlayerHealth>();
         var body = player.GetComponent<Rigidbody>();
@@ -74,6 +75,8 @@ public partial class SmokeTestDriver
         yield return Wait(.48f);
         Check(health.currentHealth == hp && stand.Clearance > 0f, "reaching safe ground ends exposure");
 
+        yield return ReviewNamedGrave(gm, stand, health, countdown);
+        body.position = player.transform.position = playerStart;
         countdown.SetValue(gm, 60.035f);
         typeof(GameManager).GetField("nextBoonTime", fields).SetValue(gm, 240f);
         yield return Wait(.65f);
@@ -154,6 +157,12 @@ public partial class SmokeTestDriver
         Check(gm != null && gm.State == GameManager.MatchState.Playing && gm.LastStand.Radius > 120f
             && SceneManager.GetSceneByName("Background").handle == world, "replaying restores midnight and the starting front in the same world");
         if (gm == null || gm.State != GameManager.MatchState.Playing) yield break;
+        gm.LastStand.GraveSelected = false;
+        typeof(GameManager).GetField("nextBoonTime", fields).SetValue(gm, 999f);
+        countdown.SetValue(gm, 119.8f);
+        yield return Wait(.4f);
+        Check(!gm.LastStand.GraveActive && gm.Boss != null && gm.Boss.type == ZombieType.Warlord,
+            "an ordinary Last Stand keeps the Warlord at three minutes");
         health = GameObject.FindWithTag("Player").GetComponent<PlayerHealth>();
         countdown.SetValue(gm, .12f);
         health.TakeDamage(999f, null, 0f, true);
@@ -169,6 +178,93 @@ public partial class SmokeTestDriver
         IEnumerator AtDawn(float seconds)
         {
             while (Time.realtimeSinceStartup < dawnStart + seconds) yield return null;
+        }
+    }
+
+    IEnumerator ReviewNamedGrave(GameManager gm, LastStandDirector stand, PlayerHealth knight, FieldInfo countdown)
+    {
+        var nextBoon = typeof(GameManager).GetField("nextBoonTime", BindingFlags.Instance | BindingFlags.NonPublic);
+        foreach (var enemy in EnemyController.All.ToArray()) if (enemy != null) Destroy(enemy.gameObject);
+        yield return null;
+        var body = knight.GetComponent<Rigidbody>();
+        var control = knight.GetComponent<PlayerControlSpeed>();
+        var camera = Camera.main;
+        var orbit = camera.GetComponent<CameraFollow>();
+        float immunity = knight.InvulnerableUntil;
+        bool originallyKinematic = body.isKinematic;
+        knight.InvulnerableUntil = 0f;
+        body.isKinematic = false;
+        countdown.SetValue(gm, 120.15f);
+        nextBoon.SetValue(gm, 180f);
+        Check(!stand.GraveActive && !stand.RevealingGrave, "the grave stays buried until the three-minute mark");
+        float deadline = Time.realtimeSinceStartup + 12f;
+        while (!stand.RevealingGrave && Time.realtimeSinceStartup < deadline) yield return null;
+        var grave = stand.GetComponentInChildren<LastStandGrave>();
+        Check(grave != null && stand.GraveActive && !GameHUD.BoonsOpen && gm.Boss == null,
+            "the selected run raises its grave automatically and reserves the Warlord and boon reveal");
+        if (grave == null)
+        {
+            body.isKinematic = originallyKinematic;
+            knight.InvulnerableUntil = immunity;
+            if (GameHUD.BoonsOpen) GameHUD.DebugPickBoon(0);
+            nextBoon.SetValue(gm, 999f);
+            yield break;
+        }
+        nextBoon.SetValue(gm, 999f);
+        float health = knight.currentHealth;
+        knight.TakeDamage(10f, null, 0f, true);
+        Check(!control.enabled && body.isKinematic && knight.currentHealth == health,
+            "the camera owns the reveal and the knight is safe while input is locked");
+        var slab = grave.transform.Find("Carved headstone");
+        Check(slab != null && slab.localPosition.y < -1f, "the solid grave rises from beneath the terrain");
+        gm.Pause();
+        float age = grave.Age;
+        Vector3 cameraAtPause = camera.transform.position;
+        yield return Wait(.32f);
+        Check(grave.Age == age && camera.transform.position == cameraAtPause, "pause holds the grave and camera on their frame");
+        gm.Resume();
+        yield return Until(2.35f);
+        var letters = slab != null ? slab.Find("Engraved name")?.GetComponent<TMPro.TextMeshPro>() : null;
+        Vector3 viewport = letters != null ? camera.WorldToViewportPoint(letters.transform.position) : Vector3.zero;
+        Check(letters != null && letters.text == GameSettings.HeroName && !letters.richText &&
+            Mathf.Abs(viewport.x-.5f) < .15f && Mathf.Abs(viewport.y-.5f) < .15f && viewport.z > 0f &&
+            camera.fieldOfView < GameSettings.FieldOfView && Mathf.Abs(slab.localPosition.y) < .01f,
+            "the camera zooms to the knight's literal name on the raised stone");
+        Capture("last_stand_grave_01_inscription");
+        yield return Until(4.95f);
+        var duelist = grave.Duelist;
+        var path = new NavMeshPath();
+        Check(duelist != null && stand.RevealingGrave && !duelist.IsDefeated &&
+            NavMesh.SamplePosition(knight.transform.position, out var foot, 3f, NavMesh.AllAreas) &&
+            NavMesh.CalculatePath(duelist.transform.position, foot.position, NavMesh.AllAreas, path) &&
+            path.status == NavMeshPathStatus.PathComplete, "the shadow emerges beside its grave on a complete path to the knight");
+        Capture("last_stand_grave_02_emergence");
+        yield return Until(7.05f);
+        Check(!stand.RevealingGrave && stand.GraveActive && !orbit.FramingGrave && control.enabled &&
+            !body.isKinematic && knight.InvulnerableUntil > Time.time && !float.IsInfinity(knight.InvulnerableUntil) &&
+            Mathf.Abs(camera.fieldOfView - GameSettings.FieldOfView) < .1f &&
+            Vector3.Distance(camera.transform.position, knight.transform.position) < orbit.maxZoom + 3f,
+            "the camera and controls return to the knight before the duel");
+        body.isKinematic = originallyKinematic;
+        knight.InvulnerableUntil = immunity;
+        if (duelist != null)
+        {
+            // Isolate the damage measurements from unrelated horde attacks.
+            var spawns = typeof(GameManager).GetField("spawnTimer", BindingFlags.Instance | BindingFlags.NonPublic);
+            float previousSpawnTimer = (float)spawns.GetValue(gm);
+            spawns.SetValue(gm, 999f);
+            try { yield return ReviewGraveCombat(duelist, knight); }
+            finally { spawns.SetValue(gm, previousSpawnTimer); }
+        }
+        Check(!stand.GraveActive && stand.GetComponentsInChildren<LastStandGrave>().Length == 1,
+            "the slain double releases the encounter and the grave cannot trigger twice");
+
+        IEnumerator Until(float targetAge)
+        {
+            float limit = Time.realtimeSinceStartup + 15f;
+            while (grave != null && grave.Revealing && grave.Age < targetAge && Time.realtimeSinceStartup < limit) yield return null;
+            // Wait for CameraFollow.LateUpdate to display the sampled director pose.
+            yield return null;
         }
     }
 

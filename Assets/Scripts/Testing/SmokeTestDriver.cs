@@ -795,9 +795,13 @@ public partial class SmokeTestDriver : MonoBehaviour
         if (rbody != null) rbody.linearVelocity = Vector3.zero;
         health.InvulnerableUntil = 0f;
         float hp = health.currentHealth;
-        BileGlob.Throw(player.transform.position + Vector3.up * 6f + fwd * 4f, player.transform.position, 10f, null);
+        float damageBeforeBile = gm.DamageTaken;
+        // Use the knight's current position after knockback; a concurrent healing
+        // pickup can replenish HP before this assertion samples the result.
+        Vector3 bileTarget = player.transform.position + Vector3.up * .7f;
+        BileGlob.Throw(bileTarget + Vector3.up * 2f, bileTarget, 10f, null);
         yield return Wait(1.8f);
-        Check(health.currentHealth < hp, $"bile damages the knight ({hp:F0} -> {health.currentHealth:F0})");
+        Check(gm.DamageTaken > damageBeforeBile, $"bile damages the knight ({hp:F0} -> {health.currentHealth:F0})");
         Check(FindFirstObjectByType<AcidPool>() != null, "acid pool created");
         Capture("17_acid");
         yield return ReviewAcidPools(player);

@@ -19,6 +19,7 @@ public class KnightGear : MonoBehaviour
     float swordLength, shieldHeight;
     bool stowed;
     PlayerControlSpeed owner;
+    GraveDuelist duelist;
     Transform quiver;
     readonly List<GameObject> storedArrows = new List<GameObject>();
     int shownArrows = -1, quiverCapacity;
@@ -56,6 +57,7 @@ public class KnightGear : MonoBehaviour
         rightShoulder = FindBone(transform, "Bip001 R UpperArm");
         neck = FindBone(transform, "Bip001 Neck");
         owner = GetComponent<PlayerControlSpeed>();
+        if (owner == null) duelist = GetComponentInParent<GraveDuelist>();
         quiver = ProceduralModels.Spawn("Right Hip Quiver", MarchwardenVisual.Asset != null ? MarchwardenVisual.Asset.quiver : ProceduralModels.HipQuiverMesh(), ProceduralModels.HipQuiverMaterials()).transform;
         if (GetComponent<MarchwardenVisual>() != null) quiver.GetComponent<MeshRenderer>().sharedMaterials = smr.sharedMaterials;
         quiver.SetParent(transform, false);
@@ -345,8 +347,9 @@ public class KnightGear : MonoBehaviour
 
     void UpdateQuiver()
     {
-        if (owner == null || quiver == null) return;
-        int capacity = Mathf.Max(1, Mathf.Max(owner.maxArrows, owner.Arrows));
+        if ((owner == null && duelist == null) || quiver == null) return;
+        int arrows = owner != null ? owner.Arrows : duelist.Arrows;
+        int capacity = Mathf.Max(1, owner != null ? Mathf.Max(owner.maxArrows, arrows) : duelist.StartingArrows);
         if (capacity != quiverCapacity)
         {
             while (storedArrows.Count < capacity)
@@ -371,9 +374,9 @@ public class KnightGear : MonoBehaviour
             quiverCapacity = capacity;
             shownArrows = -1;
         }
-        if (shownArrows != owner.Arrows)
+        if (shownArrows != arrows)
         {
-            shownArrows = owner.Arrows;
+            shownArrows = arrows;
             for (int i = 0; i < storedArrows.Count; i++) storedArrows[i].SetActive(i < shownArrows);
         }
         if(QuiverMotion!=null)return;

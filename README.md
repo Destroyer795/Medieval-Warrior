@@ -109,7 +109,9 @@ grass, flowers, forests, a mountain ring and roads that run to the real gates.
 - **Endless Horde** – escalating waves; every 5th wave brings a Brute champion, every 10th the
   Warlord alongside it. Wounds are tended between waves. Draft one of three powers
   after every wave; every third wave brings Blood Moon, Toxic Fog or a Cursed Totem.
+  Once per run, drink from the green goblet by the castle wall with **F** or the controller's **west face button** while the wave still has reinforcements. For the rest of that wave, enemies move and spawn at twice the usual rate and combat kills award double score. After a heavy wave or boss kill, ordinary reinforcements ease off briefly.
 - **Last Stand** – survive five minutes as corruption closes on the courtyard. Blood rain marks the halfway point, the horde surges in the final minute, and royal fire arrows arrive at dawn.
+  At three minutes, one run in five replaces the Warlord with a grave bearing your knight's name. Your undead double fights with sword and bow, has 60% of your maximum health, and drops a 50-health draught and 20 arrows on defeat. Ordinary zombies arrive much less frequently during the duel.
 
 Three difficulties (Squire / Knight / Warlord). High scores and best wave are saved.
 

@@ -88,6 +88,8 @@ public class AutoPlayTest : MonoBehaviour
         yield return new WaitForSecondsRealtime(12f);
         gm = GameManager.instance;
         Expect(gm != null && gm.Wave >= 1, "endless wave started");
+        Expect(gm != null && gm.Horde.Goblet != null, "wall goblet is present in the built Horde arena");
+        Expect(gm != null && gm.GobletScoreMultiplier == 1, "Horde begins at ordinary kill score");
         GameObject.FindWithTag("Player").GetComponent<PlayerHealth>().TakeDamage(9999f, null, 0f, true);
         yield return new WaitForSecondsRealtime(4f);
         Expect(gm.State == GameManager.MatchState.Lost, "run ends on death");

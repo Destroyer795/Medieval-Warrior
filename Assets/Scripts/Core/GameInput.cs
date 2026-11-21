@@ -13,6 +13,7 @@ using UnityEngine.InputSystem;
 //   Dodge      Space                   A / cross
 //   Sprint     Left Shift              left stick click or left bumper
 //   Swap       Q (1 sword, 2 bow)      Y / triangle (d-pad left/right)
+//   Drink      F near the goblet       X / square
 //   Pause      Esc or P                Start
 public static class GameInput
 {
@@ -75,6 +76,7 @@ public static class GameInput
     public static bool SwapDown => Key(Input.GetKeyDown(KeyCode.Q)) || PadPressed(p => p.buttonNorth);
     public static bool SwordDown => Key(Input.GetKeyDown(KeyCode.Alpha1)) || PadPressed(p => p.dpad.left);
     public static bool BowDown => Key(Input.GetKeyDown(KeyCode.Alpha2)) || PadPressed(p => p.dpad.right);
+    public static bool DrinkDown => Key(Input.GetKeyDown(KeyCode.F)) || PadPressed(p => p.buttonWest);
     public static bool PauseDown => Key(Input.GetKeyDown(KeyCode.Escape) || Input.GetKeyDown(KeyCode.P)) || PadPressed(p => p.startButton);
     public static int BoonChoiceDown=>Input.GetKeyDown(KeyCode.Alpha1)?0:Input.GetKeyDown(KeyCode.Alpha2)?1:Input.GetKeyDown(KeyCode.Alpha3)?2:-1;
     public static float Zoom

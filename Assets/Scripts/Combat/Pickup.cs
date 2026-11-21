@@ -18,11 +18,10 @@ public class Pickup : MonoBehaviour
     Vector3 basePos;
     bool magnet;
 
-    public static Pickup Spawn(PickupKind kind, Vector3 at, int amount)
+    public static Pickup Spawn(PickupKind kind, Vector3 at, int amount, bool onGround = false)
     {
         var go = new GameObject(kind == PickupKind.Arrows ? "Arrows" : "Healing Draught");
-        at = AcidPool.GroundBelow(at);
-        go.transform.position = at;
+        go.transform.position = onGround ? at : AcidPool.GroundBelow(at);
         var p = go.AddComponent<Pickup>();
         p.kind = kind;
         p.amount = amount;

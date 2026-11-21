@@ -6,6 +6,8 @@ public class Arrow : MonoBehaviour
     Vector3 velocity;
     float damage, knockback;
     Transform owner;
+    bool firedByDuelist;
+    GraveDuelist duelist;
     bool stuck, falling, stuckInEnemy;
     public bool isFire { get; private set; }
     bool splintered;
@@ -19,6 +21,15 @@ public class Arrow : MonoBehaviour
 
     const float Length = 0.9f;
     static GameObject template;
+
+    public static Arrow FireBow(Vector3 origin, Vector3 direction, float draw, Transform owner, int pierce = 0, bool fire = false, GraveDuelist duelist = null)
+    {
+        var arrow = Fire(origin + direction * .2f, direction, Mathf.Lerp(24f, 58f, draw), Mathf.Lerp(1f, 3.4f, draw),
+            Mathf.Lerp(2f, 9f, draw), owner, pierce, fire);
+        arrow.duelist = duelist;
+        arrow.firedByDuelist = duelist != null;
+        return arrow;
+    }
 
     public static Arrow Fire(Vector3 position, Vector3 direction, float speed, float damage, float knockback, Transform owner, int pierce = 0, bool fire = false)
     {
@@ -55,6 +66,7 @@ public class Arrow : MonoBehaviour
 
     void Update()
     {
+        if (firedByDuelist && (duelist == null || !duelist.CanFight)) { Destroy(gameObject); return; }
         age += Time.deltaTime;
         if (isFire && (age > 6f || stuckInEnemy && (stuckIn == null || !stuckIn.IsBurning))) Extinguish();
         if (falling) { UpdateFall(); return; }
@@ -76,6 +88,17 @@ public class Arrow : MonoBehaviour
         {
             if(hit.collider.isTrigger&&hit.collider.GetComponent<RevenantHitZone>()==null)continue;
             if (owner != null && hit.transform.IsChildOf(owner)) continue;
+            if (firedByDuelist)
+            {
+                if (hit.collider.GetComponentInParent<PlayerHealth>() == duelist.Knight)
+                {
+                    bool headshot = hit.point.y > duelist.Knight.transform.position.y + 1.45f * duelist.Knight.transform.lossyScale.y;
+                    duelist.Knight.TakeDamage(damage * (headshot ? 2f : 1f), owner, knockback);
+                }
+                else FX.Dust(hit.point, .2f, 3);
+                Destroy(gameObject);
+                return;
+            }
             var e = hit.collider.GetComponentInParent<EnemyController>();
             if(e!=null&&e.IsDead)continue;
             if (e != null && pierced.Contains(e)) continue;

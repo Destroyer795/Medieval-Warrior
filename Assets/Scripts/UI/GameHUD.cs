@@ -419,6 +419,8 @@ public class GameHUD : MonoBehaviour
 
         hintText = UIKit.Text(combatRoot, "WASD move  ·  Shift sprint  ·  Space dodge  ·  LMB attack  ·  RMB block / aim  ·  Q swap weapon  ·  Esc pause", 22, new Color(1, 1, 1, 0.8f));
         hintText.rectTransform.Place(new Vector2(0.5f, 0), new Vector2(0.5f, 0), new Vector2(0, 12), new Vector2(1500, 34));
+        hintText.outlineColor = new Color32(16, 14, 12, 255);
+        hintText.outlineWidth = .18f;
 
         fpsText = UIKit.Text(root, "", 20, Color.white, TextAlignmentOptions.TopLeft);
         fpsText.rectTransform.Place(new Vector2(0, 0), new Vector2(0, 0), new Vector2(8, 300), new Vector2(200, 30));
@@ -545,9 +547,11 @@ public class GameHUD : MonoBehaviour
     {
         if (cam == null) cam = Camera.main;
         float dt = Time.unscaledDeltaTime;
-        if (gm != null && gm.LastStand != null &&
-            (gm.State == GameManager.MatchState.Dawn || gm.State == GameManager.MatchState.Won))
-            combatGroup.alpha = Mathf.MoveTowards(combatGroup.alpha, 0f, dt / .85f);
+        if (gm != null && gm.LastStand != null)
+        {
+            bool cinematic = gm.LastStand.RevealingGrave || gm.State == GameManager.MatchState.Dawn || gm.State == GameManager.MatchState.Won;
+            combatGroup.alpha = Mathf.MoveTowards(combatGroup.alpha, cinematic ? 0f : 1f, dt / .4f);
+        }
 
         if (playerHealth != null)
         {
@@ -632,6 +636,18 @@ public class GameHUD : MonoBehaviour
         hintTimer -= dt;
         if (hintTimer > 0f) hintText.text = GameInput.ControlsHint;
         hintText.alpha = Mathf.Clamp01(hintTimer / 2f) * 0.85f;
+        if (gm != null && gm.Mode == GameMode.EndlessHorde && gm.State == GameManager.MatchState.Playing && !gm.ChoosingBoon)
+        {
+            var horde = gm.Horde;
+            if (horde.GobletActive || horde.Goblet != null)
+            {
+                hintText.alpha = 1;
+                if (horde.GobletActive) hintText.text = "Goblet active   ·   Double spawn rate, movement and kill score";
+                else if (horde.CanClaimGoblet) hintText.text = "<size=125%><b>" + (GameInput.UsingGamepad ? "X / Square" : "F") + "   Drink from the goblet</b></size>   ·   2× spawns, speed and kill score this wave";
+                else if (!gm.ReinforcementsPending) hintText.text = "Goblet seals until the next wave";
+                else hintText.text = "Castle wall goblet   ·   Double danger for double kill score";
+            }
+        }
 
         fpsText.gameObject.SetActive(GameSettings.ShowFps);
         if (GameSettings.ShowFps)
@@ -667,7 +683,13 @@ public class GameHUD : MonoBehaviour
                 ShowObjectiveMarker(gm.Gate.transform.position + Vector3.up * 3, "KEEP GATE", UIKit.Gold);
             return;
         }
-        if(!visible)return;
+        if (!visible)
+        {
+            if (director != null && director.Goblet != null && gm.ReinforcementsPending &&
+                gm.State == GameManager.MatchState.Playing && !gm.IsPaused && !gm.ChoosingBoon && !director.CanClaimGoblet)
+                ShowObjectiveMarker(director.Goblet.Target, "WALL GOBLET", HordeGoblet.Tint);
+            return;
+        }
         eventTitle.text=director.Title;eventTitle.color=director.EventColor;eventDetail.text=director.Objective;
         Vector3 target;string label;
         if(director.Totem!=null&&!director.Totem.IsBroken){target=director.Totem.Target+Vector3.up*1.9f;label="DESTROY THE TOTEM";}

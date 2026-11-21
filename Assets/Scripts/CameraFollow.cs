@@ -45,6 +45,33 @@ public class CameraFollow : MonoBehaviour
     // Input heading is independent of camera follow lag and trauma shake.
     public Vector3 LookDirection => Quaternion.Euler(orbitPitch, orbitYaw, 0f) * Vector3.forward;
     internal float DawnView { get; set; }
+    internal bool FramingGrave { get; private set; }
+    Vector3 graveFocus, graveEye;
+    float graveBlend, graveFov;
+
+    internal void FrameGrave(Vector3 focus, Vector3 eye, float blend, float fieldOfView)
+    {
+        FramingGrave = true;
+        graveFocus = focus;
+        graveEye = eye;
+        graveBlend = blend;
+        graveFov = fieldOfView;
+    }
+
+    internal void FaceGraveFromKnight(Vector3 grave)
+    {
+        if (target == null) return;
+        Vector3 heading = grave - target.position;
+        currentYaw = orbitYaw = Mathf.Atan2(heading.x, heading.z) * Mathf.Rad2Deg;
+        currentPitch = orbitPitch = Mathf.Clamp(13f, minPitch, maxPitch);
+        yawVelocity = pitchVelocity = 0f;
+    }
+
+    internal void EndGraveShot()
+    {
+        FramingGrave = false;
+        if (cam != null) cam.fieldOfView = GameSettings.FieldOfView;
+    }
 
     void Start()
     {
@@ -70,7 +97,7 @@ public class CameraFollow : MonoBehaviour
 
     void Update()
     {
-        if (target == null) return;
+        if (target == null || FramingGrave) return;
         bool paused = Time.timeScale < 0.01f&&!CombatTime.IsHitStopped;
         if (paused) return;
         float dt = Mathf.Min(Time.unscaledDeltaTime, 0.05f);
@@ -144,6 +171,21 @@ public class CameraFollow : MonoBehaviour
         }
 
         if (cam != null) cam.fieldOfView = Mathf.Lerp(GameSettings.FieldOfView, GameSettings.FieldOfView - aimFovDrop, e);
+        if (FramingGrave) ApplyGraveShot();
+    }
+
+    void ApplyGraveShot()
+    {
+        Vector3 toEye = graveEye - graveFocus;
+        Vector3 eye = graveFocus + toEye.normalized * ClearDistance(graveFocus, toEye.normalized, toEye.magnitude);
+        Vector3 travel = eye - transform.position;
+        float blend = graveBlend;
+        // A cut across an obstructed lane keeps both views on their own side of the masonry.
+        if (travel.sqrMagnitude > .01f && ClearDistance(transform.position, travel.normalized, travel.magnitude) < travel.magnitude - .01f)
+            blend = blend < .5f ? 0f : 1f;
+        transform.SetPositionAndRotation(Vector3.Lerp(transform.position, eye, blend),
+            Quaternion.Slerp(transform.rotation, Quaternion.LookRotation(-toEye, Vector3.up), blend));
+        if (cam != null) cam.fieldOfView = Mathf.Lerp(cam.fieldOfView, graveFov, blend);
     }
 
     float ClearDistance(Vector3 origin, Vector3 direction, float distance)

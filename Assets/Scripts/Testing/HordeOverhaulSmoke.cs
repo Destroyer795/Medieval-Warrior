@@ -23,7 +23,7 @@ public partial class SmokeTestDriver
     {
         var gm=GameManager.instance;var director=gm.Horde;var flags=BindingFlags.Instance|BindingFlags.NonPublic;
         var fields=new Dictionary<FieldInfo,object>();
-        foreach(string name in new[]{"<Wave>k__BackingField","<State>k__BackingField","<Boss>k__BackingField","<Score>k__BackingField","<Combo>k__BackingField","<BestCombo>k__BackingField","<BoonsOffered>k__BackingField","<IntermissionLeft>k__BackingField","comboExpires","waveToSpawn","waveSpawned","spawnTimer","damageAtWaveStart","lastThreatCue","currentKills"})
+        foreach(string name in new[]{"<Wave>k__BackingField","<State>k__BackingField","<Boss>k__BackingField","<Score>k__BackingField","<RecoveryRemaining>k__BackingField","<Combo>k__BackingField","<BestCombo>k__BackingField","<BoonsOffered>k__BackingField","<IntermissionLeft>k__BackingField","comboExpires","waveToSpawn","waveSpawned","spawnTimer","damageAtWaveStart","lastThreatCue","currentKills"})
         {var field=typeof(GameManager).GetField(name,flags|BindingFlags.Public);fields[field]=field.GetValue(gm);}
         bool manager=gm.enabled,control=player.enabled;var body=player.GetComponent<Rigidbody>();bool kinematic=body.isKinematic;
         Vector3 position=player.transform.position;Quaternion rotation=player.transform.rotation;
@@ -204,6 +204,7 @@ public partial class SmokeTestDriver
             }
             director.ClearWave();ClearEnemies();yield return null;
             Check(director.Current==HordeEvent.None&&director.Totem==null&&director.FogCount==0,"wave cleanup clears event state, hazard objects and protection");
+            yield return ReviewGoblet(player);
         }
         finally
         {

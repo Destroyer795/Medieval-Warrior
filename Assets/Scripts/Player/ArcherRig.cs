@@ -15,6 +15,7 @@ public class ArcherRig : MonoBehaviour
     public float fullDrawDistance = 0.62f; // string travel from brace to anchor
 
     PlayerControlSpeed pc;
+    GraveDuelist duelist;
     Transform cam;
     CameraFollow orbitCamera;
     Transform spine, neck, head, lUpper, lFore, lHand, rUpper, rFore, rHand;
@@ -53,9 +54,10 @@ public class ArcherRig : MonoBehaviour
     public float DrawElbowAlignment => rFore == null || rHand == null || bow == null ? 0 : Vector3.Angle(rFore.position-rHand.position,-bow.forward);
     public float ShaftAlignment => nocked == null || bow == null ? 0 : Vector3.Angle(nocked.forward,bow.forward);
 
-    public void Init(PlayerControlSpeed owner)
+    public void Init(PlayerControlSpeed owner, GraveDuelist opponent = null)
     {
         pc = owner;
+        duelist = opponent;
         if (Camera.main != null) cam = Camera.main.transform;
         if (cam != null) orbitCamera = cam.GetComponent<CameraFollow>();
         spine = Find("Bip001 Spine1") ?? Find("Bip001 Spine");
@@ -145,13 +147,15 @@ public class ArcherRig : MonoBehaviour
 
     void LateUpdate()
     {
-        if (pc == null || bow == null) return;
-        bool bowOut = pc.CurrentWeapon == Weapon.Bow;
-        bool aiming = bowOut && pc.enabled && (pc.IsAiming || pc.IsDrawing || releaseKick > 0.05f);
+        if ((pc == null && duelist == null) || bow == null) return;
+        bool bowOut = (duelist != null ? duelist.CurrentWeapon : pc.CurrentWeapon) == Weapon.Bow;
+        bool aiming = bowOut && (duelist != null ? duelist.IsDrawing || releaseKick > .05f :
+            pc.enabled && (pc.IsAiming || pc.IsDrawing || releaseKick > .05f));
         float dt = Time.deltaTime;
         weight = Mathf.MoveTowards(weight, aiming ? 1f : 0f, dt * (aiming ? 7f : 4f));
         float w = weight * weight * (3f - 2f * weight);
-        drawSmoothed = Mathf.Lerp(drawSmoothed, pc.IsDrawing ? pc.DrawAmount : 0f, 1f - Mathf.Exp(-18f * dt));
+        float draw = duelist != null ? duelist.DrawAmount : pc.IsDrawing ? pc.DrawAmount : 0f;
+        drawSmoothed = Mathf.Lerp(drawSmoothed, draw, 1f - Mathf.Exp(-18f * dt));
         releaseKick = Mathf.MoveTowards(releaseKick, 0f, dt * 3.5f);
         if(bodySkin!=null)
         {
@@ -160,7 +164,8 @@ public class ArcherRig : MonoBehaviour
         }
 
         Vector3 aim = transform.forward;
-        if (cam != null && aiming) aim = orbitCamera != null ? orbitCamera.LookDirection : cam.forward;
+        if (duelist != null) aim = duelist.AimDirection;
+        else if (cam != null && aiming) aim = orbitCamera != null ? orbitCamera.LookDirection : cam.forward;
         else if (cam == null && Camera.main != null) cam = Camera.main.transform;
 
         Vector3 flatAim = Vector3.ProjectOnPlane(aim, Vector3.up).normalized;
@@ -306,7 +311,7 @@ public class ArcherRig : MonoBehaviour
         else
         {
             // slung diagonally across the back
-            var gear = pc.Gear;
+            var gear = duelist != null ? duelist.Gear : pc.Gear;
             Quaternion chest = gear != null && gear.Ready ? gear.ChestRotation : transform.rotation;
             Vector3 back = gear != null && gear.Ready ? gear.BackSurface : transform.position + Vector3.up * 1.25f - transform.forward * 0.12f;
             // The bow and string occupy local YZ. Turn that entire plane onto
@@ -325,7 +330,8 @@ public class ArcherRig : MonoBehaviour
         bowString.SetPosition(1, pull);
         bowString.SetPosition(2, bottom);
 
-        bool showArrow = inHand && pc.enabled && pc.Arrows > 0 && w > 0.6f && releaseKick < 0.05f;
+        bool armed = duelist != null ? !duelist.IsDefeated && duelist.Arrows > 0 : pc.enabled && pc.Arrows > 0;
+        bool showArrow = inHand && armed && w > 0.6f && releaseKick < 0.05f;
         if (nocked.gameObject.activeSelf != showArrow) nocked.gameObject.SetActive(showArrow);
         if (showArrow)
         {
@@ -333,7 +339,7 @@ public class ArcherRig : MonoBehaviour
             if (shaft.sqrMagnitude < 0.01f) shaft = aim;
             nocked.SetPositionAndRotation(pull, Quaternion.LookRotation(shaft, bow.up));
         }
-        bool burningNock = showArrow && pc.BurningNock;
+        bool burningNock = showArrow && (duelist != null ? Boons.FireArrows && drawSmoothed > .95f : pc.BurningNock);
         if (burningNock && nockedFlame == null) nockedFlame = FX.AttachFlame(nocked, Vector3.forward * 0.9f, 0.5f);
         else if (!burningNock && nockedFlame != null) { FX.Extinguish(nockedFlame); nockedFlame = null; }
     }

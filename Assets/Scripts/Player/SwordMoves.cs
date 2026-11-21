@@ -27,5 +27,7 @@ public static class SwordMoves
         new Move("Inside returning cut", .37f, .150f), new Move("High backhand finish", .45f, .185f)
     };
     public static int Count => All.Length;
+    public static float Damage(int step) => (step == 2 ? 2f : 1f) * Boons.SwordDamage;
+    public static float Knockback(int step) => step == 2 ? 7f : 2.5f;
     public static AnimationClip Clip(int variant) => Resources.Load<AnimationClip>("Animations/Sword/Strike_" + variant.ToString("00"));
 }

@@ -608,8 +608,8 @@ public class PlayerControlSpeed : MonoBehaviour
 
         HashSet<EnemyController> hitEnemies = new HashSet<EnemyController>();
         bool finisher = step == 2;
-        float damage = (finisher ? 2f : 1f) * Boons.SwordDamage;
-        float knock = finisher ? 7f : 2.5f;
+        float damage = SwordMoves.Damage(step);
+        float knock = SwordMoves.Knockback(step);
         int landedHits=0;
         bool hitTotem=false;
         Vector3 swingDirection=SwordMoves.All[variant].thrust?transform.forward:
@@ -737,7 +737,7 @@ public class PlayerControlSpeed : MonoBehaviour
         else target = origin + transform.forward * 50f;
 
         Vector3 dir = (target - origin).normalized;
-        Arrow.Fire(origin + dir * 0.2f, dir, Mathf.Lerp(24f, 58f, draw), Mathf.Lerp(1f, 3.4f, draw), Mathf.Lerp(2f, 9f, draw), transform,
+        Arrow.FireBow(origin, dir, draw, transform,
                    Boons.Pierce, brazierArrow || NearBrazier || (Boons.FireArrows && draw > 0.95f));
         brazierArrow = false;
         AudioManager.PlayAt("bow_release", transform.position, 1f, 0.08f);
@@ -787,7 +787,7 @@ public class PlayerControlSpeed : MonoBehaviour
         Arrows--;
         Vector3 origin = rig != null ? rig.ArrowOrigin : transform.position + Vector3.up * 1.4f;
         Vector3 dir = (target - origin).normalized;
-        Arrow.Fire(origin + dir * 0.2f, dir, Mathf.Lerp(24f, 58f, draw), Mathf.Lerp(1f, 3.4f, draw), Mathf.Lerp(2f, 9f, draw), transform,
+        Arrow.FireBow(origin, dir, draw, transform,
             Boons.Pierce, brazierArrow || NearBrazier || (Boons.FireArrows && draw > 0.95f));
         brazierArrow = false;
         if (GameManager.instance != null) GameManager.instance.RegisterArrowFired();
@@ -842,6 +842,13 @@ public class PlayerControlSpeed : MonoBehaviour
 
     void OnDisable()
     {
+        CancelDraw();
+        IsAiming = false;
+        pendingHits.Clear();
+        pendingSwishes.Clear();
+        swordBufferedUntil = -99f;
+        desiredVelocity = Vector3.zero;
+        hasFacing = turnToMove = false;
         shieldDefense?.Restore();
         if (animator != null) { SetAnimationBool("isMoving", false); SetAnimationBool("isRunning", false); }
         isBlocking = false;

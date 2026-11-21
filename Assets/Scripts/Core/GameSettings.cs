@@ -7,7 +7,8 @@ public enum Difficulty { Squire, Knight, Warlord }
 public static class GameSettings
 {
     // ---------------- audio / controls / display
-    public static float MasterVolume { get => PlayerPrefs.GetFloat("mw.master", 0.85f); set { PlayerPrefs.SetFloat("mw.master", value); AudioListener.volume = value; } }
+    static readonly bool MutePlayback = System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "-mwMute") >= 0;
+    public static float MasterVolume { get => PlayerPrefs.GetFloat("mw.master", 0.85f); set { PlayerPrefs.SetFloat("mw.master", value); AudioListener.volume = MutePlayback ? 0f : value; } }
     public static float SfxVolume { get => PlayerPrefs.GetFloat("mw.sfx", 0.9f); set => PlayerPrefs.SetFloat("mw.sfx", value); }
     public static float MusicVolume { get => PlayerPrefs.GetFloat("mw.music", 0.55f); set { PlayerPrefs.SetFloat("mw.music", value); AudioManager.RefreshMusicVolume(); } }
     public static float MouseSensitivity { get => PlayerPrefs.GetFloat("mw.sens", 3.5f); set => PlayerPrefs.SetFloat("mw.sens", value); }
@@ -123,7 +124,7 @@ public static class GameSettings
             Tabard=7;Metal=3;Leather=1;BowFinish=1;
             PlayerPrefs.SetInt("mw.cinematic.palette",1);PlayerPrefs.Save();
         }
-        AudioListener.volume = MasterVolume;
+        AudioListener.volume = MutePlayback ? 0f : MasterVolume;
         if (PlayerPrefs.HasKey("mw.quality")) QualitySettings.SetQualityLevel(Mathf.Clamp(Quality, 0, QualitySettings.names.Length - 1), true);
     }
 

@@ -12,13 +12,19 @@ public sealed class HordeDirector : MonoBehaviour
     [Serializable] public class Arena { public Lane[] lanes; public string[] bridgeKeys; }
     public HordeEvent Current { get; private set; }
     public HordeTotem Totem { get; private set; }
+    public HordeGoblet Goblet { get; private set; }
+    public bool GobletActive { get; private set; }
+    public bool CanClaimGoblet => Goblet != null && health != null && !health.IsDead &&
+        GameManager.instance is GameManager match && match.Mode == GameMode.EndlessHorde &&
+        match.State == GameManager.MatchState.Playing && match.ReinforcementsPending && !match.IsPaused && !match.ChoosingBoon &&
+        Goblet.InReach(player.position);
     public float Age { get; private set; }
     public float MoonBlend { get; private set; }
     public int FogCount=>fog.Count;
     public Vector3 Refuge { get; private set; }
     public bool HasRefuge { get; private set; }
     public bool GasActive=>Current==HordeEvent.ToxicFog&&Age>=4.5f;
-    public float SpeedMultiplier=>Current==HordeEvent.BloodMoon?1.25f:1f;
+    public float SpeedMultiplier=>(Current==HordeEvent.BloodMoon?1.25f:1f)*(GobletActive?2f:1f);
     public int ScoreMultiplier=>Current==HordeEvent.BloodMoon?3:1;
     public static HordeDirector Active=>GameManager.instance!=null?GameManager.instance.Horde:null;
     public static float Speed=>Active!=null?Active.SpeedMultiplier:1;
@@ -52,6 +58,9 @@ public sealed class HordeDirector : MonoBehaviour
     bool announced;
     Camera fogCamera;
     DepthTextureMode previousDepth;
+    bool gobletUsed;
+    HordeGoblet.Site gobletSite;
+    bool gobletSiteFound;
 
     public void Prepare(PlayerHealth knight)
     {
@@ -64,6 +73,11 @@ public sealed class HordeDirector : MonoBehaviour
     public void BeginWave(int wave)
     {
         ClearWave();
+        if (!gobletUsed && GameManager.instance != null && GameManager.instance.Mode == GameMode.EndlessHorde && player != null)
+        {
+            if (!gobletSiteFound) gobletSiteFound = HordeGoblet.TryFindSite(player.position, out gobletSite);
+            if (gobletSiteFound) Goblet = HordeGoblet.Create(gobletSite, transform);
+        }
         if(wave%3!=0)return;
         if(bag.Count==0)bag.AddRange(new[]{HordeEvent.BloodMoon,HordeEvent.ToxicFog,HordeEvent.CursedTotem});
         int index=random.Next(bag.Count);
@@ -74,7 +88,7 @@ public sealed class HordeDirector : MonoBehaviour
     // Also used by the gameplay validation driver to cover every director event.
     public void Activate(HordeEvent next)
     {
-        ClearWave();Current=next;
+        ClearEvent();Current=next;
         if(next==HordeEvent.ToxicFog)BuildFog();
         if(next==HordeEvent.CursedTotem)
         {
@@ -86,6 +100,7 @@ public sealed class HordeDirector : MonoBehaviour
     {
         var gm=GameManager.instance;
         if(gm==null||gm.IsPaused||gm.ChoosingBoon||Time.deltaTime<=0)return;
+        if (Goblet != null && GameInput.DrinkDown) TryClaimGoblet();
         MoonBlend=Mathf.MoveTowards(MoonBlend,Current==HordeEvent.BloodMoon?1:0,Time.deltaTime*.45f);
         if(Current==HordeEvent.None||gm.State!=GameManager.MatchState.Playing)return;
         Age+=Time.deltaTime;
@@ -181,6 +196,31 @@ public sealed class HordeDirector : MonoBehaviour
         return false;
     }
     public void ClearWave()
+    {
+        GobletActive = false;
+        RemoveGoblet();
+        ClearEvent();
+    }
+
+    public bool TryClaimGoblet()
+    {
+        if (!CanClaimGoblet) return false;
+        GobletActive = gobletUsed = true;
+        FX.Sparkle(Goblet.Target, HordeGoblet.Tint, 20);
+        AudioManager.PlayAt("boss_horn", Goblet.Target, .55f);
+        RemoveGoblet();
+        return true;
+    }
+
+    void RemoveGoblet()
+    {
+        if (Goblet == null) return;
+        Goblet.gameObject.SetActive(false);
+        Destroy(Goblet.gameObject);
+        Goblet = null;
+    }
+
+    void ClearEvent()
     {
         Current=HordeEvent.None;Age=0;damageTick=0;announced=false;HasRefuge=false;fog.Clear();
         if(Totem!=null){Totem.gameObject.SetActive(false);Destroy(Totem.gameObject);Totem=null;}

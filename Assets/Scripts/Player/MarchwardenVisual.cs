@@ -58,7 +58,7 @@ public class MarchwardenVisual : MonoBehaviour
         WaistArmor=MarchwardenArmor.Prepare(gameObject,Body,data,Linen);
         Sword = Prop("Marchwarden Sword", data.sword);
         Shield = Prop("Marchwarden Shield", data.shield);
-        if (GetComponent<PlayerControlSpeed>() == null)
+        if (GetComponent<PlayerControlSpeed>() == null && GetComponentInParent<GraveDuelist>() == null)
         {
             menuGuard=Resources.Load<AnimationClip>("Animations/Sword/Guard");
             displayQuiver = Prop("Marchwarden Preview Quiver", data.quiver);

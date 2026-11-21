@@ -19,6 +19,15 @@ public sealed class LastStandDirector : MonoBehaviour
     LastStandWeather weather;
     float exposureTime, exposureDamage;
     bool stormStarted;
+    LastStandGrave grave;
+    bool graveTriggered;
+    float nextGraveAttempt;
+
+    // Roll once per run. A playtest can select either branch before the three-minute mark.
+    internal bool GraveSelected { get; set; }
+    internal const float GraveAt = 180f;
+    public bool RevealingGrave => grave != null && grave.Revealing;
+    public bool GraveActive => grave != null && grave.Active;
 
     public Vector3 Center { get; private set; }
     public float Radius { get; private set; }
@@ -30,6 +39,7 @@ public sealed class LastStandDirector : MonoBehaviour
     internal void Prepare(PlayerHealth knight)
     {
         player = knight;
+        GraveSelected = Random.Range(0, 5) == 0;
         // The environment builder places the knight on open ground in the courtyard.
         Center = knight != null ? knight.transform.position : transform.position;
         if (NavMesh.SamplePosition(Center, out var ground, 3f, NavMesh.AllAreas)) Center = ground.position;
@@ -60,6 +70,18 @@ public sealed class LastStandDirector : MonoBehaviour
         }
 
         if (player == null || player.IsDead) return;
+        float elapsed = Duration - timeLeft;
+        if (GraveSelected && !graveTriggered && elapsed >= GraveAt && elapsed >= nextGraveAttempt)
+        {
+            grave = LastStandGrave.TryRaise(transform, player, Center, Radius);
+            graveTriggered = grave != null;
+            nextGraveAttempt = elapsed + .5f;
+        }
+        if (RevealingGrave)
+        {
+            grave.TickReveal(deltaTime);
+            return;
+        }
         float clearance = ClearanceAt(position);
         if (clearance >= 0f)
         {
@@ -91,6 +113,7 @@ public sealed class LastStandDirector : MonoBehaviour
 
     internal IEnumerator PlayDawn()
     {
+        if (grave != null) grave.EndEncounter();
         Vector3 position = player != null ? player.transform.position : Center;
         if (player != null)
         {
@@ -130,5 +153,10 @@ public sealed class LastStandDirector : MonoBehaviour
     void OnDestroy()
     {
         weather?.Dispose();
+    }
+
+    void OnDisable()
+    {
+        if (grave != null) grave.EndEncounter();
     }
 }

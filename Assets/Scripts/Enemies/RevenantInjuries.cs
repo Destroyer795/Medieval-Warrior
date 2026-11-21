@@ -26,6 +26,7 @@ public sealed class RevenantInjuries : MonoBehaviour
         visual=owner;var mesh=owner.Form.mesh;
         if(!probes.TryGetValue(mesh,out samples))
         {
+            using var timing=BattleLoadMetrics.Measure("Revenant injury mesh readback");
             var points=mesh.vertices;var normals=mesh.normals;var weights=mesh.boneWeights;var tiles=mesh.uv2;var list=new List<Probe>();
             int stride=Mathf.Max(1,points.Length/1400);
             for(int i=0;i<points.Length;i+=stride)if(tiles[i].x<4)

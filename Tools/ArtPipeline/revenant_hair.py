@@ -10,7 +10,7 @@ for style in range(3):
     objects=[];random_hair=random.Random(285+style*71+seed)
     def hairline(p):
         forehead=smooth((p.z-.012)/.075)
-        return 1.647+forehead*(.078 if style==0 else .063 if style==1 else .080)
+        return 1.647+forehead*(.090 if style==0 else .080 if style==1 else .094)
     def density(p):
         edge=smooth((p.y-hairline(p))/.018)
         patch=.78+.22*math.sin(p.x*57+p.z*32+seed)*math.sin(p.y*87)
@@ -19,7 +19,7 @@ for style in range(3):
         lambda p,f:p.y>hairline(p)-.012 and abs(p.x)<.12,.0016,'Head')
     cap.modifiers.clear()
     for v,c in zip(cap.data.vertices,cap.data.color_attributes['Decay'].data):
-        c.color=(1,1,1,density(U(v.co))*(.70 if style==0 else 1.0))
+        c.color=(1,1,1,density(U(v.co))*(.50 if style==0 else .65))
 
     vertices=[];faces=[];uvs=[];colors=[]
     def groom(root,length,width,beard=False):

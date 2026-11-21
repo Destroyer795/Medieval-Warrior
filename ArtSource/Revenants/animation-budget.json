@@ -1,0 +1,427 @@
+{
+    "serializedBytes": 315793182,
+    "originalKeys": 1059047,
+    "reducedKeys": 394362,
+    "clips": [
+        {
+            "clip": "Revenant_DeathBack",
+            "originalKeys": 9422,
+            "reducedKeys": 7701,
+            "maximumPositionError": 0.00061119842575863,
+            "maximumAngleError": 0.059316687285900119
+        },
+        {
+            "clip": "Revenant_DeathForward",
+            "originalKeys": 7140,
+            "reducedKeys": 6392,
+            "maximumPositionError": 0.00010295506217516959,
+            "maximumAngleError": 0.01895512081682682
+        },
+        {
+            "clip": "Walker_Cut",
+            "originalKeys": 14030,
+            "reducedKeys": 7246,
+            "maximumPositionError": 0.0005165893817320466,
+            "maximumAngleError": 0.0710706040263176
+        },
+        {
+            "clip": "Walker_Thrust",
+            "originalKeys": 14030,
+            "reducedKeys": 7269,
+            "maximumPositionError": 0.0004976359196007252,
+            "maximumAngleError": 0.07249294221401215
+        },
+        {
+            "clip": "Walker_Grab",
+            "originalKeys": 14030,
+            "reducedKeys": 7194,
+            "maximumPositionError": 0.000546275929082185,
+            "maximumAngleError": 0.0720401480793953
+        },
+        {
+            "clip": "Walker_RisingRake",
+            "originalKeys": 14030,
+            "reducedKeys": 7175,
+            "maximumPositionError": 0.0006369517650455236,
+            "maximumAngleError": 0.06826326251029968
+        },
+        {
+            "clip": "Walker_LeftHook",
+            "originalKeys": 14030,
+            "reducedKeys": 7278,
+            "maximumPositionError": 0.0004684574087150395,
+            "maximumAngleError": 0.06657106429338455
+        },
+        {
+            "clip": "Walker_Guard",
+            "originalKeys": 32729,
+            "reducedKeys": 3033,
+            "maximumPositionError": 0.0009581562480889261,
+            "maximumAngleError": 0.15804976224899293
+        },
+        {
+            "clip": "Walker_Walk",
+            "originalKeys": 22666,
+            "reducedKeys": 4753,
+            "maximumPositionError": 0.0006266519194468856,
+            "maximumAngleError": 0.0728495866060257
+        },
+        {
+            "clip": "Walker_Run",
+            "originalKeys": 10016,
+            "reducedKeys": 6152,
+            "maximumPositionError": 0.000567375507671386,
+            "maximumAngleError": 0.17380884289741517
+        },
+        {
+            "clip": "Runner_Cut",
+            "originalKeys": 10154,
+            "reducedKeys": 8853,
+            "maximumPositionError": 0.000031920193578116596,
+            "maximumAngleError": 0.0214125607162714
+        },
+        {
+            "clip": "Runner_Thrust",
+            "originalKeys": 10154,
+            "reducedKeys": 7267,
+            "maximumPositionError": 0.00033826674916781485,
+            "maximumAngleError": 0.09273914992809296
+        },
+        {
+            "clip": "Runner_Grab",
+            "originalKeys": 10154,
+            "reducedKeys": 7241,
+            "maximumPositionError": 0.00025147030828520656,
+            "maximumAngleError": 0.044463153928518298
+        },
+        {
+            "clip": "Runner_RisingRake",
+            "originalKeys": 10154,
+            "reducedKeys": 7242,
+            "maximumPositionError": 0.0002514999941922724,
+            "maximumAngleError": 0.05170489475131035
+        },
+        {
+            "clip": "Runner_LeftHook",
+            "originalKeys": 10154,
+            "reducedKeys": 7252,
+            "maximumPositionError": 0.000303205888485536,
+            "maximumAngleError": 0.0815713182091713
+        },
+        {
+            "clip": "Runner_Guard",
+            "originalKeys": 32729,
+            "reducedKeys": 3027,
+            "maximumPositionError": 0.000850894779432565,
+            "maximumAngleError": 0.17062066495418549
+        },
+        {
+            "clip": "Runner_Walk",
+            "originalKeys": 22666,
+            "reducedKeys": 4884,
+            "maximumPositionError": 0.0006185366655699909,
+            "maximumAngleError": 0.08012613654136658
+        },
+        {
+            "clip": "Runner_Run",
+            "originalKeys": 10016,
+            "reducedKeys": 6358,
+            "maximumPositionError": 0.0005641102907247841,
+            "maximumAngleError": 0.09946838766336441
+        },
+        {
+            "clip": "Brute_Cut",
+            "originalKeys": 17906,
+            "reducedKeys": 7768,
+            "maximumPositionError": 0.0006345518049784005,
+            "maximumAngleError": 0.08600908517837525
+        },
+        {
+            "clip": "Brute_Thrust",
+            "originalKeys": 17906,
+            "reducedKeys": 9443,
+            "maximumPositionError": 0.00031502850470133126,
+            "maximumAngleError": 0.0589761808514595
+        },
+        {
+            "clip": "Brute_Grab",
+            "originalKeys": 17906,
+            "reducedKeys": 7759,
+            "maximumPositionError": 0.0006456478149630129,
+            "maximumAngleError": 0.07398476451635361
+        },
+        {
+            "clip": "Brute_RisingRake",
+            "originalKeys": 17906,
+            "reducedKeys": 7678,
+            "maximumPositionError": 0.0007540850783698261,
+            "maximumAngleError": 0.0937836542725563
+        },
+        {
+            "clip": "Brute_LeftHook",
+            "originalKeys": 17906,
+            "reducedKeys": 11059,
+            "maximumPositionError": 0.00015082789468578994,
+            "maximumAngleError": 0.10307509452104569
+        },
+        {
+            "clip": "Brute_Guard",
+            "originalKeys": 32729,
+            "reducedKeys": 4174,
+            "maximumPositionError": 0.00035547633888199925,
+            "maximumAngleError": 0.06465644389390946
+        },
+        {
+            "clip": "Brute_Walk",
+            "originalKeys": 22309,
+            "reducedKeys": 3729,
+            "maximumPositionError": 0.0009039721917361021,
+            "maximumAngleError": 0.14235112071037293
+        },
+        {
+            "clip": "Brute_Run",
+            "originalKeys": 10016,
+            "reducedKeys": 6190,
+            "maximumPositionError": 0.0005054728826507926,
+            "maximumAngleError": 0.16900692880153657
+        },
+        {
+            "clip": "Spitter_Cut",
+            "originalKeys": 14846,
+            "reducedKeys": 7420,
+            "maximumPositionError": 0.0005372250452637672,
+            "maximumAngleError": 0.08696763217449188
+        },
+        {
+            "clip": "Spitter_Thrust",
+            "originalKeys": 14846,
+            "reducedKeys": 7319,
+            "maximumPositionError": 0.0007198713719844818,
+            "maximumAngleError": 0.0839061439037323
+        },
+        {
+            "clip": "Spitter_SideSpit",
+            "originalKeys": 14846,
+            "reducedKeys": 7421,
+            "maximumPositionError": 0.000764108553994447,
+            "maximumAngleError": 0.09023579210042954
+        },
+        {
+            "clip": "Spitter_Guard",
+            "originalKeys": 32729,
+            "reducedKeys": 3028,
+            "maximumPositionError": 0.0008373272139579058,
+            "maximumAngleError": 0.1604422777891159
+        },
+        {
+            "clip": "Spitter_Walk",
+            "originalKeys": 22309,
+            "reducedKeys": 3718,
+            "maximumPositionError": 0.0008346432587131858,
+            "maximumAngleError": 0.18485292792320252
+        },
+        {
+            "clip": "Spitter_Run",
+            "originalKeys": 10016,
+            "reducedKeys": 6104,
+            "maximumPositionError": 0.000567375507671386,
+            "maximumAngleError": 0.17380884289741517
+        },
+        {
+            "clip": "Bloater_Cut",
+            "originalKeys": 20966,
+            "reducedKeys": 7955,
+            "maximumPositionError": 0.0009020193829201162,
+            "maximumAngleError": 0.11090562492609024
+        },
+        {
+            "clip": "Bloater_Thrust",
+            "originalKeys": 20966,
+            "reducedKeys": 9866,
+            "maximumPositionError": 0.0006064368644729257,
+            "maximumAngleError": 0.07474056631326676
+        },
+        {
+            "clip": "Bloater_Grab",
+            "originalKeys": 20966,
+            "reducedKeys": 7985,
+            "maximumPositionError": 0.0007650764309801161,
+            "maximumAngleError": 0.09251642227172852
+        },
+        {
+            "clip": "Bloater_RisingRake",
+            "originalKeys": 20966,
+            "reducedKeys": 8036,
+            "maximumPositionError": 0.0007979749352671206,
+            "maximumAngleError": 0.10225094854831696
+        },
+        {
+            "clip": "Bloater_Guard",
+            "originalKeys": 32729,
+            "reducedKeys": 4189,
+            "maximumPositionError": 0.00039014851790852845,
+            "maximumAngleError": 0.06731439381837845
+        },
+        {
+            "clip": "Bloater_Walk",
+            "originalKeys": 22309,
+            "reducedKeys": 3733,
+            "maximumPositionError": 0.0008959398255683482,
+            "maximumAngleError": 0.14245769381523133
+        },
+        {
+            "clip": "Bloater_Run",
+            "originalKeys": 10016,
+            "reducedKeys": 6191,
+            "maximumPositionError": 0.0005054728826507926,
+            "maximumAngleError": 0.16900692880153657
+        },
+        {
+            "clip": "Warlord_Cut",
+            "originalKeys": 17090,
+            "reducedKeys": 7815,
+            "maximumPositionError": 0.00047659879783168435,
+            "maximumAngleError": 0.07950184494256973
+        },
+        {
+            "clip": "Warlord_Thrust",
+            "originalKeys": 17090,
+            "reducedKeys": 7805,
+            "maximumPositionError": 0.00065363704925403,
+            "maximumAngleError": 0.08326662331819534
+        },
+        {
+            "clip": "Warlord_RisingCut",
+            "originalKeys": 17090,
+            "reducedKeys": 7928,
+            "maximumPositionError": 0.0006122465129010379,
+            "maximumAngleError": 0.0789816752076149
+        },
+        {
+            "clip": "Warlord_Overhead",
+            "originalKeys": 17090,
+            "reducedKeys": 7817,
+            "maximumPositionError": 0.0005587942432612181,
+            "maximumAngleError": 0.07841750979423523
+        },
+        {
+            "clip": "Warlord_Guard",
+            "originalKeys": 32729,
+            "reducedKeys": 4184,
+            "maximumPositionError": 0.0003689822624437511,
+            "maximumAngleError": 0.06518306583166123
+        },
+        {
+            "clip": "Warlord_Walk",
+            "originalKeys": 22666,
+            "reducedKeys": 4727,
+            "maximumPositionError": 0.0006068918155506253,
+            "maximumAngleError": 0.07350464910268784
+        },
+        {
+            "clip": "Warlord_Run",
+            "originalKeys": 10016,
+            "reducedKeys": 6239,
+            "maximumPositionError": 0.000567375507671386,
+            "maximumAngleError": 0.17380884289741517
+        },
+        {
+            "clip": "Swordsman_Cut",
+            "originalKeys": 13214,
+            "reducedKeys": 7177,
+            "maximumPositionError": 0.00046421890147030354,
+            "maximumAngleError": 0.06315939873456955
+        },
+        {
+            "clip": "Swordsman_Thrust",
+            "originalKeys": 13214,
+            "reducedKeys": 7181,
+            "maximumPositionError": 0.0005154709215275943,
+            "maximumAngleError": 0.07873398065567017
+        },
+        {
+            "clip": "Swordsman_RisingCut",
+            "originalKeys": 13214,
+            "reducedKeys": 7263,
+            "maximumPositionError": 0.0004771032836288214,
+            "maximumAngleError": 0.06596434116363526
+        },
+        {
+            "clip": "Swordsman_Overhead",
+            "originalKeys": 13214,
+            "reducedKeys": 7199,
+            "maximumPositionError": 0.0005163528257980943,
+            "maximumAngleError": 0.07301366329193115
+        },
+        {
+            "clip": "Swordsman_Guard",
+            "originalKeys": 32729,
+            "reducedKeys": 4184,
+            "maximumPositionError": 0.0003689822624437511,
+            "maximumAngleError": 0.06518306583166123
+        },
+        {
+            "clip": "Swordsman_Walk",
+            "originalKeys": 22666,
+            "reducedKeys": 4735,
+            "maximumPositionError": 0.00060552719514817,
+            "maximumAngleError": 0.07663393020629883
+        },
+        {
+            "clip": "Swordsman_Run",
+            "originalKeys": 10016,
+            "reducedKeys": 6234,
+            "maximumPositionError": 0.000567375507671386,
+            "maximumAngleError": 0.17380884289741517
+        },
+        {
+            "clip": "Bulwark_Cut",
+            "originalKeys": 15050,
+            "reducedKeys": 7608,
+            "maximumPositionError": 0.0006271894671954215,
+            "maximumAngleError": 0.07914365082979202
+        },
+        {
+            "clip": "Bulwark_Thrust",
+            "originalKeys": 15050,
+            "reducedKeys": 9033,
+            "maximumPositionError": 0.0002037007943727076,
+            "maximumAngleError": 0.06891245394945145
+        },
+        {
+            "clip": "Bulwark_RisingCut",
+            "originalKeys": 15050,
+            "reducedKeys": 7693,
+            "maximumPositionError": 0.0005559591227211058,
+            "maximumAngleError": 0.09744827449321747
+        },
+        {
+            "clip": "Bulwark_Overhead",
+            "originalKeys": 15050,
+            "reducedKeys": 7615,
+            "maximumPositionError": 0.0006158764590509236,
+            "maximumAngleError": 0.07908464223146439
+        },
+        {
+            "clip": "Bulwark_Guard",
+            "originalKeys": 32729,
+            "reducedKeys": 4144,
+            "maximumPositionError": 0.0003689822624437511,
+            "maximumAngleError": 0.076298788189888
+        },
+        {
+            "clip": "Bulwark_Walk",
+            "originalKeys": 22666,
+            "reducedKeys": 4568,
+            "maximumPositionError": 0.00060552719514817,
+            "maximumAngleError": 0.07797299325466156
+        },
+        {
+            "clip": "Bulwark_Run",
+            "originalKeys": 10016,
+            "reducedKeys": 6131,
+            "maximumPositionError": 0.000567375507671386,
+            "maximumAngleError": 0.17380884289741517
+        }
+    ]
+}

@@ -37,13 +37,14 @@ if 'HAND_LIBRARY' not in globals():
                     if cost<score:score=cost;best=(a,b,c)
         return best
     closed={f:finger_pose(f,best_angles(f)) for f in range(2,6)}
-    claw={f:finger_pose(f,(12,34,20)) for f in range(2,6)}
+    claw_angles=((9,32,17),(14,41,21),(18,48,24),(23,54,27))
+    claw={f:finger_pose(f,claw_angles[f-2]) for f in range(2,6)}
     def thumb_pose(targets):
         q=[chains[1][0].copy()]
         for j,p in enumerate(targets):q.append(q[-1]+(Vector(p)-q[-1]).normalized()*(chains[1][j+1]-chains[1][j]).length)
         return q
     closed[1]=thumb_pose(((.043,.065,-.012),(.029,.081,-.032),(.010,.073,-.042)))
-    claw[1]=thumb_pose(((.050,.060,.003),(.054,.082,.005),(.052,.101,.005)))
+    claw[1]=thumb_pose(((.047,.060,-.008),(.049,.080,-.014),(.046,.096,-.015)))
     def HF(a,b):
         y=(b-a).normalized();x=Vector((1,0,0));x=(x-y*x.dot(y)).normalized();z=x.cross(y);return Matrix((x,y,z)).transposed()
     influences=[]
@@ -73,7 +74,9 @@ def target_hand_frame(side):
     distal=(sum((J(side+'ArmDigit%d1'%f) for f in range(2,6)),Vector())/4-wrist).normalized()
     across=J(side+'ArmDigit21')-J(side+'ArmDigit51');across=(across-distal*across.dot(distal)).normalized()
     normal=across.cross(distal).normalized()
-    dorsal=normal*(-1 if side=='R' else 1)
+    # MakeHuman's right arm is on -X. The Unity rig puts the right arm on
+    # +X, so its hand needs the opposite handedness in these coordinates.
+    dorsal=normal*(1 if side=='R' else -1)
     arm=(wrist-J(side+'ArmForearm')).normalized()
     arm_local=Vector((arm.dot(across),arm.dot(distal),arm.dot(dorsal)))
     forearm_fit=(-HC(marker['elbow'])).normalized().rotation_difference(arm_local)
@@ -101,11 +104,11 @@ def make_hands():
         for p in hand_points:
             w=smooth((p.y+.07)/.06);ws.append([(jid(side+'ArmForearm'),1-w),(jid(side+'ArmPalm'),w)])
         add_mesh('Continuous anatomical '+side+' hand and wrist',points,hand_faces,0,ws,[decay_color(p) for p in points],huv)
-        # The blade uses the dorsal frame; the shield faces out of its palm.
-        result.append(dict(side=side,position=vec(place(GRIP)),along=vec(across),normal=vec(-normal),distal=vec(distal)))
+        # Keep the equipment mounting plane separate from the anatomical dorsum.
+        result.append(dict(side=side,position=vec(place(GRIP)),along=vec(across),normal=vec(-normal),distal=vec(distal),dorsal=vec(dorsal)))
         thumb=place(chains[1][0])-wrist;target_thumb=J(side+'ArmDigit11')-wrist
         assert thumb.dot(target_thumb)>0,side+' thumb is on the wrong side of the palm'
-        assert ((across.cross(distal)).dot(dorsal)<0)==(side=='R'),'Hand chirality mismatch'
+        assert dorsal.x*(1 if side=='R' else -1)>.5,side+' hand dorsum should face out in the bind pose'
         print('HAND FRAME',kind,side,'thumb alignment',round(thumb.normalized().dot(target_thumb.normalized()),4),flush=True)
         axis=(wrist-J(side+'ArmForearm')).normalized()
         fitted_surface('Fitted ragged wrist wrapping',1,lambda p,f,wrist=wrist,axis=axis:all(any('ArmForearm' in names[b] and w>.15 for b,w in body_weights[i]) for i in f) and -.070<(p-wrist).dot(axis)<-.012,.006)

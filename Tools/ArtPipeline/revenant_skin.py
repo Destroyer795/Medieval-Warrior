@@ -12,15 +12,15 @@ if '--skip-skin' not in sys.argv or not (TEXTURES/'Skin3.png').exists():
     coord=nodes.new('ShaderNodeTexCoord')
     noise=nodes.new('ShaderNodeTexNoise');noise.noise_dimensions='4D';noise.inputs['Scale'].default_value=13;noise.inputs['Detail'].default_value=5;noise.inputs['Roughness'].default_value=.74;noise.inputs['Distortion'].default_value=.45;links.new(coord.outputs['Generated'],noise.inputs['Vector'])
     ramp=nodes.new('ShaderNodeValToRGB');cr=ramp.color_ramp
-    colors=[(.18,(.065,.050,.042,1)),(.37,(.17,.145,.105,1)),(.50,(.30,.28,.225,1)),(.65,(.48,.43,.34,1)),(.83,(.60,.535,.43,1))]
+    colors=[(.18,(.12,.105,.085,1)),(.37,(.25,.245,.18,1)),(.50,(.41,.395,.29,1)),(.65,(.56,.52,.40,1)),(.83,(.66,.61,.49,1))]
     cr.elements.remove(cr.elements[1]);cr.elements[0].position=colors[0][0];cr.elements[0].color=colors[0][1]
     for position,color in colors[1:]:e=cr.elements.new(position);e.color=color
     links.new(noise.outputs['Fac'],ramp.inputs[0])
     pores=nodes.new('ShaderNodeTexNoise');pores.inputs['Scale'].default_value=260;pores.inputs['Detail'].default_value=3;pores.inputs['Roughness'].default_value=.82;links.new(coord.outputs['Generated'],pores.inputs['Vector'])
     pore_ramp=nodes.new('ShaderNodeValToRGB');pore_ramp.color_ramp.elements[0].position=.34;pore_ramp.color_ramp.elements[0].color=(.42,.38,.31,1);pore_ramp.color_ramp.elements[1].position=.63;pore_ramp.color_ramp.elements[1].color=(1,1,.95,1);links.new(pores.outputs['Fac'],pore_ramp.inputs[0])
-    multiply=nodes.new('ShaderNodeMixRGB');multiply.blend_type='MULTIPLY';multiply.inputs[0].default_value=.42;links.new(ramp.outputs[0],multiply.inputs[1]);links.new(pore_ramp.outputs[0],multiply.inputs[2])
+    multiply=nodes.new('ShaderNodeMixRGB');multiply.blend_type='MULTIPLY';multiply.inputs[0].default_value=.28;links.new(ramp.outputs[0],multiply.inputs[1]);links.new(pore_ramp.outputs[0],multiply.inputs[2])
     sores=nodes.new('ShaderNodeTexNoise');sores.noise_dimensions='4D';sores.inputs['Scale'].default_value=26;sores.inputs['Detail'].default_value=4;sores.inputs['Distortion'].default_value=1.4;links.new(coord.outputs['Generated'],sores.inputs['Vector'])
-    lesions=nodes.new('ShaderNodeValToRGB');lesions.color_ramp.elements[0].position=.63;lesions.color_ramp.elements[1].position=.73;links.new(sores.outputs['Fac'],lesions.inputs[0])
+    lesions=nodes.new('ShaderNodeValToRGB');lesions.color_ramp.elements[0].position=.69;lesions.color_ramp.elements[1].position=.79;links.new(sores.outputs['Fac'],lesions.inputs[0])
     tissue=nodes.new('ShaderNodeMixRGB');tissue.inputs[2].default_value=(.105,.022,.012,1);links.new(lesions.outputs[0],tissue.inputs[0]);links.new(multiply.outputs[0],tissue.inputs[1]);links.new(tissue.outputs[0],emit.inputs['Color'])
     target=nodes.new('ShaderNodeTexImage');nodes.active=target
     scene=bpy.context.scene;scene.render.engine='CYCLES';scene.cycles.samples=1;scene.render.bake.margin=12

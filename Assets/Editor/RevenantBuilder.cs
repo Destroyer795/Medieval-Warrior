@@ -9,7 +9,7 @@ public static class RevenantBuilder
 {
     [Serializable] public class Bone { public string name; public int parent; public Vector3 position; public Matrix4x4 frame; }
     [Serializable] public class Rig { public Bone[] bones; }
-    [Serializable] public class Grip { public string side; public Vector3 position,along,normal,distal,bladeTip; }
+    [Serializable] public class Grip { public string side; public Vector3 position,along,normal,distal,dorsal,bladeTip; }
     [Serializable] public class Part
     {
         public string name;
@@ -72,10 +72,11 @@ public static class RevenantBuilder
         foreach(var p in input.parts)
         {
             var mesh=new Mesh{name="Revenant "+p.name,indexFormat=UnityEngine.Rendering.IndexFormat.UInt32};
-            bool hairPart=p.name.Contains("_Hair");
-            var headInverse=reference.bones.First(b=>b.name=="Base HumanHead").frame.inverse;
-            mesh.vertices=hairPart?p.vertices.Select(v=>headInverse.MultiplyPoint3x4(v)).ToArray():p.vertices;
-            mesh.normals=hairPart?p.normals.Select(v=>headInverse.MultiplyVector(v).normalized).ToArray():p.normals;mesh.uv=p.uv;
+            bool hairPart=p.name.Contains("_Hair"),helmetPart=p.name.Contains("_Helmet"),swordPart=p.name.Contains("_Sword");
+            bool mounted=hairPart||helmetPart||swordPart;
+            var mountInverse=reference.bones.First(b=>b.name==(swordPart?"Base HumanRArmPalm":"Base HumanHead")).frame.inverse;
+            mesh.vertices=mounted?p.vertices.Select(v=>mountInverse.MultiplyPoint3x4(v)).ToArray():p.vertices;
+            mesh.normals=mounted?p.normals.Select(v=>mountInverse.MultiplyVector(v).normalized).ToArray():p.normals;mesh.uv=p.uv;
             mesh.uv2=p.tiles.Select(t=>new Vector2(t,0)).ToArray();mesh.colors=p.colors;mesh.triangles=p.triangles;
             mesh.bindposes=reference.bones.Select(b=>b.frame.inverse).ToArray();
             mesh.boneWeights=Enumerable.Range(0,p.vertices.Length).Select(i=>
@@ -108,18 +109,20 @@ public static class RevenantBuilder
                 if(p.name.EndsWith("LOD1"))target.lod1=mesh;else target.lod2=mesh;
                 EditorUtility.SetDirty(mesh);continue;
             }
-            if(hairPart)
+            if(mounted)
             {
                 var target=data.forms[(int)Enum.Parse(typeof(ZombieType),p.name.Split('_')[0])];
-                target.hair[int.Parse(p.name.Substring(p.name.Length-1))]=mesh;EditorUtility.SetDirty(mesh);continue;
+                var options=hairPart?target.hair:helmetPart?target.helmets:target.swords;
+                options[int.Parse(p.name.Substring(p.name.Length-1))]=mesh;EditorUtility.SetDirty(mesh);continue;
             }
-            var form=new RevenantAsset.Form{type=(ZombieType)Enum.Parse(typeof(ZombieType),p.name),mesh=mesh,hair=new Mesh[3]};
+            var form=new RevenantAsset.Form{type=(ZombieType)Enum.Parse(typeof(ZombieType),p.name),mesh=mesh,hair=new Mesh[3],helmets=new Mesh[3],swords=new Mesh[3]};
             form.leftWristRest=Quaternion.Inverse(reference.bones.First(b=>b.name=="Base HumanLArmForearm").frame.rotation)*reference.bones.First(b=>b.name=="Base HumanLArmPalm").frame.rotation;
             foreach(var g in p.grips)
             {
                 var b=reference.bones.First(x=>x.name=="Base Human"+g.side+"ArmPalm");
                 var grip=new RevenantAsset.Grip{position=b.frame.inverse.MultiplyPoint3x4(g.position),along=b.frame.inverse.MultiplyVector(g.along),
-                    normal=b.frame.inverse.MultiplyVector(g.normal),distal=b.frame.inverse.MultiplyVector(g.distal)};
+                    normal=b.frame.inverse.MultiplyVector(g.normal),distal=b.frame.inverse.MultiplyVector(g.distal),
+                    dorsal=b.frame.inverse.MultiplyVector(g.dorsal)};
                 grip.rotation=Quaternion.LookRotation(grip.normal,Vector3.Cross(grip.normal,grip.along));
                 if(g.side=="R")
                 {

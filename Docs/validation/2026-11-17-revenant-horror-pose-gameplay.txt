@@ -1,0 +1,174 @@
+PASS
+PASS  main menu UI built
+PASS  menu camera orbits the castle
+PASS  castle world loaded behind the menu
+PASS  knight preview + customisation component
+PASS  Marchwarden replaces the demo mesh in the customise preview
+PASS  customisation preview loads the ten-percent-taller warrior
+PASS  game loads the world scene itself
+PASS  GameManager present
+PASS  HUD built
+PASS  match moved from intro to playing
+PASS  zombies spawned on their own (3 alive)
+PASS  player components
+PASS  Marchwarden replaces the demo mesh in gameplay
+PASS  gameplay stature is ten percent taller and repeated setup does not compound scale
+PASS  Marchwarden has separate PBR surfaces and original equipped weapons
+PASS  the enlarged upper torso retains a broad anatomical rib cage
+PASS  quiver bag is compact at realistic belt dimensions
+PASS  sixty metal lamellae use rigid hinge weights instead of thigh deformation
+PASS  heater has a distinct raised arch above its shoulders (0.048 m)
+PASS  cinematic shoulders keep all four anatomical skin influences at runtime
+PASS  independent native cloth loads a lightweight mesh with a pinned waist
+PASS  cloth has explicit thigh, calf, heel, toe and pelvis collision capsules
+PASS  cloth uses continuous capsule collision and virtual triangle particles
+PASS  mesh-bound 4K surface atlas and tangent normals are loaded in gameplay
+PASS  warrior surface UVs stay inside the unique texture atlas
+PASS  all fourteen surfaces retain independent close-up texture detail
+PASS  new cloth and shield support saved palette customisation
+PASS  visible warrior stands taller with the gladiator crest (1.86 m)
+PASS  live neutral shield rim stays below the head joint (0.0187 m)
+PASS  sword and heater handles sit in the palms (0.0000/0.0000 m)
+PASS  the simulated linen surface is visible to the rendered close-up camera
+PASS  crowd spawn prefab contains no demo zombie surfaces
+PASS  Walker spawns its distinct Blender anatomy and shared PBR surface
+PASS  Walker uses the new generic skeletal clips without humanoid retarget conflicts
+PASS  Walker walk/run actually moves leg bones in Play mode
+PASS  Walker attack actually moves arm bones in Play mode
+PASS  Walker death actually lowers the animated body in Play mode
+PASS  Walker retains independently colored, visible tunic and trousers in Play mode
+PASS  Walker appearance stays within three renderer draws
+PASS  Walker Animator plays four visibly distinct unarmed attacks at the real contact time
+PASS  unarmed AI selects varied attacks without immediate repetition
+PASS  Walker standing soles reach the physical floor (clearance -0.008m)
+PASS  Walker has query-only arm, leg and head hit volumes
+PASS  Walker exposed forearm can be struck outside its torso capsule
+PASS  Walker a limb hit deals damage and records blood at the struck surface
+PASS  Walker blood projects to nearby posed anatomy instead of the root capsule
+PASS  procedural posing does not accumulate on a disabled animation rig
+PASS  a real arrow can wound an exposed arm through the anatomical hit volume
+PASS  pause holds terrain grounding and hit-recoil poses without accumulation
+PASS  Runner spawns its distinct Blender anatomy and shared PBR surface
+PASS  Runner uses the new generic skeletal clips without humanoid retarget conflicts
+PASS  Runner walk/run actually moves leg bones in Play mode
+PASS  Runner attack actually moves arm bones in Play mode
+PASS  Runner death actually lowers the animated body in Play mode
+PASS  Runner retains independently colored, visible tunic and trousers in Play mode
+PASS  Runner appearance stays within three renderer draws
+PASS  Runner Animator plays four visibly distinct unarmed attacks at the real contact time
+PASS  Runner standing soles reach the physical floor (clearance -0.007m)
+PASS  Runner has query-only arm, leg and head hit volumes
+PASS  Runner exposed forearm can be struck outside its torso capsule
+PASS  Runner a limb hit deals damage and records blood at the struck surface
+PASS  Runner blood projects to nearby posed anatomy instead of the root capsule
+PASS  Brute spawns its distinct Blender anatomy and shared PBR surface
+PASS  Brute uses the new generic skeletal clips without humanoid retarget conflicts
+PASS  Brute walk/run actually moves leg bones in Play mode
+PASS  Brute attack actually moves arm bones in Play mode
+PASS  Brute death actually lowers the animated body in Play mode
+PASS  Brute retains independently colored, visible tunic and trousers in Play mode
+PASS  Brute appearance stays within three renderer draws
+PASS  Brute Animator plays four visibly distinct unarmed attacks at the real contact time
+PASS  Brute standing soles reach the physical floor (clearance -0.011m)
+PASS  Brute has query-only arm, leg and head hit volumes
+PASS  Brute exposed forearm can be struck outside its torso capsule
+PASS  Brute a limb hit deals damage and records blood at the struck surface
+PASS  Brute blood projects to nearby posed anatomy instead of the root capsule
+PASS  Spitter spawns its distinct Blender anatomy and shared PBR surface
+PASS  Spitter uses the new generic skeletal clips without humanoid retarget conflicts
+PASS  Spitter walk/run actually moves leg bones in Play mode
+PASS  Spitter attack actually moves arm bones in Play mode
+PASS  Spitter death actually lowers the animated body in Play mode
+PASS  Spitter retains independently colored, visible tunic and trousers in Play mode
+PASS  Spitter appearance stays within three renderer draws
+PASS  Spitter standing soles reach the physical floor (clearance -0.007m)
+PASS  Spitter has query-only arm, leg and head hit volumes
+PASS  Spitter exposed forearm can be struck outside its torso capsule
+PASS  Spitter a limb hit deals damage and records blood at the struck surface
+PASS  Spitter blood projects to nearby posed anatomy instead of the root capsule
+PASS  Bloater spawns its distinct Blender anatomy and shared PBR surface
+PASS  Bloater uses the new generic skeletal clips without humanoid retarget conflicts
+PASS  Bloater walk/run actually moves leg bones in Play mode
+PASS  Bloater attack actually moves arm bones in Play mode
+PASS  Bloater death actually lowers the animated body in Play mode
+PASS  Bloater retains independently colored, visible tunic and trousers in Play mode
+PASS  Bloater appearance stays within three renderer draws
+PASS  Bloater Animator plays four visibly distinct unarmed attacks at the real contact time
+PASS  Bloater standing soles reach the physical floor (clearance -0.009m)
+PASS  Bloater has query-only arm, leg and head hit volumes
+PASS  Bloater exposed forearm can be struck outside its torso capsule
+PASS  Bloater a limb hit deals damage and records blood at the struck surface
+PASS  Bloater blood projects to nearby posed anatomy instead of the root capsule
+PASS  Warlord spawns its distinct Blender anatomy and shared PBR surface
+PASS  Warlord uses the new generic skeletal clips without humanoid retarget conflicts
+PASS  Warlord walk/run actually moves leg bones in Play mode
+PASS  Warlord attack actually moves arm bones in Play mode
+PASS  Warlord death actually lowers the animated body in Play mode
+PASS  Warlord retains independently colored, visible tunic and trousers in Play mode
+PASS  Warlord appearance stays within three renderer draws
+PASS  Warlord equips a shared palm-mounted sword variant
+PASS  Warlord standing soles reach the physical floor (clearance -0.015m)
+PASS  Warlord has query-only arm, leg and head hit volumes
+PASS  Warlord exposed forearm can be struck outside its torso capsule
+PASS  Warlord a limb hit deals damage and records blood at the struck surface
+PASS  Warlord blood projects to nearby posed anatomy instead of the root capsule
+PASS  Warlord telegraph cannot damage before blade contact
+PASS  Warlord baked blade contact lands at normal melee reach, style 0 (distance 1.73m)
+PASS  Warlord contact detection leaves the live animation pose untouched, style 0
+PASS  Warlord sword sweep damages at most once per attack, style 0
+PASS  Warlord telegraph cannot damage before blade contact
+PASS  Warlord baked blade contact lands at normal melee reach, style 1 (distance 1.73m)
+PASS  Warlord contact detection leaves the live animation pose untouched, style 1
+PASS  Warlord sword sweep damages at most once per attack, style 1
+PASS  Warlord misses when its committed blade passes beside the warrior
+PASS  Swordsman spawns its distinct Blender anatomy and shared PBR surface
+PASS  Swordsman uses the new generic skeletal clips without humanoid retarget conflicts
+PASS  Swordsman walk/run actually moves leg bones in Play mode
+PASS  Swordsman attack actually moves arm bones in Play mode
+PASS  Swordsman death actually lowers the animated body in Play mode
+PASS  Swordsman retains independently colored, visible tunic and trousers in Play mode
+PASS  Swordsman appearance stays within three renderer draws
+PASS  Swordsman equips a shared palm-mounted sword variant
+PASS  Swordsman standing soles reach the physical floor (clearance -0.009m)
+PASS  Swordsman has query-only arm, leg and head hit volumes
+PASS  Swordsman exposed forearm can be struck outside its torso capsule
+PASS  Swordsman a limb hit deals damage and records blood at the struck surface
+PASS  Swordsman blood projects to nearby posed anatomy instead of the root capsule
+PASS  Swordsman telegraph cannot damage before blade contact
+PASS  Swordsman baked blade contact lands at normal melee reach, style 0 (distance 1.50m)
+PASS  Swordsman contact detection leaves the live animation pose untouched, style 0
+PASS  Swordsman sword sweep damages at most once per attack, style 0
+PASS  Swordsman telegraph cannot damage before blade contact
+PASS  Swordsman baked blade contact lands at normal melee reach, style 1 (distance 1.50m)
+PASS  Swordsman contact detection leaves the live animation pose untouched, style 1
+PASS  Swordsman sword sweep damages at most once per attack, style 1
+PASS  Swordsman misses when its committed blade passes beside the warrior
+PASS  Bulwark spawns its distinct Blender anatomy and shared PBR surface
+PASS  Bulwark uses the new generic skeletal clips without humanoid retarget conflicts
+PASS  Bulwark walk/run actually moves leg bones in Play mode
+PASS  Bulwark attack actually moves arm bones in Play mode
+PASS  Bulwark death actually lowers the animated body in Play mode
+PASS  Bulwark retains independently colored, visible tunic and trousers in Play mode
+PASS  Bulwark appearance stays within three renderer draws
+PASS  Bulwark equips a shared palm-mounted sword variant
+PASS  Bulwark standing soles reach the physical floor (clearance -0.009m)
+PASS  Bulwark has query-only arm, leg and head hit volumes
+PASS  Bulwark exposed forearm can be struck outside its torso capsule
+PASS  Bulwark a limb hit deals damage and records blood at the struck surface
+PASS  Bulwark blood projects to nearby posed anatomy instead of the root capsule
+PASS  Bulwark intercepts a frontal torso weapon hit
+PASS  Bulwark can be damaged from behind its shield
+PASS  an arrow above the Bulwark shield can reach its head
+PASS  shield bash opens the Bulwark guard without freezing its brain
+PASS  Bulwark telegraph cannot damage before blade contact
+PASS  Bulwark baked blade contact lands at normal melee reach, style 0 (distance 1.50m)
+PASS  Bulwark contact detection leaves the live animation pose untouched, style 0
+PASS  Bulwark sword sweep damages at most once per attack, style 0
+PASS  Bulwark exposes its torso during attack follow-through
+PASS  Bulwark telegraph cannot damage before blade contact
+PASS  Bulwark baked blade contact lands at normal melee reach, style 1 (distance 1.50m)
+PASS  Bulwark contact detection leaves the live animation pose untouched, style 1
+PASS  Bulwark sword sweep damages at most once per attack, style 1
+PASS  Bulwark exposes its torso during attack follow-through
+PASS  Bulwark misses when its committed blade passes beside the warrior
+PASS  no errors/exceptions logged (0)

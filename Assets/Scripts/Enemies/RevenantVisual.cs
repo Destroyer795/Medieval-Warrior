@@ -2,27 +2,51 @@ using System.Collections.Generic;
 using UnityEngine;
 
 // Shared PBR skin variants and skeleton; no instantiated materials or per-frame
-// mesh generation. Optional alpha hair uses one extra draw near the camera.
+// mesh generation. Hair or a fitted helmet adds one rigid draw near the camera;
+// armed forms add one palm-mounted sword draw.
 public sealed class RevenantVisual : MonoBehaviour
 {
     static RevenantAsset roster;
-    public static RevenantAsset Roster=>roster!=null?roster:roster=Resources.Load<RevenantAsset>("Revenants/Roster");
+    public static void CacheRoster(RevenantAsset asset)
+    {
+        if(asset==null||asset.forms==null||asset.forms.Length!=ZombieTypes.Count)
+            throw new System.InvalidOperationException("Import the complete Revenant roster before preparing battle");
+        roster=asset;
+    }
+    public static RevenantAsset Roster
+    {
+        get
+        {
+            if(roster==null)
+            {
+                using var timing=BattleLoadMetrics.Measure("Revenant roster synchronous load");
+                roster=Resources.Load<RevenantAsset>("Revenants/Roster");
+            }
+            return roster;
+        }
+    }
     public SkinnedMeshRenderer Body {get;private set;}
     public RevenantAsset.Form Form {get;private set;}
     public Transform SwordHand {get;private set;}
     public Transform ShieldHand=>leftHand;
     Transform leftUpper,leftFore,leftHand;
     EnemyController brain;
+    Animator rigAnimator;
     Camera view;
     float nextDistanceCheck;
     Transform chest;
     float reactionAt=-100;
     Vector3 reactionAxis;
     int level;
-    MeshRenderer hair;
+    MeshRenderer hair,helmet,sword;
+    bool hidden;
+    Transform headMount;
     public RevenantGrounding Grounding {get;private set;}
     public RevenantInjuries Injuries {get;private set;}
     public int HairStyle {get;private set;}=-1;
+    public int HelmetStyle {get;private set;}=-1;
+    public int SwordStyle {get;private set;}=-1;
+    public int OutfitPalette {get;private set;}
     public int DetailLevel=>level;
     public Vector3 BladeBase=>SwordHand.TransformPoint(Form.bladeBase);
     public Vector3 BladeTip=>SwordHand.TransformPoint(Form.bladeTip);
@@ -52,9 +76,11 @@ public sealed class RevenantVisual : MonoBehaviour
 
     public static RevenantVisual Install(GameObject root,ZombieType type)
     {
+        using var timing=BattleLoadMetrics.Measure(BattleLoadMetrics.Enabled?"Revenant install "+type:null);
         var data=Roster;
         if(data==null)throw new System.InvalidOperationException("Import the Blender Revenant roster before spawning enemies");
         var visual=root.GetComponent<RevenantVisual>()??root.AddComponent<RevenantVisual>();
+        bool refresh=visual.Form!=data.Get(type)||visual.Body==null;
         visual.Form=data.Get(type);
         if(visual.Body==null)
         {
@@ -69,27 +95,17 @@ public sealed class RevenantVisual : MonoBehaviour
             visual.Body.sharedMaterial=data.skinSurfaces!=null&&data.skinSurfaces.Length>0?data.skinSurfaces[Random.Range(0,data.skinSurfaces.Length)]:data.surface;visual.Body.quality=SkinQuality.Bone4;
             visual.Body.updateWhenOffscreen=false;
             visual.SwordHand=transforms["Base HumanRArmPalm"];
+            visual.headMount=transforms["Base HumanHead"];
             visual.leftUpper=transforms["Base HumanLArmUpperarm"];visual.leftFore=transforms["Base HumanLArmForearm"];visual.leftHand=transforms["Base HumanLArmPalm"];
             visual.brain=root.GetComponent<EnemyController>();
+            visual.rigAnimator=root.GetComponent<Animator>();
             visual.chest=transforms["Base HumanRibcage"];
             visual.Grounding=root.GetComponent<RevenantGrounding>()??root.AddComponent<RevenantGrounding>();
             visual.Grounding.Bind(visual,transforms);
             visual.Injuries=root.GetComponent<RevenantInjuries>()??root.AddComponent<RevenantInjuries>();
             visual.Injuries.Bind(visual,transforms);
-            var block=new MaterialPropertyBlock();
-            var cloth=new[]{Color.white,new Color(.86f,.50f,.34f),new Color(.52f,.64f,.43f),new Color(.50f,.47f,.43f),new Color(.65f,.32f,.28f)};
-            block.SetColor("_ClothTint",type==ZombieType.Warlord?Color.white:cloth[Random.Range(0,cloth.Length)]);
-            block.SetColor("_SkinTint",Color.Lerp(new Color(.88f,.91f,.89f),new Color(1.03f,.94f,.86f),Random.value));visual.Body.SetPropertyBlock(block);
-            int hairCount=visual.Form.hair!=null?visual.Form.hair.Length:0;
-            visual.HairStyle=hairCount==0||Random.value<.18f?-1:Random.Range(0,hairCount);
-            if(visual.HairStyle>=0)
-            {
-                var head=transforms["Base HumanHead"];var hairObject=new GameObject("Matted hair and beard");hairObject.transform.SetParent(head,false);
-                hairObject.AddComponent<MeshFilter>().sharedMesh=visual.Form.hair[visual.HairStyle];visual.hair=hairObject.AddComponent<MeshRenderer>();visual.hair.sharedMaterial=data.hairSurface!=null?data.hairSurface:data.surface;
-                var tint=new[]{new Color(.42f,.43f,.46f),Color.white,new Color(1.3f,1.5f,1.8f),new Color(.85f,.64f,.40f)};
-                var hairBlock=new MaterialPropertyBlock();hairBlock.SetColor("_HairTint",tint[Random.Range(0,tint.Length)]);visual.hair.SetPropertyBlock(hairBlock);
-            }
         }
+        if(refresh)visual.Dress(data,type);
         visual.Body.sharedMesh=visual.Form.mesh;
         visual.Body.localBounds=new Bounds(new Vector3(0,1,0),new Vector3(2.8f,2.8f,2.8f));
         var animator=root.GetComponent<Animator>();
@@ -104,9 +120,56 @@ public sealed class RevenantVisual : MonoBehaviour
         }
         return visual;
     }
+
+    // Paired historical dyes remain readable under night lighting. Primary,
+    // trousers and facings have independent atlas tiles, never multiply to black.
+    static readonly Color[,] outfits={
+        {new Color(.47f,.62f,.73f),new Color(.59f,.36f,.24f),new Color(.81f,.72f,.52f)},
+        {new Color(.72f,.32f,.24f),new Color(.48f,.49f,.39f),new Color(.82f,.69f,.43f)},
+        {new Color(.72f,.58f,.28f),new Color(.38f,.43f,.49f),new Color(.72f,.43f,.27f)},
+        {new Color(.43f,.57f,.35f),new Color(.70f,.62f,.47f),new Color(.57f,.29f,.22f)},
+        {new Color(.59f,.43f,.57f),new Color(.51f,.50f,.43f),new Color(.79f,.72f,.53f)},
+        {new Color(.80f,.74f,.57f),new Color(.37f,.47f,.57f),new Color(.62f,.34f,.22f)},
+        {new Color(.66f,.39f,.24f),new Color(.46f,.55f,.41f),new Color(.75f,.65f,.44f)},
+        {new Color(.45f,.54f,.58f),new Color(.66f,.46f,.35f),new Color(.76f,.42f,.31f)}
+    };
+    void Dress(RevenantAsset data,ZombieType type)
+    {
+        hidden=false;Body.enabled=true;
+        Body.sharedMaterial=data.skinSurfaces[Random.Range(0,data.skinSurfaces.Length)];
+        OutfitPalette=Random.Range(0,outfits.GetLength(0));
+        var block=new MaterialPropertyBlock();
+        block.SetColor("_ClothTint",outfits[OutfitPalette,0]);
+        block.SetColor("_TrouserTint",outfits[OutfitPalette,1]);
+        block.SetColor("_FacingTint",outfits[OutfitPalette,2]);
+        block.SetColor("_SkinTint",Color.Lerp(new Color(.87f,.94f,.86f),new Color(1.06f,.92f,.86f),Random.value));
+        block.SetColor("_MetalTint",Color.Lerp(new Color(.68f,.74f,.78f),new Color(1.05f,.88f,.65f),Random.value));
+        Body.SetPropertyBlock(block);
+        float helmetChance=type==ZombieType.Warlord?1:Armed(type)?.85f:type==ZombieType.Brute?.3f:.20f;
+        HelmetStyle=Form.helmets!=null&&Form.helmets.Length>0&&Random.value<helmetChance?Random.Range(0,Form.helmets.Length):-1;
+        SwordStyle=Armed(type)&&Form.swords!=null&&Form.swords.Length>0?Random.Range(0,Form.swords.Length):-1;
+        Mount(ref helmet,"Fitted interchangeable helmet",headMount,HelmetStyle>=0?Form.helmets[HelmetStyle]:null,Body.sharedMaterial,block);
+        Mount(ref sword,"Palm mounted interchangeable sword",SwordHand,SwordStyle>=0?Form.swords[SwordStyle]:null,Body.sharedMaterial,block);
+        HairStyle=Form.hair==null||Form.hair.Length==0||Random.value<.14f?-1:Random.Range(0,Form.hair.Length);
+        var hairBlock=new MaterialPropertyBlock();
+        hairBlock.SetColor("_HairTint",Color.Lerp(new Color(.52f,.43f,.34f),new Color(1.50f,1.54f,1.57f),Random.value));
+        Mount(ref hair,"Matted hair and beard",headMount,HairStyle>=0?Form.hair[HairStyle]:null,data.hairSurface,hairBlock);
+        if(hair!=null)hair.enabled=HairStyle>=0&&HelmetStyle<0;
+        level=0;
+    }
+    static void Mount(ref MeshRenderer renderer,string name,Transform bone,Mesh mesh,Material material,MaterialPropertyBlock block)
+    {
+        if(renderer==null)
+        {
+            var child=new GameObject(name);child.transform.SetParent(bone,false);
+            child.AddComponent<MeshFilter>();renderer=child.AddComponent<MeshRenderer>();
+        }
+        renderer.GetComponent<MeshFilter>().sharedMesh=mesh;renderer.sharedMaterial=material;
+        renderer.SetPropertyBlock(block);renderer.enabled=mesh!=null;
+    }
     void LateUpdate()
     {
-        if(Body==null)return;
+        if(Body==null||hidden)return;
         if(Time.time>=nextDistanceCheck)
         {
             nextDistanceCheck=Time.time+.23f;
@@ -118,7 +181,8 @@ public sealed class RevenantVisual : MonoBehaviour
                 int wanted=distance>(level==2?34*34:39*39)?2:distance>(level>0?16*16:20*20)?1:0;
                 var mesh=wanted==2?Form.lod2:wanted==1?Form.lod1:Form.mesh;
                 if(mesh!=null&&Body.sharedMesh!=mesh){Body.sharedMesh=mesh;level=wanted;}
-                if(hair!=null)hair.enabled=level<2;
+                if(hair!=null)hair.enabled=level<2&&HairStyle>=0&&HelmetStyle<0;
+                if(helmet!=null)helmet.enabled=level<2&&HelmetStyle>=0;
             }
         }
         if(Form.type==ZombieType.Bulwark&&brain!=null&&!brain.IsDead&&!brain.IsAttacking&&!brain.GuardRaised)
@@ -128,7 +192,8 @@ public sealed class RevenantVisual : MonoBehaviour
             PoseMath.SetWrist(leftFore,leftHand,desired,Form.left.distal,Form.leftWristRest);
         }
         float phase=(Time.time-reactionAt)/.18f;
-        if(chest!=null&&brain!=null&&!brain.IsDead&&phase>=0&&phase<1)
+        bool freshPose=Time.timeScale>0&&Time.deltaTime>0&&rigAnimator!=null&&rigAnimator.enabled&&(Body.isVisible||rigAnimator.cullingMode==AnimatorCullingMode.AlwaysAnimate);
+        if(freshPose&&chest!=null&&brain!=null&&!brain.IsDead&&phase>=0&&phase<1)
         {
             float recoil=Mathf.Sin(phase*Mathf.PI)*Mathf.Exp(-phase*1.25f)*8;
             chest.rotation=Quaternion.AngleAxis(recoil,reactionAxis)*chest.rotation;
@@ -139,5 +204,13 @@ public sealed class RevenantVisual : MonoBehaviour
         reactionAt=Time.time;
         reactionAxis=Vector3.Cross(Vector3.up,Vector3.ProjectOnPlane(direction,Vector3.up)).normalized;
         if(reactionAxis.sqrMagnitude<.1f)reactionAxis=transform.right;
+    }
+    public void HideSurfaces()
+    {
+        hidden=true;
+        if(Body!=null)Body.enabled=false;
+        if(hair!=null)hair.enabled=false;
+        if(helmet!=null)helmet.enabled=false;
+        if(sword!=null)sword.enabled=false;
     }
 }

@@ -16,7 +16,7 @@ public sealed class RevenantAsset : ScriptableObject
     }
     [Serializable] public struct Grip
     {
-        public Vector3 position,along,normal,distal;
+        public Vector3 position,along,normal,distal,dorsal;
         public Quaternion rotation;
     }
     [Serializable] public class Form
@@ -29,6 +29,7 @@ public sealed class RevenantAsset : ScriptableObject
         public Vector3 bladeBase,bladeTip;
         public Quaternion leftWristRest;
         public Mesh[] hair;
+        public Mesh[] helmets,swords;
         public BladeTrack[] blades;
         public float walkSpeed=.25f,runSpeed=3.55f;
     }

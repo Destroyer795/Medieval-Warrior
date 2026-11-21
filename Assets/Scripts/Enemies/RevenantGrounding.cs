@@ -42,6 +42,9 @@ public sealed class RevenantGrounding : MonoBehaviour
 
     void LateUpdate()
     {
+        // Offsets are applied to a freshly evaluated animation pose. Reapplying
+        // them while paused or Animator-disabled would accumulate a floor drift.
+        if(animator==null||!animator.enabled||Time.timeScale<=0||Time.deltaTime<=0)return;
         if(visual==null||!visual.Body.isVisible&&animator.cullingMode!=AnimatorCullingMode.AlwaysAnimate)return;
         if(brain!=null&&brain.IsDead)
         {

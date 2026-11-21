@@ -34,13 +34,14 @@ def near(p,a,b):
 def vec(v):return dict(zip('xyz',(round(float(c),6) for c in v)))
 bpy.ops.object.select_all(action='SELECT');bpy.ops.object.delete(use_global=False)
 
-# Shared atlased PBR palette. One draw per character (including eyes and armor).
+# Shared atlas: one skinned body draw (including eyes/armor), plus rigid variants.
 # UV0 is a tile number + local UV; the shader filters tile coordinates explicitly.
-palette=[('Necrotic skin',(.47,.50,.41),0,.83),('Burial linen',(.26,.24,.19),0,.96),
- ('Oxidised iron',(.23,.235,.23),.87,.57),('Old oxblood leather',(.18,.085,.055),0,.81),
+palette=[('Necrotic skin',(.47,.50,.41),0,.88),('Burial linen',(.67,.64,.57),0,.98),
+ ('Oxidised iron',(.33,.345,.35),.70,.84),('Old oxblood leather',(.25,.14,.09),0,.94),
  ('Exposed bone',(.68,.61,.43),0,.76),('Splintered oak',(.27,.18,.10),0,.85),
  ('Tarnished bronze',(.32,.25,.14),.30,.94),('Clouded eyes',(.38,.37,.31),0,.90),('Matted hair',(.16,.11,.075),0,.98),('Scalp stubble',(.12,.10,.075),0,.98),
- ('Clotted blood',(.12,.012,.009),0,.98),('Exposed muscle',(.30,.055,.038),0,.91)]
+ ('Clotted blood',(.12,.012,.009),0,.98),('Exposed muscle',(.34,.065,.048),0,.94),
+ ('Trouser linen',(.59,.57,.51),0,.98),('Faded facing',(.72,.68,.57),0,.98)]
 materials=[];rng=np.random.default_rng(518);tile=512;size=tile*4
 albedo=np.ones((size,size,4),dtype=np.float32)
 normal=np.ones_like(albedo);normal[:,:,:3]=(.5,.5,1)
@@ -55,11 +56,12 @@ for i,(name,col,metal,rough) in enumerate(palette):
         veins=np.exp(-(np.sin(x*math.tau*13+np.sin(y*math.tau*7)*2.7)*26)**2)*np.exp(-(np.cos(y*math.tau*5+x*17)*4)**2)
         creases=np.maximum(0,grains-1.4)
         height+=veins*.009-creases*.012;tone-=veins*.12+creases*.07
-    elif i==1:
+    elif i in (1,12,13):
         weave=np.sin(x*math.tau*112)*np.cos(y*math.tau*112)
-        height=weave*.018+grains*.0018
+        height=weave*.008+grains*.0018
         dirt=(np.sin(x*31+np.sin(y*19)*2)*np.sin(y*27+x*7)+1)*.5
-        tone=.78+weave*.018+grains*.008+dirt*.20
+        stains=np.maximum(0,np.sin(x*13+np.sin(y*23)*1.7)*np.cos(y*17-x*5))
+        tone=.90+weave*.018+grains*.012+dirt*.04-stains*.06
     elif i in (2,6):
         pits=np.maximum(0,grains-1.2);height=grains*.002-pits*.010;tone=.91+grains*.012-pits*.045
         for k in range(30):
@@ -78,7 +80,7 @@ for i,(name,col,metal,rough) in enumerate(palette):
     if i in (2,6):
         field=rng.normal(0,1,(tile,tile));fy=np.fft.fftfreq(tile);fx=np.fft.fftfreq(tile)
         blur=np.fft.ifft2(np.fft.fft2(field)*np.exp(-2*math.pi**2*32**2*(fy[:,None]**2+fx[None,:]**2))).real
-        field=(blur-blur.mean())/max(blur.std(),.00001);rust=np.clip((field-.4)*.22,0,.60)
+        field=(blur-blur.mean())/max(blur.std(),.00001);rust=np.clip((field-.4)*.10,0,.28)
         albedo[yy:yy+tile,xx:xx+tile,:3]=albedo[yy:yy+tile,xx:xx+tile,:3]*(1-rust[:,:,None])+np.array((.18,.070,.025))*rust[:,:,None]
     if i==8:
         alpha=np.zeros_like(x)
@@ -276,12 +278,17 @@ def fitted_surface(name,mat,mask,offset=.012,rigid_bone=None):
     return o
 
 def jerkin_region(p,f):
-    if not torso_region(p,f):return False
-    if not 1.005+.014*math.sin(p.x*64+seed)<p.y<1.445:return False
-    # Low curved neckline and torn armholes are cut in the cloth, not the body.
-    if p.z>.015 and p.y>1.418-.055*math.exp(-(p.x/.070)**4):return False
-    if kind=='Runner':return p.z<-.045 or abs(p.x)>.115 and p.y<1.35
-    tear=((p.x-.085)/.051)**2+((p.y-1.215)/.085)**2
+    if not torso_region(p,f):
+        # Torn half sleeves follow the upper-arm weights, including the shoulder.
+        for side in ('L','R'):
+            a=J(side+'ArmUpperarm');b=J(side+'ArmForearm');axis=b-a
+            t=(p-a).dot(axis)/axis.length_squared
+            if p.x*a.x>0 and -.12<t<(.64 if kind=='Walker' else .33):return True
+        return False
+    if not 1.005+.014*math.sin(p.x*64+seed)<p.y<1.488:return False
+    if p.y>1.458-.018*math.exp(-(p.x/.061)**4) and abs(p.x)<.079:return False
+    if kind=='Runner' and p.z>.025 and p.x<-.055 and 1.12<p.y<1.39:return False
+    tear=((p.x-.085)/.044)**2+((p.y-1.215)/.061)**2
     return not (p.z>.04 and tear<1+.12*math.sin(p.y*137))
 
 def torso_region(p,f):
@@ -377,17 +384,7 @@ def equipment(grips):
         for s in (-1,1):
             thigh='LLegThigh' if s<0 else 'RThigh'
             fitted_surface('Fitted thigh fauld plate',2,lambda p,f,s=s:s*p.x>.025 and .83<p.y<.94 and p.z>.04,.023,thigh)
-        if kind!='Brute':
-            h=J('Head');fitted_surface('Fitted open faced iron sallet',2,lambda p,f:p.y>1.70 or p.y>1.65 and p.z<.015,.012,'Head')
-            fitted_surface('Forged nasal bridge',2,lambda p,f:abs(p.x)<.010 and 1.65<p.y<1.72 and p.z>.05,.014,'Head')
-            if kind=='Bulwark':
-                fitted_surface('Contoured open cheek guards',2,lambda p,f:.075<abs(p.x)<.105 and 1.61<p.y<1.705 and p.z>.018,.014,'Head')
-            for s in (-1,1):
-                sweep('Forged temple edging',[(s*.092,y,depth(s*.092,y)+.015) for y in np.linspace(1.66,1.72,12)],.005,6 if kind=='Warlord' else 2,'Head',8)
-            if kind=='Warlord':
-                for k in range(9):
-                    a=k*math.tau/9;c=h+Vector((.095*math.sin(a),.09,.085*math.cos(a)))
-                    sweep('Broken crown point',[c,c+Vector((.008*math.sin(a),.10+(.035 if k%2 else 0),.008*math.cos(a)))],lambda t:.014*(1-t)+.001,6,'Head',8)
+        if kind=='Warlord':
                 verts=[];faces=[];ws=[]
                 for j in range(17):
                     t=j/16
@@ -421,16 +418,6 @@ def equipment(grips):
         along=Vector(tuple(mount['along'][k] for k in 'xyz'));forward=Vector(tuple(mount['normal'][k] for k in 'xyz'))
         # Weapon axes are local to an actual closed palm, not the fingertips.
         blade=along;edge=unit(blade.cross(forward));root=c+blade*.075;tip=c+blade*(.79 if kind=='Warlord' else .72)
-        sweep('Leather wrapped sword grip',[c-blade*.065,c+blade*.065],.018,3,'RArmPalm',12)
-        ellipsoid('Peened sword pommel',c-blade*.087,(.026,.026,.026),2,'RArmPalm',20,12)
-        sweep('Swept crossguard',[root-edge*.115-blade*.018,root-edge*.07,root,root+edge*.07,root+edge*.115-blade*.018],.012,2,'RArmPalm',12)
-        v=[];fs=[]
-        for t,width in [(0,.034),(.12,.033),(.80,.023),(.99,.003)]:
-            p=root.lerp(tip,t)
-            for a,b in [(-width,0),(0,.006),(width,0),(0,-.006)]:v.append(p+edge*a+forward*b)
-        for j in range(3):
-            for k in range(4):a=j*4+k;fs.append((a,j*4+(k+1)%4,(j+1)*4+(k+1)%4,a+4))
-        fs +=[(3,2,1,0),(12,13,14,15)];rigid('Forged diamond section arming sword',v,fs,2,'RArmPalm')
         mount['bladeTip']=vec(tip)
         if kind=='Bulwark':
             g=next(g for g in grips if g['side']=='L');c=Vector(tuple(g['position'][k] for k in 'xyz'))
@@ -461,6 +448,13 @@ def decay_color(p):
     socket=math.exp(-((abs(p.x)-.033)/.025)**2-((p.y-1.659)/.021)**2)*smooth((p.z-.03)/.05)
     mouth=math.exp(-(p.x/.042)**4-((p.y-1.596)/.009)**2)*smooth((p.z-.05)/.05)
     base*=1-.78*socket-.65*mouth
+    if 1.55<p.y<1.72 and p.z>.045:
+        front=smooth((p.z-.045)/.04)
+        cheek=math.exp(-((abs(p.x)-.051)/.022)**2-((p.y-1.614)/.022)**2)*front
+        orbit=math.exp(-((abs(p.x)-.031)/.029)**4-((p.y-1.652)/.018)**2)*front
+        crease_x=.019+(1.624-p.y)*.52
+        fold=math.exp(-((abs(p.x)-crease_x)/.005)**2-((p.y-1.607)/.021)**4)*front
+        base*=np.array((1-.32*cheek,1-.44*cheek,1-.25*cheek))*(1-.50*orbit-.36*fold)
     # Deliberately bounded lesions, not overall noisy red skin.
     lesions=[(-.10,1.29,.075,.031),(.075,1.11,.10,.029),(-.049,1.647,.092,.022),(.035,1.60,.105,.015),(.14,.44,.025,.020)]
     for x,y,z,r in lesions:
@@ -494,10 +488,12 @@ def export_objects(label,objects,grips):
 
 exec((ROOT/'Tools/ArtPipeline/revenant_hands.py').read_text(),globals())
 exec((ROOT/'Tools/ArtPipeline/revenant_anatomy.py').read_text(),globals())
+exec((ROOT/'Tools/ArtPipeline/revenant_dread.py').read_text(),globals())
 for seed,kind in enumerate(roster):
     collection=bpy.data.collections.new('Revenants / '+kind);bpy.context.scene.collection.children.link(collection);objects=[]
     pts=[body_shape(p,i) for i,p in enumerate(fitted)];weights=[ws.copy() for ws in skin];grips=[]
     fit_wrist_seams(pts)
+    mouth_faces=fit_lips(pts)
     prepare_wounds(pts,weights)
     if kind=='Walker':texture_points=[p.copy() for p in pts]
     body_points=pts;body_weights=weights;body_normals=[Vector() for _ in pts]
@@ -511,22 +507,24 @@ for seed,kind in enumerate(roster):
     for side in ('L','R'):
         p=M(('r' if side=='L' else 'l')+'-eye');sw=candidates(p)
         e=fit(p,sw)
-        ellipsoid('Clouded recessed eye',e-Vector((0,0,.010)),(.0115,.0112,.008),7,'Head',24,14)
+        ellipsoid('Clouded recessed eye',e-Vector((0,0,.0085)),(.012,.0112,.008),7,'Head',24,14)
         if side=='R' or kind in ('Swordsman','Bulwark'):
-            ellipsoid('Contracted dark pupil',e-Vector((0,0,.0022)),(.0023,.0028,.0006),3,'Head',16,10,(.13,.16,.12))
+            ellipsoid('Contracted dark pupil',e-Vector((0,0,.0007)),(.0020,.0026,.0006),3,'Head',16,10,(.13,.16,.12))
     equipment(grips)
+    make_dread_face()
     make_wounds()
     # Remove skin strictly inside the fitted clothing. The safety margin at
     # each opening retains a continuous joint but prevents coincident surfaces.
     def covered(p,f):
         if any(hand_removed[i] for i in f):return True
+        if tuple(f) in mouth_faces:return True
         if any(injury_radius(p,w)<.90 for w in injuries):return True
         arm=any('Arm' in names[b] and w>.4 for i in f for b,w in weights[i])
         armored=kind in ('Brute','Warlord','Swordsman','Bulwark')
-        if not arm and .63<p.y<.94:return True
+        if not arm and PANT_HEMS[kind]+.025<p.y<.94:return True
         if armored and torso_region(p,f) and 1.045<p.y<1.415:return True
         if armored and torso_region(p,f) and .945<p.y<1.015:return True
-        if kind in ('Warlord','Swordsman','Bulwark') and (p.y>1.715 or p.y<.22):return True
+        if kind in ('Warlord','Swordsman','Bulwark') and p.y<.22:return True
         if not armored and kind!='Bloater' and jerkin_region(p,f):return True
         return False
     kept=[i for i,f in enumerate(source_faces) if not covered(sum((pts[j] for j in f),Vector())/len(f),f)]
@@ -542,6 +540,7 @@ for seed,kind in enumerate(roster):
     for i,b in enumerate(rig):
         if b['parent']>=0:arm.edit_bones[i].parent=arm.edit_bones[b['parent']]
     bpy.ops.object.mode_set(mode='OBJECT');ao.select_set(False)
+    fit_crowd_budget()
     all_exports.append(export_objects(kind,objects,grips))
     # Distance meshes retain materials, UVs and skin groups. Decimate separate
     # pieces so armor cannot collapse into skin and finger webs stay separate.
@@ -552,6 +551,7 @@ for seed,kind in enumerate(roster):
     for o in objects:
         o.modifiers.remove(o.modifiers['Crowd distance LOD'])
         mod=o.modifiers.new('Animation skeleton','ARMATURE');mod.object=ao;o.parent=ao
+    export_dread_equipment(grips,ao)
     exec((ROOT/'Tools/ArtPipeline/revenant_hair.py').read_text(),globals())
 
 exec((ROOT/'Tools/ArtPipeline/revenant_skin.py').read_text(),globals())

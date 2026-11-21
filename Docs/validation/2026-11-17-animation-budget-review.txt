@@ -1,0 +1,185 @@
+PASS Eight Blender archetypes imported
+PASS Walker: continuous anatomy within crowd triangle budget
+PASS Walker: one shared matte body draw
+PASS Walker: three fitted hair/beard options
+PASS Walker: four detailed anatomical UV skin maps
+PASS Walker: normalized four-influence skin
+PASS Walker: two reduced distance meshes preserve crowd performance
+PASS Walker: one body draw and at most two rigid equipment draws; helmet excludes scalp hair
+PASS Walker: 4 distinct baked combat clips and controller
+PASS Walker: three fitted interchangeable helmet silhouettes
+PASS Walker: trousers have their own color channel
+PASS Walker: open mouth includes modeled enamel teeth
+PASS Walker: clip contact/recovery timing matches brain
+PASS Hair meshes retain separate strand and scalp surface coordinates
+PASS Walker: R thumb-side axis agrees with the actual finger bones
+PASS Walker: L thumb-side axis agrees with the actual finger bones
+PASS Walker: walking soles remain on the authored floor (max 0.0001m)
+PASS Walker: idle, walk and run close without a loop seam
+PASS Walker: finite posed mesh, strike 0
+PASS Walker: finite posed mesh, strike 1
+PASS Walker: finite posed mesh, strike 2
+PASS Walker: finite posed mesh, strike 3
+PASS Walker: wrists remain anatomically limited across every attack (max 46.1 degrees)
+PASS Walker: no arm flips between 120Hz pose samples (max 14.6 degrees)
+PASS Walker: four unarmed contacts have distinct bilateral hand poses
+PASS Runner: continuous anatomy within crowd triangle budget
+PASS Runner: one shared matte body draw
+PASS Runner: three fitted hair/beard options
+PASS Runner: four detailed anatomical UV skin maps
+PASS Runner: normalized four-influence skin
+PASS Runner: two reduced distance meshes preserve crowd performance
+PASS Runner: one body draw and at most two rigid equipment draws; helmet excludes scalp hair
+PASS Runner: 4 distinct baked combat clips and controller
+PASS Runner: three fitted interchangeable helmet silhouettes
+PASS Runner: trousers have their own color channel
+PASS Runner: open mouth includes modeled enamel teeth
+PASS Runner: clip contact/recovery timing matches brain
+PASS Runner: R thumb-side axis agrees with the actual finger bones
+PASS Runner: L thumb-side axis agrees with the actual finger bones
+PASS Runner: walking soles remain on the authored floor (max 0.0001m)
+PASS Runner: idle, walk and run close without a loop seam
+PASS Runner: finite posed mesh, strike 0
+PASS Runner: finite posed mesh, strike 1
+PASS Runner: finite posed mesh, strike 2
+PASS Runner: finite posed mesh, strike 3
+PASS Runner: wrists remain anatomically limited across every attack (max 47.6 degrees)
+PASS Runner: no arm flips between 120Hz pose samples (max 20.6 degrees)
+PASS Runner: four unarmed contacts have distinct bilateral hand poses
+PASS Brute: continuous anatomy within crowd triangle budget
+PASS Brute: one shared matte body draw
+PASS Brute: three fitted hair/beard options
+PASS Brute: four detailed anatomical UV skin maps
+PASS Brute: normalized four-influence skin
+PASS Brute: two reduced distance meshes preserve crowd performance
+PASS Brute: one body draw and at most two rigid equipment draws; helmet excludes scalp hair
+PASS Brute: 4 distinct baked combat clips and controller
+PASS Brute: three fitted interchangeable helmet silhouettes
+PASS Brute: trousers have their own color channel
+PASS Brute: open mouth includes modeled enamel teeth
+PASS Brute: clip contact/recovery timing matches brain
+PASS Brute: R thumb-side axis agrees with the actual finger bones
+PASS Brute: L thumb-side axis agrees with the actual finger bones
+PASS Brute: walking soles remain on the authored floor (max 0.0001m)
+PASS Brute: idle, walk and run close without a loop seam
+PASS Brute: finite posed mesh, strike 0
+PASS Brute: finite posed mesh, strike 1
+PASS Brute: finite posed mesh, strike 2
+PASS Brute: finite posed mesh, strike 3
+PASS Brute: wrists remain anatomically limited across every attack (max 46.5 degrees)
+PASS Brute: no arm flips between 120Hz pose samples (max 17.9 degrees)
+PASS Brute: four unarmed contacts have distinct bilateral hand poses
+PASS Spitter: continuous anatomy within crowd triangle budget
+PASS Spitter: one shared matte body draw
+PASS Spitter: three fitted hair/beard options
+PASS Spitter: four detailed anatomical UV skin maps
+PASS Spitter: normalized four-influence skin
+PASS Spitter: two reduced distance meshes preserve crowd performance
+PASS Spitter: one body draw and at most two rigid equipment draws; helmet excludes scalp hair
+PASS Spitter: 2 distinct baked combat clips and controller
+PASS Spitter: three fitted interchangeable helmet silhouettes
+PASS Spitter: trousers have their own color channel
+PASS Spitter: open mouth includes modeled enamel teeth
+PASS Spitter: clip contact/recovery timing matches brain
+PASS Spitter: R thumb-side axis agrees with the actual finger bones
+PASS Spitter: L thumb-side axis agrees with the actual finger bones
+PASS Spitter: walking soles remain on the authored floor (max 0.0001m)
+PASS Spitter: idle, walk and run close without a loop seam
+PASS Spitter: finite posed mesh, strike 0
+PASS Spitter: finite posed mesh, strike 1
+PASS Spitter: wrists remain anatomically limited across every attack (max 46.1 degrees)
+PASS Spitter: no arm flips between 120Hz pose samples (max 5.3 degrees)
+PASS Bloater: continuous anatomy within crowd triangle budget
+PASS Bloater: one shared matte body draw
+PASS Bloater: three fitted hair/beard options
+PASS Bloater: four detailed anatomical UV skin maps
+PASS Bloater: normalized four-influence skin
+PASS Bloater: two reduced distance meshes preserve crowd performance
+PASS Bloater: one body draw and at most two rigid equipment draws; helmet excludes scalp hair
+PASS Bloater: 4 distinct baked combat clips and controller
+PASS Bloater: three fitted interchangeable helmet silhouettes
+PASS Bloater: trousers have their own color channel
+PASS Bloater: open mouth includes modeled enamel teeth
+PASS Bloater: clip contact/recovery timing matches brain
+PASS Bloater: R thumb-side axis agrees with the actual finger bones
+PASS Bloater: L thumb-side axis agrees with the actual finger bones
+PASS Bloater: walking soles remain on the authored floor (max 0.0001m)
+PASS Bloater: idle, walk and run close without a loop seam
+PASS Bloater: finite posed mesh, strike 0
+PASS Bloater: finite posed mesh, strike 1
+PASS Bloater: finite posed mesh, strike 2
+PASS Bloater: finite posed mesh, strike 3
+PASS Bloater: wrists remain anatomically limited across every attack (max 46.3 degrees)
+PASS Bloater: no arm flips between 120Hz pose samples (max 11.6 degrees)
+PASS Bloater: four unarmed contacts have distinct bilateral hand poses
+PASS Warlord: continuous anatomy within crowd triangle budget
+PASS Warlord: one shared matte body draw
+PASS Warlord: three fitted hair/beard options
+PASS Warlord: four detailed anatomical UV skin maps
+PASS Warlord: normalized four-influence skin
+PASS Warlord: two reduced distance meshes preserve crowd performance
+PASS Warlord: one body draw and at most two rigid equipment draws; helmet excludes scalp hair
+PASS Warlord: 2 distinct baked combat clips and controller
+PASS Warlord: three fitted interchangeable helmet silhouettes
+PASS Warlord: three palm-mounted sword variants
+PASS Warlord: trousers have their own color channel
+PASS Warlord: open mouth includes modeled enamel teeth
+PASS Warlord: clip contact/recovery timing matches brain
+PASS Warlord: R thumb-side axis agrees with the actual finger bones
+PASS Warlord: L thumb-side axis agrees with the actual finger bones
+PASS Warlord: walking soles remain on the authored floor (max 0.0001m)
+PASS Warlord: idle, walk and run close without a loop seam
+PASS Warlord: finite posed mesh, strike 0
+PASS Warlord: blade passes through melee contact corridor at gameplay scale, strike 0 (0.463m)
+PASS Warlord: finite posed mesh, strike 1
+PASS Warlord: blade passes through melee contact corridor at gameplay scale, strike 1 (0.087m)
+PASS Warlord: wrists remain anatomically limited across every attack (max 51.7 degrees)
+PASS Warlord: no arm flips between 120Hz pose samples (max 26.6 degrees)
+PASS Swordsman: continuous anatomy within crowd triangle budget
+PASS Swordsman: one shared matte body draw
+PASS Swordsman: three fitted hair/beard options
+PASS Swordsman: four detailed anatomical UV skin maps
+PASS Swordsman: normalized four-influence skin
+PASS Swordsman: two reduced distance meshes preserve crowd performance
+PASS Swordsman: one body draw and at most two rigid equipment draws; helmet excludes scalp hair
+PASS Swordsman: 2 distinct baked combat clips and controller
+PASS Swordsman: three fitted interchangeable helmet silhouettes
+PASS Swordsman: three palm-mounted sword variants
+PASS Swordsman: trousers have their own color channel
+PASS Swordsman: open mouth includes modeled enamel teeth
+PASS Swordsman: clip contact/recovery timing matches brain
+PASS Swordsman: R thumb-side axis agrees with the actual finger bones
+PASS Swordsman: L thumb-side axis agrees with the actual finger bones
+PASS Swordsman: walking soles remain on the authored floor (max 0.0001m)
+PASS Swordsman: idle, walk and run close without a loop seam
+PASS Swordsman: finite posed mesh, strike 0
+PASS Swordsman: blade passes through melee contact corridor at gameplay scale, strike 0 (0.519m)
+PASS Swordsman: finite posed mesh, strike 1
+PASS Swordsman: blade passes through melee contact corridor at gameplay scale, strike 1 (0.595m)
+PASS Swordsman: wrists remain anatomically limited across every attack (max 48.8 degrees)
+PASS Swordsman: no arm flips between 120Hz pose samples (max 20.6 degrees)
+PASS Bulwark: continuous anatomy within crowd triangle budget
+PASS Bulwark: one shared matte body draw
+PASS Bulwark: three fitted hair/beard options
+PASS Bulwark: four detailed anatomical UV skin maps
+PASS Bulwark: normalized four-influence skin
+PASS Bulwark: two reduced distance meshes preserve crowd performance
+PASS Bulwark: one body draw and at most two rigid equipment draws; helmet excludes scalp hair
+PASS Bulwark: 2 distinct baked combat clips and controller
+PASS Bulwark: three fitted interchangeable helmet silhouettes
+PASS Bulwark: three palm-mounted sword variants
+PASS Bulwark: trousers have their own color channel
+PASS Bulwark: open mouth includes modeled enamel teeth
+PASS Bulwark: clip contact/recovery timing matches brain
+PASS Bulwark: R thumb-side axis agrees with the actual finger bones
+PASS Bulwark: L thumb-side axis agrees with the actual finger bones
+PASS Bulwark: walking soles remain on the authored floor (max 0.0001m)
+PASS Bulwark: idle, walk and run close without a loop seam
+PASS Bulwark: finite posed mesh, strike 0
+PASS Bulwark: blade passes through melee contact corridor at gameplay scale, strike 0 (0.433m)
+PASS Bulwark: finite posed mesh, strike 1
+PASS Bulwark: blade passes through melee contact corridor at gameplay scale, strike 1 (0.607m)
+PASS Bulwark: wrists remain anatomically limited across every attack (max 52.0 degrees)
+PASS Bulwark: no arm flips between 120Hz pose samples (max 19.8 degrees)
+PASS Spawned crowd retains independently colored, varied historical dye combinations
+Failures: 0

@@ -1,0 +1,327 @@
+{
+  "rigs": 8,
+  "actions": 64,
+  "samples": [
+    {
+      "rig": "Walker",
+      "action": "Walker_Guard",
+      "max_matrix_error": 2.3543834686279297e-06
+    },
+    {
+      "rig": "Walker",
+      "action": "Walker_Walk",
+      "max_matrix_error": 4.589557647705078e-06
+    },
+    {
+      "rig": "Walker",
+      "action": "Walker_Run",
+      "max_matrix_error": 6.943941116333008e-06
+    },
+    {
+      "rig": "Walker",
+      "action": "Walker_Cut",
+      "max_matrix_error": 2.2649765014648438e-06
+    },
+    {
+      "rig": "Walker",
+      "action": "Walker_Thrust",
+      "max_matrix_error": 2.2649765014648438e-06
+    },
+    {
+      "rig": "Walker",
+      "action": "Walker_Grab",
+      "max_matrix_error": 2.2649765014648438e-06
+    },
+    {
+      "rig": "Walker",
+      "action": "Walker_RisingRake",
+      "max_matrix_error": 2.2649765014648438e-06
+    },
+    {
+      "rig": "Walker",
+      "action": "Revenant_DeathBack",
+      "max_matrix_error": 3.1739473342895508e-06
+    },
+    {
+      "rig": "Walker",
+      "action": "Revenant_DeathForward",
+      "max_matrix_error": 9.775161743164062e-06
+    },
+    {
+      "rig": "Runner",
+      "action": "Runner_Guard",
+      "max_matrix_error": 2.3543834686279297e-06
+    },
+    {
+      "rig": "Runner",
+      "action": "Runner_Walk",
+      "max_matrix_error": 4.589557647705078e-06
+    },
+    {
+      "rig": "Runner",
+      "action": "Runner_Run",
+      "max_matrix_error": 6.943941116333008e-06
+    },
+    {
+      "rig": "Runner",
+      "action": "Runner_Cut",
+      "max_matrix_error": 2.0265579223632812e-06
+    },
+    {
+      "rig": "Runner",
+      "action": "Runner_Thrust",
+      "max_matrix_error": 2.0265579223632812e-06
+    },
+    {
+      "rig": "Runner",
+      "action": "Runner_Grab",
+      "max_matrix_error": 2.0265579223632812e-06
+    },
+    {
+      "rig": "Runner",
+      "action": "Runner_RisingRake",
+      "max_matrix_error": 2.0265579223632812e-06
+    },
+    {
+      "rig": "Runner",
+      "action": "Revenant_DeathBack",
+      "max_matrix_error": 3.1739473342895508e-06
+    },
+    {
+      "rig": "Runner",
+      "action": "Revenant_DeathForward",
+      "max_matrix_error": 9.775161743164062e-06
+    },
+    {
+      "rig": "Brute",
+      "action": "Brute_Guard",
+      "max_matrix_error": 2.086162567138672e-06
+    },
+    {
+      "rig": "Brute",
+      "action": "Brute_Walk",
+      "max_matrix_error": 4.4405460357666016e-06
+    },
+    {
+      "rig": "Brute",
+      "action": "Brute_Run",
+      "max_matrix_error": 6.943941116333008e-06
+    },
+    {
+      "rig": "Brute",
+      "action": "Brute_Cut",
+      "max_matrix_error": 2.086162567138672e-06
+    },
+    {
+      "rig": "Brute",
+      "action": "Brute_Thrust",
+      "max_matrix_error": 2.086162567138672e-06
+    },
+    {
+      "rig": "Brute",
+      "action": "Brute_Grab",
+      "max_matrix_error": 2.205371856689453e-06
+    },
+    {
+      "rig": "Brute",
+      "action": "Brute_RisingRake",
+      "max_matrix_error": 2.086162567138672e-06
+    },
+    {
+      "rig": "Brute",
+      "action": "Revenant_DeathBack",
+      "max_matrix_error": 3.1739473342895508e-06
+    },
+    {
+      "rig": "Brute",
+      "action": "Revenant_DeathForward",
+      "max_matrix_error": 9.775161743164062e-06
+    },
+    {
+      "rig": "Spitter",
+      "action": "Spitter_Guard",
+      "max_matrix_error": 2.115964889526367e-06
+    },
+    {
+      "rig": "Spitter",
+      "action": "Spitter_Walk",
+      "max_matrix_error": 4.4405460357666016e-06
+    },
+    {
+      "rig": "Spitter",
+      "action": "Spitter_Run",
+      "max_matrix_error": 6.943941116333008e-06
+    },
+    {
+      "rig": "Spitter",
+      "action": "Spitter_Cut",
+      "max_matrix_error": 2.205371856689453e-06
+    },
+    {
+      "rig": "Spitter",
+      "action": "Spitter_Thrust",
+      "max_matrix_error": 2.205371856689453e-06
+    },
+    {
+      "rig": "Spitter",
+      "action": "Revenant_DeathBack",
+      "max_matrix_error": 3.1739473342895508e-06
+    },
+    {
+      "rig": "Spitter",
+      "action": "Revenant_DeathForward",
+      "max_matrix_error": 9.775161743164062e-06
+    },
+    {
+      "rig": "Bloater",
+      "action": "Bloater_Guard",
+      "max_matrix_error": 2.2351741790771484e-06
+    },
+    {
+      "rig": "Bloater",
+      "action": "Bloater_Walk",
+      "max_matrix_error": 4.4405460357666016e-06
+    },
+    {
+      "rig": "Bloater",
+      "action": "Bloater_Run",
+      "max_matrix_error": 6.943941116333008e-06
+    },
+    {
+      "rig": "Bloater",
+      "action": "Bloater_Cut",
+      "max_matrix_error": 2.2351741790771484e-06
+    },
+    {
+      "rig": "Bloater",
+      "action": "Bloater_Thrust",
+      "max_matrix_error": 1.9222497940063477e-06
+    },
+    {
+      "rig": "Bloater",
+      "action": "Bloater_Grab",
+      "max_matrix_error": 1.9222497940063477e-06
+    },
+    {
+      "rig": "Bloater",
+      "action": "Bloater_RisingRake",
+      "max_matrix_error": 1.9222497940063477e-06
+    },
+    {
+      "rig": "Bloater",
+      "action": "Revenant_DeathBack",
+      "max_matrix_error": 3.1739473342895508e-06
+    },
+    {
+      "rig": "Bloater",
+      "action": "Revenant_DeathForward",
+      "max_matrix_error": 9.775161743164062e-06
+    },
+    {
+      "rig": "Warlord",
+      "action": "Warlord_Guard",
+      "max_matrix_error": 2.3543834686279297e-06
+    },
+    {
+      "rig": "Warlord",
+      "action": "Warlord_Walk",
+      "max_matrix_error": 4.589557647705078e-06
+    },
+    {
+      "rig": "Warlord",
+      "action": "Warlord_Run",
+      "max_matrix_error": 6.943941116333008e-06
+    },
+    {
+      "rig": "Warlord",
+      "action": "Warlord_Cut",
+      "max_matrix_error": 2.5033950805664062e-06
+    },
+    {
+      "rig": "Warlord",
+      "action": "Warlord_Thrust",
+      "max_matrix_error": 2.5033950805664062e-06
+    },
+    {
+      "rig": "Warlord",
+      "action": "Revenant_DeathBack",
+      "max_matrix_error": 3.1739473342895508e-06
+    },
+    {
+      "rig": "Warlord",
+      "action": "Revenant_DeathForward",
+      "max_matrix_error": 9.775161743164062e-06
+    },
+    {
+      "rig": "Swordsman",
+      "action": "Swordsman_Guard",
+      "max_matrix_error": 2.3543834686279297e-06
+    },
+    {
+      "rig": "Swordsman",
+      "action": "Swordsman_Walk",
+      "max_matrix_error": 4.589557647705078e-06
+    },
+    {
+      "rig": "Swordsman",
+      "action": "Swordsman_Run",
+      "max_matrix_error": 6.943941116333008e-06
+    },
+    {
+      "rig": "Swordsman",
+      "action": "Swordsman_Cut",
+      "max_matrix_error": 1.9669532775878906e-06
+    },
+    {
+      "rig": "Swordsman",
+      "action": "Swordsman_Thrust",
+      "max_matrix_error": 1.9669532775878906e-06
+    },
+    {
+      "rig": "Swordsman",
+      "action": "Revenant_DeathBack",
+      "max_matrix_error": 3.1739473342895508e-06
+    },
+    {
+      "rig": "Swordsman",
+      "action": "Revenant_DeathForward",
+      "max_matrix_error": 9.775161743164062e-06
+    },
+    {
+      "rig": "Bulwark",
+      "action": "Bulwark_Guard",
+      "max_matrix_error": 2.250075340270996e-06
+    },
+    {
+      "rig": "Bulwark",
+      "action": "Bulwark_Walk",
+      "max_matrix_error": 4.589557647705078e-06
+    },
+    {
+      "rig": "Bulwark",
+      "action": "Bulwark_Run",
+      "max_matrix_error": 6.943941116333008e-06
+    },
+    {
+      "rig": "Bulwark",
+      "action": "Bulwark_Cut",
+      "max_matrix_error": 2.205371856689453e-06
+    },
+    {
+      "rig": "Bulwark",
+      "action": "Bulwark_Thrust",
+      "max_matrix_error": 2.205371856689453e-06
+    },
+    {
+      "rig": "Bulwark",
+      "action": "Revenant_DeathBack",
+      "max_matrix_error": 3.1739473342895508e-06
+    },
+    {
+      "rig": "Bulwark",
+      "action": "Revenant_DeathForward",
+      "max_matrix_error": 9.775161743164062e-06
+    }
+  ],
+  "passed": true
+}

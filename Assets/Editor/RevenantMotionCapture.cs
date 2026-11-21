@@ -49,13 +49,15 @@ public sealed class RevenantMotionCapture : IDisposable
         }
         finally{graph.Destroy();}
     }
-    public void Apply(string name,float time,Transform[] target)
+    public void Apply(string name,float time,Transform[] target,float weight=1f)
     {
         var motion=Get(name);float frame=Mathf.Clamp01(time/motion.length)*(motion.frames.Length-1);int a=Mathf.FloorToInt(frame),b=Mathf.Min(a+1,motion.frames.Length-1);float t=frame-a;
         for(int i=0;i<target.Length;i++)
         {
-            target[i].localPosition=Vector3.Lerp(motion.frames[a].position[i],motion.frames[b].position[i],t);
-            target[i].localRotation=Quaternion.Slerp(motion.frames[a].rotation[i],motion.frames[b].rotation[i],t);
+            var position=Vector3.Lerp(motion.frames[a].position[i],motion.frames[b].position[i],t);
+            var rotation=Quaternion.Slerp(motion.frames[a].rotation[i],motion.frames[b].rotation[i],t);
+            target[i].localPosition=weight>=1f?position:Vector3.Lerp(target[i].localPosition,position,weight);
+            target[i].localRotation=weight>=1f?rotation:Quaternion.Slerp(target[i].localRotation,rotation,weight);
         }
     }
     public void Dispose()=>UnityEngine.Object.DestroyImmediate(source);

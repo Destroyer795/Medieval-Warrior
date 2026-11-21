@@ -51,7 +51,7 @@ for label in ('Albedo','Normal','Surface','Skin0','Skin1','Skin2','Skin3','SkinN
     im=bpy.data.images.load(str(texture_dir/(label+'.png')),check_existing=False);im.name='Revenant reviewed '+label
     if label in ('Normal','Surface','SkinNormal'):im.colorspace_settings.name='Non-Color'
     im.pack();images[label]=im
-palette=['Necrotic skin','Burial linen','Oxidised iron','Old oxblood leather','Exposed bone','Splintered oak','Tarnished bronze','Clouded eyes','Matted hair','Scalp stubble','Clotted blood','Exposed muscle']
+palette=['Necrotic skin','Burial linen','Oxidised iron','Old oxblood leather','Exposed bone','Splintered oak','Tarnished bronze','Clouded eyes','Matted hair','Scalp stubble','Clotted blood','Exposed muscle','Trouser linen','Faded facing']
 for index,name in enumerate(palette):
     if name not in bpy.data.materials:continue
     mat=bpy.data.materials[name];nodes=mat.node_tree.nodes;links=mat.node_tree.links;nodes.clear()
@@ -70,7 +70,10 @@ for index,name in enumerate(palette):
     links.new(vc.outputs['Color'],mix.inputs[1]);links.new(maps['Albedo'].outputs['Color'],mix.inputs[2]);links.new(mix.outputs[0],bs.inputs['Base Color'])
     norm=nodes.new('ShaderNodeNormalMap');norm.inputs['Strength'].default_value=.65;links.new(maps['Normal'].outputs['Color'],norm.inputs['Color']);links.new(norm.outputs[0],bs.inputs['Normal'])
     bs.inputs['Metallic'].default_value=0;bs.inputs['Roughness'].default_value=.98
-    if index>=8:
+    if index==7:
+        bs.inputs['Emission Color'].default_value=(.032,.039,.028,1)
+        bs.inputs['Emission Strength'].default_value=1
+    if index in (8,9):
         alpha=nodes.new('ShaderNodeMath');alpha.operation='MULTIPLY';links.new(maps['Albedo'].outputs['Alpha'],alpha.inputs[0]);links.new(vc.outputs['Alpha'],alpha.inputs[1])
         links.new(alpha.outputs[0],bs.inputs['Alpha'])
         mat.surface_render_method='DITHERED'
@@ -80,22 +83,37 @@ for i in range(4):
     for node in mat.node_tree.nodes:
         if node.type=='TEX_IMAGE' and node.image==images['Skin0']:node.image=images['Skin'+str(i)]
     skin_materials.append(mat)
+outfits=[((.47,.62,.73),(.59,.36,.24),(.81,.72,.52)),
+         ((.72,.32,.24),(.48,.49,.39),(.82,.69,.43)),
+         ((.72,.58,.28),(.38,.43,.49),(.72,.43,.27)),
+         ((.43,.57,.35),(.70,.62,.47),(.57,.29,.22)),
+         ((.59,.43,.57),(.51,.50,.43),(.79,.72,.53)),
+         ((.80,.74,.57),(.37,.47,.57),(.62,.34,.22)),
+         ((.66,.39,.24),(.46,.55,.41),(.75,.65,.44)),
+         ((.45,.54,.58),(.66,.46,.35),(.76,.42,.31))]
 for index,kind in enumerate(['Walker','Runner','Brute','Spitter','Bloater','Warlord','Swordsman','Bulwark']):
+    dyed={}
+    for label,tint in zip(('Burial linen','Trouser linen','Faded facing'),outfits[index]):
+        material=bpy.data.materials[label].copy();material.name=kind+' worn '+label
+        nodes=material.node_tree.nodes;links=material.node_tree.links;bs=next(n for n in nodes if n.type=='BSDF_PRINCIPLED')
+        source=bs.inputs['Base Color'].links[0].from_socket
+        dye=nodes.new('ShaderNodeMixRGB');dye.blend_type='MULTIPLY';dye.inputs[0].default_value=1;dye.inputs[2].default_value=(*tint,1)
+        links.new(source,dye.inputs[1]);links.new(dye.outputs[0],bs.inputs['Base Color']);dyed[label]=material
     for ob in bpy.data.objects[kind+' rig'].children:
         if ob.type!='MESH':continue
         for slot in ob.material_slots:
             if slot.material==bpy.data.materials['Necrotic skin']:slot.material=skin_materials[index%4]
+            elif slot.material and slot.material.name in dyed:slot.material=dyed[slot.material.name]
 bpy.context.scene.frame_set(0);bpy.context.scene.frame_end=math.ceil(max(a['duration'] for a in actions)*30)
 for kind,scale in zip(['Walker','Runner','Brute','Spitter','Bloater','Warlord','Swordsman','Bulwark'],[1,.93,1.45,.98,1.18,1.85,1.06,1.08]):bpy.data.objects[kind+' rig'].scale=(scale,)*3
 
 # Verify editable action playback against the exported Unity joint frames.
 # Compare rig-local matrices, excluding each character's presentation placement.
 audit=[]
-for kind in ('Walker','Swordsman','Warlord'):
+for kind in ('Walker','Runner','Brute','Spitter','Bloater','Warlord','Swordsman','Bulwark'):
     ao=bpy.data.objects[kind+' rig']
-    for suffix in ('_Guard','_Walk','_Run','_Cut','Revenant_DeathBack'):
-        name=suffix if suffix.startswith('Revenant_') else kind+suffix
-        data=next(a for a in actions if a['name']==name)
+    for data in (action for action in actions if action['form'] in (kind,'Shared')):
+        name=data['name']
         ao.animation_data.action=bpy.data.actions[kind+' / '+name];error=0
         for index in (0,len(data['samples'])//2,len(data['samples'])-1):
             sample=data['samples'][index];frame=sample['time']*30
@@ -122,6 +140,7 @@ cam.location=B((.2,2.5,14));cam.rotation_euler=(B((0,1.5,0))-cam.location).to_tr
 scene=bpy.context.scene;scene.camera=cam;scene.render.engine='CYCLES';scene.cycles.samples=24;scene.cycles.use_denoising=True
 scene.render.resolution_x=2400;scene.render.resolution_y=1000;scene.render.resolution_percentage=100;scene.view_settings.view_transform='AgX'
 scene.render.image_settings.file_format='PNG';scene.render.filepath=str(ROOT/'Artifacts/Revenants/blender-roster.png')
+bpy.ops.file.make_paths_relative()
 bpy.ops.wm.save_as_mainfile(filepath=str(path),compress=True)
 print('REVENANTS editable actions attached:',len(bpy.data.actions),flush=True)
 if '--skip-render' not in sys.argv:bpy.ops.render.render(write_still=True)

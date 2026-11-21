@@ -80,6 +80,22 @@ public class EnemyController : MonoBehaviour
     float runnerBurst=1.5f,runnerWithdrawUntil;
     int runnerEvadedSwing=-1;
     NavMeshPath runnerPath;
+    internal bool SiegeEscort { get; set; }
+    float divertedUntil;
+    KeepGate siegeGate;
+    bool objectiveSwing;
+    Vector3 bombardTarget;
+    bool IsBreacher => type == ZombieType.Walker || type == ZombieType.Brute || SiegeEscort;
+
+    bool ShieldInLane(float reach)
+    {
+        if (siegeGate == null || playerControl == null || !playerControl.isBlocking) return false;
+        Vector3 relative = transform.position - player.position;
+        float forward = Vector3.Dot(Flat(relative), Flat(player.forward).normalized);
+        return Mathf.Abs(relative.y) < 1.25f && forward > .05f && forward <= reach &&
+            Mathf.Abs(Vector3.Dot(relative, player.right)) < .75f + navAgent.radius &&
+            !NavMesh.Raycast(transform.position, player.position, out _, navAgent.areaMask);
+    }
 
     public static bool InRunnerRearArc(Vector3 position,Vector3 target,Vector3 facing)
     {
@@ -138,6 +154,7 @@ public class EnemyController : MonoBehaviour
     {
         initialised = true;
         type = t;
+        siegeGate = GameManager.instance != null ? GameManager.instance.Gate : null;
         if(t==ZombieType.Runner&&runnerPath==null)runnerPath=new NavMeshPath();
         isBoss = boss;
         Stats = ZombieTypes.Get(t);
@@ -228,6 +245,13 @@ public class EnemyController : MonoBehaviour
             return;
         }
 
+        if (siegeGate != null)
+        {
+            if (GameManager.instance.State != GameManager.MatchState.Playing) { Idle(); return; }
+            if (IsBreacher && ShieldInLane(3f)) DivertToKnight();
+            if ((state == State.Hunt || state == State.Circle || state == State.Kite) && UpdateSiegeOrder()) return;
+        }
+
         if (type == ZombieType.Warlord && !enraged && HealthFraction < 0.5f) Enrage();
         if (enraged && Time.time > nextSummon) { Summon(2); nextSummon = Time.time + 18f; }
 
@@ -260,6 +284,7 @@ public class EnemyController : MonoBehaviour
         if(HasAttackMotion(state)&&(s==State.Hunt||s==State.Circle||s==State.Kite||s==State.Staggered)&&animator!=null&&animator.isInitialized)
             animator.CrossFadeInFixedTime("Locomotion",.07f);
         state = s;
+        objectiveSwing = false;
         stateTimer = 0f;
         hitDealt = false;
         weaponScanTime = 0;
@@ -270,6 +295,54 @@ public class EnemyController : MonoBehaviour
     {
         if (navAgent.isOnNavMesh) navAgent.isStopped = true;
         ReleaseToken();
+    }
+
+    void DivertToKnight()
+    {
+        divertedUntil = Time.time + 3.5f;
+        if (objectiveSwing) SetState(State.Hunt);
+    }
+
+    bool UpdateSiegeOrder()
+    {
+        bool artillery = type == ZombieType.Spitter;
+        if (!artillery && (!IsBreacher || Time.time < divertedUntil)) return false;
+        ReleaseToken();
+        Vector3 station = artillery ? siegeGate.Battery(GetInstanceID()) : siegeGate.Approach;
+        float range = artillery ? 1.25f : Mathf.Max(.65f, attackRange - .6f);
+        if ((transform.position - station).sqrMagnitude > range * range)
+            Chase(station, baseSpeed);
+        else
+        {
+            navAgent.isStopped = true;
+            FaceTowards(siegeGate.transform.position, 9f);
+            if (Time.time >= attackTimer)
+            {
+                Vector2 spread = UnityEngine.Random.insideUnitCircle * 2.1f;
+                bombardTarget = siegeGate.Approach + siegeGate.Outward * 3 + new Vector3(spread.x, 0, spread.y);
+                BeginAttack();
+                objectiveSwing = true;
+            }
+        }
+        return true;
+    }
+
+    void UpdateObjectiveSwing()
+    {
+        FaceTowards(type == ZombieType.Spitter ? bombardTarget : siegeGate.transform.position, 9f);
+        if (!hitDealt && stateTimer >= Stats.windup)
+        {
+            hitDealt = true;
+            if (type == ZombieType.Spitter)
+                BileGlob.Throw(HeadPosition - Vector3.up * .2f + transform.forward * .4f, bombardTarget, damage, this);
+            else if ((transform.position - siegeGate.Approach).sqrMagnitude <= attackRange * attackRange)
+                siegeGate.Strike(damage);
+        }
+        if (stateTimer >= Stats.windup + .55f)
+        {
+            attackTimer = Time.time + timeBetweenAttacks * UnityEngine.Random.Range(.85f, 1.2f);
+            SetState(State.Hunt);
+        }
     }
 
     void UpdateHunt()
@@ -295,7 +368,12 @@ public class EnemyController : MonoBehaviour
             return;
         }
 
-        Chase(player.position, baseSpeed);
+        Vector3 pursuit = player.position;
+        if (siegeGate != null && type == ZombieType.Swordsman && d > attackRange + .6f && d < 14 &&
+            !SiegeEscort && NavMesh.SamplePosition(player.position + player.right * ((GetInstanceID() & 1) == 0 ? 2 : -2)
+                - player.forward, out var flank, 1.2f, navAgent.areaMask))
+            pursuit = flank.position;
+        Chase(pursuit, baseSpeed);
 
         if (hasToken && d <= attackRange && Time.time >= attackTimer) BeginAttack();
     }
@@ -418,6 +496,7 @@ public class EnemyController : MonoBehaviour
 
     void UpdateAttack()
     {
+        if (objectiveSwing) { UpdateObjectiveSwing(); return; }
         if(type==ZombieType.Runner&&!hitDealt&&!RunnerBehind)
         {
             ReleaseToken();runnerDecisionAt=0;SetState(State.Hunt);return;
@@ -569,6 +648,11 @@ public class EnemyController : MonoBehaviour
 
     void Chase(Vector3 target, float speed)
     {
+        if (ShieldInLane(1.45f) && Vector3.Dot(Flat(target - transform.position), player.forward) <= 0f)
+        {
+            navAgent.isStopped = true;
+            return;
+        }
         navAgent.isStopped = false;
         navAgent.speed = speed*HordeDirector.Speed;
 
@@ -691,6 +775,7 @@ public class EnemyController : MonoBehaviour
     public bool ReceiveWeaponHit(float amount,Vector3 direction,float knockback,Vector3 point,bool bash=false,Vector3? bloodDirection=null)
     {
         if(IsDead||awaitingRoyalVolley||amount<=0||state==State.Emerging&&stateTimer<.4f)return false;
+        if (siegeGate != null && IsBreacher) DivertToKnight();
         bool frontal=Vector3.Dot(transform.forward,-Flat(direction).normalized)>.40f;
         if(bash&&type==ZombieType.Bulwark&&frontal)guardBrokenUntil=Time.time+1.25f;
         if(!bash&&GuardsContact(direction,point))
@@ -941,7 +1026,7 @@ public class EnemyController : MonoBehaviour
             return;
         }
         Vector3 before = transform.position;
-        if (navAgent.isOnNavMesh) navAgent.Move(chargeDir * ChargeSpeed * Time.deltaTime);
+        if (navAgent.isOnNavMesh && !ShieldInLane(1.55f)) navAgent.Move(chargeDir * ChargeSpeed * Time.deltaTime);
         if (Mathf.Repeat(stateTimer, 0.12f) < Time.deltaTime) FX.Dust(transform.position, 0.5f, 3);
 
         Vector3 toPlayer = player.position - transform.position;

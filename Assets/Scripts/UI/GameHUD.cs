@@ -22,7 +22,10 @@ public class GameHUD : MonoBehaviour
     TextMeshProUGUI objectiveText, scoreText, comboText, lastStandStatus;
     RectTransform eventRoot,eventMarker;
     TextMeshProUGUI eventTitle,eventDetail,eventTarget;
-    Image objectiveIcon, comboBar;
+    Image objectiveIcon, comboBar, gateFill;
+    RectTransform gateRow;
+    TextMeshProUGUI gateLabel;
+    float gateWarningUntil;
     RectTransform bossRoot;
     Image bossFill;
     TextMeshProUGUI bossName;
@@ -56,12 +59,19 @@ public class GameHUD : MonoBehaviour
 
     public static void Banner(string title, string subtitle, float duration)
     {
-        if (instance == null) return;
+        if (instance == null || Time.time < instance.gateWarningUntil) return;
         instance.bannerTitle.text = title;
         instance.bannerSub.text = subtitle;
         instance.bannerSub.gameObject.SetActive(!string.IsNullOrEmpty(subtitle));
         instance.bannerDuration = instance.bannerTimer = duration;
         instance.bannerRoot.gameObject.SetActive(true);
+    }
+
+    internal static void GateWarning()
+    {
+        if (instance == null) return;
+        Banner("THE KEEP GATE IS UNDER ATTACK!", "Intercept the breachers", 2.2f);
+        instance.gateWarningUntil = Time.time + 2.2f;
     }
 
     internal static void BeginDawn()
@@ -310,6 +320,12 @@ public class GameHUD : MonoBehaviour
         lastStandStatus = UIKit.Text(plaque.transform, "", 21, UIKit.Parchment, TextAlignmentOptions.Center, true);
         lastStandStatus.rectTransform.Place(new Vector2(.5f, 0f), new Vector2(.5f, 1f), new Vector2(0f, 1f), new Vector2(720, 28));
         lastStandStatus.gameObject.SetActive(false);
+        gateRow = UIKit.Img(plaque.transform, "bar_bg", Color.white, "Gate Integrity").rectTransform;
+        gateRow.Place(new Vector2(.5f, 0), new Vector2(.5f, 1), Vector2.zero, new Vector2(500, 36));
+        gateFill = BarFill(gateRow, Color.green);
+        gateLabel = UIKit.Text(gateRow, "", 22, Color.white, TextAlignmentOptions.Center, true);
+        gateLabel.rectTransform.Fill();
+        gateRow.gameObject.SetActive(false);
 
         var eventPanel=UIKit.Img(combatRoot,"panel_iron",new Color(.8f,.8f,.8f,.94f),"Horde Event");eventRoot=eventPanel.rectTransform;
         eventRoot.Place(new Vector2(.5f,1),new Vector2(.5f,1),new Vector2(40,-216),new Vector2(640,88));
@@ -451,6 +467,9 @@ public class GameHUD : MonoBehaviour
 
         var sub = UIKit.Text(endPage.transform, GameSettings.ModeName(gm.Mode) + "  ·  " + GameSettings.Difficulty, 28, UIKit.Parchment);
         sub.rectTransform.Place(new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0, -140), new Vector2(900, 40));
+        if (gm.Gate != null)
+            sub.text = victory ? $"Keep held at {gm.Gate.Integrity:P0}   +{gm.GateBonus:N0} defense bonus" :
+                gm.Gate.Health <= 0 ? "The sanctuary gate was breached" : "The knight fell defending the Keep";
         var score = UIKit.Text(endPage.transform, gm.Score.ToString("N0"), 76, UIKit.Gold, TextAlignmentOptions.Center, true);
         score.rectTransform.Place(new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0, -188), new Vector2(900, 90));
         var best = UIKit.Text(endPage.transform, gm.NewRecord ? "New record!" : "Best: " + GameSettings.HighScore(gm.Mode).ToString("N0"), 28, gm.NewRecord ? new Color(1f, 0.6f, 0.3f) : UIKit.GoldDim);
@@ -571,6 +590,18 @@ public class GameHUD : MonoBehaviour
         if (gm != null)
         {
             objectiveText.text = gm.Objective;
+            var gate = gm.Gate;
+            gateRow.gameObject.SetActive(gate != null);
+            if (gate != null)
+            {
+                float hp = gate.Integrity;
+                Color condition = hp > .5f ? Color.Lerp(UIKit.Gold, new Color(.16f,.51f,.27f), hp * 2 - 1)
+                    : Color.Lerp(new Color(.78f,.09f,.06f), UIKit.Gold, hp * 2);
+                gateFill.fillAmount = hp;
+                gateFill.color = Color.Lerp(condition, Color.white, Mathf.Clamp01(1 - (Time.time - gate.LastImpact) * 3));
+                gateLabel.text = $"KEEP GATE   {Mathf.CeilToInt(hp * 100)}%";
+                bossRoot.anchoredPosition = new Vector2(0, -143);
+            }
             scoreText.text = gm.Score.ToString("N0");
             scoreText.transform.localScale = Vector3.Lerp(scoreText.transform.localScale, Vector3.one, 1f - Mathf.Exp(-8f * dt));
             comboText.text = gm.Combo >= 2 ? $"{gm.Combo} kill streak  x{gm.ComboMultiplier}" : "";

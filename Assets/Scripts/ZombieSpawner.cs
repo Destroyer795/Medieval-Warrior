@@ -48,12 +48,32 @@ public class ZombieSpawner : MonoBehaviour
 
         Vector3 position;
         var stand = GameManager.instance != null ? GameManager.instance.LastStand : null;
-        if (stand != null && stand.Radius < 54f)
+        var gate = GameManager.instance != null ? GameManager.instance.Gate : null;
+        if (gate != null)
+        {
+            position = gate.Road;
+            for (int i = 0; i < 8; i++)
+            {
+                Vector3 lane = gate.Deployment(Random.Range(0, int.MaxValue));
+                var offset = Random.insideUnitCircle * 2;
+                if (!gate.TryReach(gate.Approach, lane + new Vector3(offset.x,0,offset.y), 2f, out var candidate) ||
+                    Flat(candidate - center).sqrMagnitude < 100f) continue;
+                position = candidate;
+                break;
+            }
+        }
+        else if (stand != null && stand.Radius < 54f)
         {
             if (!TryFindCourtyardApproach(stand, center, boss, out position)) return null;
         }
         else if (!TryFindSpawnPoint(center, min, maxSpawnDistance, out position)) position = Fallback();
 
+        return SpawnAt(type, boss, position, center);
+    }
+
+    internal EnemyController SpawnAt(ZombieType type, bool boss, Vector3 position, Vector3 center)
+    {
+        if (zombiePrefab == null) return null;
         Quaternion facing = Quaternion.LookRotation(Flat(center - position).sqrMagnitude > 0.01f ? Flat(center - position) : Vector3.forward);
         var go = Instantiate(zombiePrefab, position, facing);
         go.name = (boss ? "Boss " : "") + type;

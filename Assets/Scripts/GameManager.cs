@@ -40,6 +40,9 @@ public class GameManager : MonoBehaviour
     public float IntermissionLeft { get; private set; }
     public float MatchTime { get; private set; }
     public EnemyController Boss { get; private set; }
+    public KeepGate Gate { get; private set; }
+    public int GateBonus { get; private set; }
+    bool warlordSlain;
     public HordeDirector Horde { get; private set; }
     public LastStandDirector LastStand { get; private set; }
     public bool NewRecord { get; private set; }
@@ -192,13 +195,23 @@ public class GameManager : MonoBehaviour
 
     string IntroLine() => Mode switch
     {
-        GameMode.DefendTheCastle => $"Slay {targetKills} of the undead",
+        GameMode.DefendTheCastle => "Hold the sanctuary gate. Break the assault and slay its Warlord.",
         GameMode.EndlessHorde => "Survive as many waves as you can",
         _ => "The gates have fallen. Fall back to the courtyard as corruption closes in.",
     };
 
     void BeginPlay()
     {
+        if (Mode == GameMode.DefendTheCastle)
+        {
+            Gate = playerHealth != null ? KeepGate.Create(this, playerHealth.transform.position) : null;
+            if (Gate == null)
+            {
+                Debug.LogError("Siege setup failed: the Keep doorway or road gate has no route from the knight.");
+                GameOver();
+                return;
+            }
+        }
         if (Mode == GameMode.EndlessHorde) StartWave(1);
         else
         {
@@ -222,11 +235,10 @@ public class GameManager : MonoBehaviour
                 int cap = Mathf.RoundToInt(Mathf.Lerp(4, p.maxAlive, progress));
                 if (!warlordSpawned && progress >= 0.75f)
                 {
-                    warlordSpawned = true;
-                    SpawnBoss(ZombieType.Warlord);
+                    LaunchFinalAssault();
                 }
-                TickSpawner(cap, 2.4f / p.spawnRate, progress);
-                if (currentKills >= targetKills && (Boss == null || Boss.IsDead)) WinGame();
+                if (currentKills < targetKills) TickSpawner(cap, 2.4f / p.spawnRate, progress);
+                if (currentKills >= targetKills && warlordSlain && Gate.Health > 0 && !playerHealth.IsDead) WinGame();
                 break;
             }
             case GameMode.EndlessHorde:
@@ -458,6 +470,26 @@ public class GameManager : MonoBehaviour
         (60f, "Space to dodge roll - you can't be hurt mid-roll", "stamina"),
     };
 
+    void LaunchFinalAssault()
+    {
+        var spawner = ZombieSpawner.Instance;
+        if (spawner == null) return;
+        Boss = spawner.SpawnAt(ZombieType.Warlord, true, Gate.Road, Gate.Approach);
+        if (Boss == null) return;
+        warlordSpawned = true;
+        Boss.SiegeEscort = true;
+        Vector3 march = Vector3.ProjectOnPlane(Gate.Approach - Gate.Road, Vector3.up).normalized;
+        Vector3 side = Vector3.Cross(Vector3.up, march);
+        for (int i = 0; i < 4; i++)
+        {
+            Vector3 slot = Gate.Road + side * (i % 2 == 0 ? -1.25f : 1.25f) + march * (i < 2 ? 1.8f : -1.8f);
+            if (!Gate.TryReach(Gate.Road, slot, 2f, out var station)) station = Gate.Road;
+            var guard = spawner.SpawnAt(i < 2 ? ZombieType.Bulwark : ZombieType.Swordsman, false, station, Gate.Approach);
+            if (guard != null) guard.SiegeEscort = true;
+        }
+        ThreatStinger(ZombieType.Warlord);
+    }
+
     void SpawnBoss(ZombieType type)
     {
         var spawner = ZombieSpawner.Instance;
@@ -472,7 +504,7 @@ public class GameManager : MonoBehaviour
         AudioManager.Play2D("boss_horn", 1f);
         FX.Shake(.55f);
         GameHUD.Banner(type == ZombieType.Warlord ? "<b>THE WARLORD APPROACHES</b>" : "<b>A BRUTE LEADS THE DEAD</b>",
-            type==ZombieType.Warlord?"Break his guard. Survive his charge.":"A towering horror enters the battle.",3.2f);
+            Gate != null && type == ZombieType.Warlord ? "The Warlord and his guard are marching from the road gate." : type==ZombieType.Warlord?"Break his guard. Survive his charge.":"A towering horror enters the battle.",3.2f);
     }
 
     float damageAtWaveStart;
@@ -541,6 +573,7 @@ public class GameManager : MonoBehaviour
         Killed?.Invoke(enemy, points);
         if (enemy != null && enemy == Boss)
         {
+            if (Gate != null && enemy.type == ZombieType.Warlord) warlordSlain = true;
             GameHUD.Banner(enemy.Stats.name + " Slain!", "", 2.5f);
             StartCoroutine(BossSlowMotion());
         }
@@ -574,7 +607,7 @@ public class GameManager : MonoBehaviour
 
     public string Objective => Mode switch
     {
-        GameMode.DefendTheCastle => $"Undead slain  {currentKills} / {targetKills}",
+        GameMode.DefendTheCastle => $"Defend the Castle   {Mathf.Min(currentKills, targetKills)} / {targetKills}",
         GameMode.EndlessHorde => State == MatchState.Intermission ? $"Next wave in {Mathf.CeilToInt(IntermissionLeft)}" : $"Wave {Wave}  -  {WaveRemaining} remain",
         _ => $"Dawn in {Mathf.CeilToInt(TimeLeft) / 60}:{Mathf.CeilToInt(TimeLeft) % 60:00}",
     };
@@ -596,6 +629,11 @@ public class GameManager : MonoBehaviour
         if(Horde!=null)Horde.ClearWave();
         State = victory ? MatchState.Won : MatchState.Lost;
         if (victory) Score += Mathf.RoundToInt(playerHealth != null ? playerHealth.currentHealth * 10f : 0f);
+        if (victory && Gate != null)
+        {
+            GateBonus = Mathf.RoundToInt(Gate.Integrity * 3000f);
+            Score += GateBonus;
+        }
         NewRecord = GameSettings.SubmitScore(Mode, Score, Wave);
         if (victory && Mode == GameMode.DefendTheCastle) Feats.Unlock("defender");
         if (victory && Mode == GameMode.LastStand) Feats.Unlock("dawn");

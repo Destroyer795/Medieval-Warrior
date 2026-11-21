@@ -7,10 +7,25 @@ public class BileGlob : MonoBehaviour
     float damage;
     EnemyController owner;
 
+    const float FlightTime = 1.05f;
+
+    internal static bool ClearArc(Vector3 from, Vector3 target)
+    {
+        var v = (target - from) / FlightTime - .5f * Physics.gravity * FlightTime;
+        Vector3 previous = from;
+        for (int i = 1; i <= 6; i++)
+        {
+            float t = FlightTime * i / 7;
+            Vector3 next = from + v * t + .5f * Physics.gravity * t * t;
+            if (Physics.Linecast(previous, next, ~0, QueryTriggerInteraction.Ignore)) return false;
+            previous = next;
+        }
+        return true;
+    }
+
     public static void Throw(Vector3 from, Vector3 target, float damage, EnemyController owner)
     {
-        const float flightTime = 1.05f;
-        Vector3 v = (target - from) / flightTime - 0.5f * Physics.gravity * flightTime;
+        Vector3 v = (target - from) / FlightTime - 0.5f * Physics.gravity * FlightTime;
         var go = ProceduralModels.Spawn("Bile", ProceduralModels.PotionMesh(), new[] { Combat.ResourceMaterial("Acid", new Color(0.5f, 0.85f, 0.1f)) }, null, false);
         go.transform.position = from;
         go.transform.localScale = Vector3.one * 1.3f;

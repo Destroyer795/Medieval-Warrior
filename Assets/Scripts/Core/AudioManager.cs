@@ -138,6 +138,12 @@ public class AudioManager : MonoBehaviour
         return true;
     }
 
+    public static void GateImpact(Vector3 position, bool warning)
+    {
+        PlayAt("keep_impact", position, 1f, .07f, 1f, 18000f, 60, .85f, 7, 60);
+        if (warning) Play2D("shield_block", .8f, 1.09f);
+    }
+
     public static void PlayPlayerDamage(Vector3 position, float damage, float healthFraction, bool blocked)
     {
         float force = Mathf.InverseLerp(3f, 30f, damage);

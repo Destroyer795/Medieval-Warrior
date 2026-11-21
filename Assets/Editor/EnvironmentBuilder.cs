@@ -132,6 +132,7 @@ public static class EnvironmentBuilder
         GroundBuildings();
 
         Terrain terrain = CreateTerrain(env.transform, prefabs);
+        MarkSiegeRoad(env.transform, new Vector2(Mathf.Cos(roadGateAngle), Mathf.Sin(roadGateAngle)));
         CreateFoundations(env.transform, mats);
         ScatterBaseProps(env.transform, prefabs);
         PlaceSupplyCrates(env.transform);
@@ -609,6 +610,21 @@ public static class EnvironmentBuilder
         return gaps.Where(g => g.width >= 2).OrderByDescending(g => g.width).Select(g => g.center).Take(2).ToList();
     }
 
+    static void MarkSiegeRoad(Transform environment, Vector2 direction)
+    {
+        Vector2 at = Center;
+        for (float r = 0; r < CastleRadius * 1.5f; r += .5f)
+        {
+            at = Center + direction * r;
+            if (!InsideWalls(at, 0f)) break;
+        }
+        at += direction * 2f;
+        var marker = new GameObject("Siege Road Gate").transform;
+        marker.SetParent(environment, false);
+        marker.position = new Vector3(at.x, WorldHeight(at.x, at.y), at.y);
+    }
+
+    static float roadGateAngle;
     static void DeriveLayout()
     {
         var ring = wallHull.Count >= 3 ? wallHull : buildings.Select(b => b.center).ToList();
@@ -631,6 +647,7 @@ public static class EnvironmentBuilder
         var gates = FindGateAngles();
         float a0 = gates.Count > 0 ? gates[0] : -62f;
         float a1 = gates.Count > 1 ? gates[1] : a0 + 180f;
+        roadGateAngle = a0 * Mathf.Deg2Rad;
         Roads = new[] { Road(a0, 9f), Road(a1, 7f) };
         Debug.Log($"[EnvironmentBuilder] gates at {string.Join(", ", gates.Select(g => g.ToString("F0")))} deg");
         Debug.Log($"[EnvironmentBuilder] centre {Center} castle radius {CastleRadius:F1} terrain {TerrainSize}");

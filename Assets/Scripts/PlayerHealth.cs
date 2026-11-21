@@ -160,6 +160,12 @@ public class PlayerHealth : MonoBehaviour
         Apply(amount);
     }
 
+    internal void TakeCorruption(float amount)
+    {
+        // Exposure is continuous across a dodge. Only reaching safe ground stops it.
+        if (!isDead && amount > 0f) Apply(amount);
+    }
+
     void Apply(float amount)
     {
         currentHealth -= amount;

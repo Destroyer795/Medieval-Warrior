@@ -39,6 +39,7 @@ public class EnemyController : MonoBehaviour
 
     enum State { Emerging, Hunt, Circle, Attack, Kite, Fuse, Charge, Dead, Staggered }
     State state = State.Hunt;
+    static bool HasAttackMotion(State s) => s == State.Attack || s == State.Fuse;
 
     Animator animator;
     CapsuleCollider myCollider;
@@ -52,10 +53,15 @@ public class EnemyController : MonoBehaviour
     Vector3? weaponImpact;
     Vector3? weaponBloodDirection;
     float staggerUntil;
+    float bleedUntil,bleedDps,bleedTick,pullUntil,pullSpeed;
+    Vector3 pullCenter;
+    float moonEyes=-1;
+    public bool IsBleeding=>!IsDead&&Time.time<bleedUntil;
     public bool IsStaggered=>state==State.Staggered&&Time.time<staggerUntil;
     public bool IsAttacking=>state==State.Attack;
-    public float AttackElapsed=>stateTimer;
-    public int AttackStyle {get;private set;}
+    public float AttackElapsed => HasAttackMotion(state) ? stateTimer / AttackSpeed : stateTimer;
+    public int AttackStyle { get; private set; } = -1;
+    public float AttackSpeed { get; private set; } = 1f;
     public bool GuardRaised=>type==ZombieType.Bulwark&&!IsDead&&Time.time>=guardBrokenUntil&&
         (state==State.Hunt||state==State.Circle||state==State.Attack&&stateTimer<Stats.windup-.18f);
 
@@ -63,6 +69,7 @@ public class EnemyController : MonoBehaviour
     float circleAngle, circleRadius;
     int groanIndex;
     bool hasToken, initialised, enraged, hitDealt;
+    bool awaitingRoyalVolley;
     float weaponScanTime;
     Vector3 lastPosition, detourTarget;
     float stuckTimer, detourTimer, unreachableTimer;
@@ -148,7 +155,7 @@ public class EnemyController : MonoBehaviour
 
         if (navAgent != null)
         {
-            navAgent.speed = baseSpeed;
+            navAgent.speed = baseSpeed*HordeDirector.Speed;
             navAgent.acceleration = 14f;
             navAgent.angularSpeed = 540f;
             if(t==ZombieType.Runner){navAgent.acceleration=44f;navAgent.angularSpeed=900f;}
@@ -161,8 +168,10 @@ public class EnemyController : MonoBehaviour
         if (animator != null)
         {
             if (pMoveMul) animator.SetFloat(hMoveMul, Stats.animSpeed);
-            if (pAttackMul) animator.SetFloat(hAttackMul, 1f); // authored clips use each type's actual contact time
+            if (pAttackMul) animator.SetFloat(hAttackMul, 1f);
         }
+        AttackStyle = -1;
+        AttackSpeed = 1f;
         ApplyTint(0f);
 
         var playerObj = GameObject.FindWithTag("Player");
@@ -194,6 +203,13 @@ public class EnemyController : MonoBehaviour
     void Update()
     {
         if (!initialised || IsDead) return;
+        if (awaitingRoyalVolley)
+        {
+            if (state == State.Emerging) UpdateEmerging();
+            else UpdateAnimator();
+            return;
+        }
+        UpdateHordeEffects();
         UpdateBurning();
         if (IsDead) return;
         UpdateFlash();
@@ -204,7 +220,8 @@ public class EnemyController : MonoBehaviour
         if (player == null || navAgent == null || !navAgent.enabled || !navAgent.isOnNavMesh) return;
         if (playerHealth != null && playerHealth.IsDead) { Idle(); return; }
 
-        stateTimer += Time.deltaTime;
+        // Combat thresholds and blade tracks are in clip seconds.
+        stateTimer += Time.deltaTime * (HasAttackMotion(state) ? AttackSpeed : 1f);
         if(state==State.Staggered)
         {
             if(Time.time>=staggerUntil)SetState(type==ZombieType.Spitter?State.Kite:State.Hunt);
@@ -240,7 +257,7 @@ public class EnemyController : MonoBehaviour
 
     void SetState(State s)
     {
-        if(state==State.Attack&&(s==State.Hunt||s==State.Circle||s==State.Kite||s==State.Staggered)&&animator!=null&&animator.isInitialized)
+        if(HasAttackMotion(state)&&(s==State.Hunt||s==State.Circle||s==State.Kite||s==State.Staggered)&&animator!=null&&animator.isInitialized)
             animator.CrossFadeInFixedTime("Locomotion",.07f);
         state = s;
         stateTimer = 0f;
@@ -374,12 +391,29 @@ public class EnemyController : MonoBehaviour
     void BeginAttack()
     {
         if(type==ZombieType.Runner&&!RunnerBehind)return;
-        SetState(State.Attack);
-        AttackStyle=UnityEngine.Random.Range(0,2);
-        animator.SetFloat("AttackStyle",AttackStyle);
-        if (pAttack) animator.Play("Attack",0,0f);
+        BeginAttackMotion(State.Attack);
         if (type == ZombieType.Spitter) AudioManager.PlayAt("spit", transform.position, 0.8f);
         else AudioManager.PlayZombieVoice("zombie_attack", transform.position, type);
+    }
+
+    void BeginAttackMotion(State next)
+    {
+        SetState(next);
+        int count = revenant.Form.attacks.Length;
+        AttackStyle = count > 1 && AttackStyle >= 0
+            ? (AttackStyle + UnityEngine.Random.Range(1, count)) % count
+            : UnityEngine.Random.Range(0, count);
+        // Keep the Runner's short rear-attack telegraph readable at the fast end.
+        float variation = type switch
+        {
+            ZombieType.Runner => .12f,
+            ZombieType.Brute or ZombieType.Warlord or ZombieType.Spitter or ZombieType.Bloater => .18f,
+            _ => .23f
+        };
+        AttackSpeed = UnityEngine.Random.Range(1f - variation, 1f + variation);
+        animator.SetFloat("AttackStyle", AttackStyle);
+        if (pAttackMul) animator.SetFloat(hAttackMul, AttackSpeed);
+        if (pAttack) animator.CrossFadeInFixedTime("Attack", .055f, 0, 0f);
     }
 
     void UpdateAttack()
@@ -507,7 +541,7 @@ public class EnemyController : MonoBehaviour
 
     void StartFuse()
     {
-        SetState(State.Fuse);
+        BeginAttackMotion(State.Fuse);
         AudioManager.PlayAt("bloater_fuse", transform.position, 1f, 0f);
     }
 
@@ -523,6 +557,8 @@ public class EnemyController : MonoBehaviour
     void Explode()
     {
         if (exploded) return;
+        if(HordeDirector.Active!=null&&HordeDirector.Active.Protects(this))
+        {HordeDirector.Active.Totem.Deflect(HeadPosition);stateTimer=0;SetState(State.Hunt);return;}
         exploded = true;
         Combat.Explode(transform.position + Vector3.up, 4.2f, damage, this, new Color(0.7f, 0.85f, 0.2f, 0.9f));
         Kill(Vector3.up, true);
@@ -534,7 +570,7 @@ public class EnemyController : MonoBehaviour
     void Chase(Vector3 target, float speed)
     {
         navAgent.isStopped = false;
-        navAgent.speed = speed;
+        navAgent.speed = speed*HordeDirector.Speed;
 
         if (detourTimer > 0f)
         {
@@ -602,7 +638,8 @@ public class EnemyController : MonoBehaviour
     {
         if (animator == null) return;
         float v = navAgent != null && navAgent.enabled ? navAgent.velocity.magnitude : 0f;
-        if (state == State.Attack || state == State.Fuse || state == State.Charge) v = 0f;
+        if (state == State.Attack || state == State.Fuse) v = 0f;
+        if (state == State.Charge) v = stateTimer >= chargeWindup ? ChargeSpeed : 0f;
         float localSpeed=v/Mathf.Max(.5f,transform.localScale.y);
         float cadence=Mathf.Max(Stats.animSpeed,localSpeed/Mathf.Max(.5f,revenant.Form.runSpeed));
         if(pMoveMul)animator.SetFloat(hMoveMul,cadence,.08f,Time.deltaTime);
@@ -653,7 +690,7 @@ public class EnemyController : MonoBehaviour
     // Only weapon contacts go through the physical guard rules.
     public bool ReceiveWeaponHit(float amount,Vector3 direction,float knockback,Vector3 point,bool bash=false,Vector3? bloodDirection=null)
     {
-        if(IsDead||amount<=0||state==State.Emerging&&stateTimer<.4f)return false;
+        if(IsDead||awaitingRoyalVolley||amount<=0||state==State.Emerging&&stateTimer<.4f)return false;
         bool frontal=Vector3.Dot(transform.forward,-Flat(direction).normalized)>.40f;
         if(bash&&type==ZombieType.Bulwark&&frontal)guardBrokenUntil=Time.time+1.25f;
         if(!bash&&GuardsContact(direction,point))
@@ -676,9 +713,9 @@ public class EnemyController : MonoBehaviour
 
     public void TakeDamage(float amount, Vector3 hitDirection, float knockback)
     {
-        if (IsDead || state == State.Emerging && stateTimer < 0.4f) return;
+        if (IsDead || awaitingRoyalVolley || amount<=0 || state == State.Emerging && stateTimer < 0.4f) return;
 
-        Health -= amount;
+        Health = HordeDirector.GuardHealth(this,Health-amount);
         if(Health>0&&revenant!=null)revenant.React(hitDirection);
         health = Mathf.CeilToInt(Health);
         LastHitTime = Time.time;
@@ -694,7 +731,7 @@ public class EnemyController : MonoBehaviour
                 explodePending = true;
                 deathDirection = hitDirection;
                 Invoke(nameof(Explode), 0.35f);
-                SetState(State.Fuse);
+                BeginAttackMotion(State.Fuse);
                 IsDeadPending();
                 return;
             }
@@ -715,7 +752,21 @@ public class EnemyController : MonoBehaviour
         ReleaseToken();
     }
 
-    void Kill(Vector3 hitDirection, bool exploded)
+    internal void AwaitRoyalVolley()
+    {
+        awaitingRoyalVolley = true;
+        ReleaseToken();
+        CancelInvoke(nameof(Explode));
+    }
+
+    internal void FallToRoyalVolley(Vector3 direction)
+    {
+        Health = 0f;
+        health = 0;
+        Kill(direction, false, grantRewards: false);
+    }
+
+    void Kill(Vector3 hitDirection, bool exploded, bool grantRewards = true)
     {
         if (IsDead) return;
         IsDead = true;
@@ -736,11 +787,14 @@ public class EnemyController : MonoBehaviour
         if (navAgent != null) navAgent.enabled = false;
         AudioManager.PlayZombieVoice("zombie_die", transform.position, type);
 
-        if (GameManager.instance != null) GameManager.instance.AddKill(this);
-        DropLoot();
+        if (grantRewards)
+        {
+            if (GameManager.instance != null) GameManager.instance.AddKill(this);
+            DropLoot();
+        }
 
         gameObject.tag = "Untagged";
-        if (exploded) { foreach (var r in renderers) if (r != null) r.enabled = false; Destroy(gameObject, 0.1f); }
+        if (exploded) { if(revenant!=null)revenant.HideSurfaces();else foreach (var r in renderers) if (r != null) r.enabled = false; Destroy(gameObject, 0.1f); }
         else { Invoke(nameof(BeginSink), 3.5f); Destroy(gameObject, 6f); }
     }
 
@@ -768,7 +822,7 @@ public class EnemyController : MonoBehaviour
             burnDps = 0f;
             return;
         }
-        Health -= burnDps * Time.deltaTime;
+        Health = HordeDirector.GuardHealth(this,Health-burnDps*Time.deltaTime);
         health = Mathf.Max(0, Mathf.CeilToInt(Health));
         burnAccum += burnDps * Time.deltaTime;
         emberTimer -= Time.deltaTime;
@@ -780,6 +834,36 @@ public class EnemyController : MonoBehaviour
         }
         flashTimer = Mathf.Max(flashTimer, 0.25f);
         if (Health <= 0f) Kill(transform.forward, false);
+    }
+
+    public void Bleed(float seconds,float dps)
+    {
+        if(IsDead||seconds<=0||dps<=0)return;
+        bleedUntil=Mathf.Max(bleedUntil,Time.time+seconds);bleedDps=Mathf.Max(bleedDps,dps);
+    }
+    public void PullTowards(Vector3 center,float seconds,float speed)
+    {
+        if(IsDead)return;pullCenter=center;pullUntil=Time.time+seconds;pullSpeed=speed*(isBoss?.2f:1);
+    }
+    void UpdateHordeEffects()
+    {
+        float eyes=HordeDirector.Active!=null&&HordeDirector.Active.Current==HordeEvent.BloodMoon?1:0;
+        if(moonEyes!=eyes&&revenant!=null)
+        {
+            moonEyes=eyes;revenant.Body.GetPropertyBlock(mpb);mpb.SetFloat("_BloodMoon",eyes);revenant.Body.SetPropertyBlock(mpb);
+        }
+        if(IsBleeding)
+        {
+            bleedTick+=Time.deltaTime;
+            if(bleedTick>=.25f){float elapsed=bleedTick;bleedTick=0;TakeDamage(bleedDps*elapsed,Vector3.down,0);}
+        }
+        else {bleedDps=0;bleedTick=0;}
+        if(!IsDead&&Time.time<pullUntil&&navAgent!=null&&navAgent.enabled&&navAgent.isOnNavMesh)
+        {
+            Vector3 delta=Flat(pullCenter-transform.position);
+            Vector3 step=Vector3.ClampMagnitude(delta,Mathf.Min(.12f,pullSpeed*Time.deltaTime));
+            if(delta.magnitude>1&&!NavMesh.Raycast(transform.position,transform.position+step,out _,navAgent.areaMask))navAgent.Move(step);
+        }
     }
 
     void BeginSink() => sinking = true;
@@ -820,6 +904,8 @@ public class EnemyController : MonoBehaviour
     PlayerControlSpeed playerControl;
     float nextCharge, nextSummon;
     Vector3 chargeDir;
+    float chargeWindup;
+    float ChargeSpeed => baseSpeed * HordeDirector.Speed * 2.6f;
     bool chargeHit;
     readonly System.Collections.Generic.List<EnemyController> summoned = new System.Collections.Generic.List<EnemyController>();
 
@@ -835,6 +921,7 @@ public class EnemyController : MonoBehaviour
     void StartCharge()
     {
         SetState(State.Charge);
+        chargeWindup = .65f / UnityEngine.Random.Range(.82f, 1.18f);
         chargeHit = false;
         chargeDir = Flat(player.position - transform.position).normalized;
         AudioManager.PlayZombieVoice("brute_roar", transform.position, type);
@@ -843,7 +930,8 @@ public class EnemyController : MonoBehaviour
 
     void UpdateCharge()
     {
-        const float windup = 0.65f, run = 1.5f;
+        const float run = 1.5f;
+        float windup = chargeWindup;
         if (stateTimer < windup)
         {
             // paw the ground and line up
@@ -853,8 +941,7 @@ public class EnemyController : MonoBehaviour
             return;
         }
         Vector3 before = transform.position;
-        if (navAgent.isOnNavMesh) navAgent.Move(chargeDir * baseSpeed * 2.6f * Time.deltaTime);
-        if (pSpeed) animator.SetFloat(hSpeed, 4f);
+        if (navAgent.isOnNavMesh) navAgent.Move(chargeDir * ChargeSpeed * Time.deltaTime);
         if (Mathf.Repeat(stateTimer, 0.12f) < Time.deltaTime) FX.Dust(transform.position, 0.5f, 3);
 
         Vector3 toPlayer = player.position - transform.position;
@@ -948,7 +1035,9 @@ public static class ZombieDirector
 {
     static readonly HashSet<EnemyController> tokens = new HashSet<EnemyController>();
 
-    static int MaxAttackers => GameSettings.Difficulty switch { Difficulty.Squire => 2, Difficulty.Knight => 3, _ => 4 };
+    static int MaxAttackers => (GameSettings.Difficulty switch { Difficulty.Squire => 2, Difficulty.Knight => 3, _ => 4 })
+        + (GameManager.instance != null && GameManager.instance.LastStand != null &&
+            GameManager.instance.LastStand.IsSurging ? 1 : 0);
 
     public static bool RequestToken(EnemyController e)
     {

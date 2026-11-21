@@ -21,7 +21,8 @@ public class ZombieSpawner : MonoBehaviour
     void Awake()
     {
         Instance=this;
-        var revenant=Resources.Load<GameObject>("Revenants/Revenant");
+        var revenant=BattleLoading.ZombiePrefab;
+        if(revenant==null)revenant=Resources.Load<GameObject>("Revenants/Revenant");
         if(revenant!=null)zombiePrefab=revenant;
     }
 
@@ -39,13 +40,19 @@ public class ZombieSpawner : MonoBehaviour
 
     public EnemyController Spawn(ZombieType type, bool boss)
     {
+        using var timing=BattleLoadMetrics.Measure(BattleLoadMetrics.Enabled?"Zombie spawn "+type:null);
         if (zombiePrefab == null) return null;
         var player = GameObject.FindWithTag("Player");
         Vector3 center = player != null ? player.transform.position : transform.position;
         float min = boss ? 24f : minSpawnDistance;
 
         Vector3 position;
-        if (!TryFindSpawnPoint(center, min, maxSpawnDistance, out position)) position = Fallback();
+        var stand = GameManager.instance != null ? GameManager.instance.LastStand : null;
+        if (stand != null && stand.Radius < 54f)
+        {
+            if (!TryFindCourtyardApproach(stand, center, boss, out position)) return null;
+        }
+        else if (!TryFindSpawnPoint(center, min, maxSpawnDistance, out position)) position = Fallback();
 
         Quaternion facing = Quaternion.LookRotation(Flat(center - position).sqrMagnitude > 0.01f ? Flat(center - position) : Vector3.forward);
         var go = Instantiate(zombiePrefab, position, facing);
@@ -56,6 +63,42 @@ public class ZombieSpawner : MonoBehaviour
     }
 
     static Vector3 Flat(Vector3 v) => new Vector3(v.x, 0, v.z);
+
+    static bool TryFindCourtyardApproach(LastStandDirector stand, Vector3 player, bool boss, out Vector3 result)
+    {
+        result = default;
+        if (!NavMesh.SamplePosition(player, out var target, 5f, NavMesh.AllAreas)) return false;
+
+        var camera = Camera.main;
+        var path = new NavMeshPath();
+        float angle = Random.Range(0f, 360f);
+        float minDistance = boss ? 12f : stand.IsSurging ? 7f : 10f;
+        bool haveVisible = false;
+        for (int i = 0; i < 24; i++)
+        {
+            // Search around the closing front, including approaches just inside it.
+            Vector3 direction = Quaternion.Euler(0f, angle + i * 137.5f, 0f) * Vector3.forward;
+            float distance = Random.Range(stand.Radius - 5f, stand.Radius + 7f);
+            Vector3 guess = stand.Center + direction * distance + Vector3.up;
+            if (!NavMesh.SamplePosition(guess, out var hit, 4f, NavMesh.AllAreas)) continue;
+            if (Mathf.Abs(hit.position.y - stand.Center.y) > 4f) continue;
+            if (Flat(hit.position - player).sqrMagnitude < minDistance * minDistance) continue;
+            if (!NavMesh.CalculatePath(hit.position, target.position, NavMesh.AllAreas, path)
+                || path.status != NavMeshPathStatus.PathComplete) continue;
+
+            if (!IsInView(camera, hit.position))
+            {
+                result = hit.position;
+                return true;
+            }
+            if (!haveVisible)
+            {
+                result = hit.position;
+                haveVisible = true;
+            }
+        }
+        return haveVisible;
+    }
 
     Vector3 Fallback()
     {
@@ -89,16 +132,17 @@ public class ZombieSpawner : MonoBehaviour
             if (Vector3.Distance(Flat(hit.position), Flat(around)) < minDist * 0.8f) continue;
             if (!NavMesh.CalculatePath(hit.position, target.position, NavMesh.AllAreas, path) || path.status != NavMeshPathStatus.PathComplete) continue;
 
-            bool visible = false;
-            if (cam != null)
-            {
-                Vector3 vp = cam.WorldToViewportPoint(hit.position + Vector3.up);
-                visible = vp.z > 0 && vp.x > -0.05f && vp.x < 1.05f && vp.y > -0.05f && vp.y < 1.05f;
-            }
-            if (!visible) { result = hit.position; return true; }
+            if (!IsInView(cam, hit.position)) { result = hit.position; return true; }
             if (!haveVisible) { visibleBackup = hit.position; haveVisible = true; }
         }
         if (haveVisible) { result = visibleBackup; return true; }  // rising from the ground in view is fine too
         return false;
+    }
+
+    static bool IsInView(Camera camera, Vector3 position)
+    {
+        if (camera == null) return false;
+        Vector3 vp = camera.WorldToViewportPoint(position + Vector3.up);
+        return vp.z > 0f && vp.x > -0.05f && vp.x < 1.05f && vp.y > -0.05f && vp.y < 1.05f;
     }
 }

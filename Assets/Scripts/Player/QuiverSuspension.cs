@@ -34,19 +34,21 @@ public sealed class QuiverSuspension : MonoBehaviour
     {
         var item=prop.GetComponent<QuiverSuspension>();if(item==null)item=prop.gameObject.AddComponent<QuiverSuspension>();
         item.data=data;item.owner=root.transform;item.gear=root.GetComponent<KnightGear>();
-        Transform Bone(string name)=>Array.Find(body.bones,b=>b.name=="Bip001 "+name);
+        var bones=body.bones;var bindposes=data.body.bindposes;
+        Transform Bone(string name)=>Array.Find(bones,b=>b.name=="Bip001 "+name);
         item.pelvis=Bone("Pelvis");item.spine=Bone("Spine");item.upper=Bone("R UpperArm");item.fore=Bone("R Forearm");item.hand=Bone("R Hand");
         item.linen=root.GetComponent<MarchwardenVisual>().Linen;item.chestOffset=data.chestFrameRotation;
-        int index=Array.IndexOf(body.bones,item.spine);var vertices=data.body.vertices;var weights=data.body.boneWeights;
+        int index=Array.IndexOf(bones,item.spine);var vertices=data.body.vertices;var weights=data.body.boneWeights;
+        Matrix4x4 toChest=Matrix4x4.Rotate(Quaternion.Inverse(item.chestOffset))*bindposes[index];
         bool first=true;Bounds box=new Bounds();
         for(int i=0;i<vertices.Length;i++)if(weights[i].boneIndex0==index&&weights[i].weight0>.98f)
         {
-            Vector3 point=Quaternion.Inverse(item.chestOffset)*data.body.bindposes[index].MultiplyPoint3x4(vertices[i]);
+            Vector3 point=toChest.MultiplyPoint3x4(vertices[i]);
             if(first){box=new Bounds(point,Vector3.zero);first=false;}else box.Encapsulate(point);
         }
-        int pelvisIndex=Array.IndexOf(body.bones,item.pelvis);
-        item.restTilt=(data.meshToCharacter*data.body.bindposes[pelvisIndex].inverse*data.quiverMount).rotation;
-        Matrix4x4 toPelvis=data.body.bindposes[pelvisIndex]*data.meshToCharacter.inverse;
+        int pelvisIndex=Array.IndexOf(bones,item.pelvis);
+        item.restTilt=(data.meshToCharacter*bindposes[pelvisIndex].inverse*data.quiverMount).rotation;
+        Matrix4x4 toPelvis=bindposes[pelvisIndex]*data.meshToCharacter.inverse;
         for(int side=0;side<2;side++)
         {
             float direction=side==0?-1:1;

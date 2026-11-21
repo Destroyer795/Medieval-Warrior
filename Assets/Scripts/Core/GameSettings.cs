@@ -72,16 +72,15 @@ public static class GameSettings
     {
         public float enemyHealth, enemyDamage, enemySpeed, spawnRate, aggression;
         public int defendTarget, maxAlive;
-        public float lastStandMinutes;
     }
 
     public static DifficultyProfile Profile => Profiles[(int)Difficulty];
 
     static readonly DifficultyProfile[] Profiles =
     {
-        new DifficultyProfile { enemyHealth = 0.8f, enemyDamage = 0.6f, enemySpeed = 0.9f, spawnRate = 0.75f, aggression = 0.6f, defendTarget = 20, maxAlive = 7, lastStandMinutes = 3f },
-        new DifficultyProfile { enemyHealth = 1f, enemyDamage = 1f, enemySpeed = 1f, spawnRate = 1f, aggression = 0.8f, defendTarget = 30, maxAlive = 10, lastStandMinutes = 4f },
-        new DifficultyProfile { enemyHealth = 1.35f, enemyDamage = 1.4f, enemySpeed = 1.12f, spawnRate = 1.35f, aggression = 1f, defendTarget = 45, maxAlive = 14, lastStandMinutes = 5f },
+        new DifficultyProfile { enemyHealth = 0.8f, enemyDamage = 0.6f, enemySpeed = 0.9f, spawnRate = 0.75f, aggression = 0.6f, defendTarget = 20, maxAlive = 7 },
+        new DifficultyProfile { enemyHealth = 1f, enemyDamage = 1f, enemySpeed = 1f, spawnRate = 1f, aggression = 0.8f, defendTarget = 30, maxAlive = 10 },
+        new DifficultyProfile { enemyHealth = 1.35f, enemyDamage = 1.4f, enemySpeed = 1.12f, spawnRate = 1.35f, aggression = 1f, defendTarget = 45, maxAlive = 14 },
     };
 
     public static string ModeName(GameMode m) => m switch
@@ -94,7 +93,7 @@ public static class GameSettings
     public static string ModeBlurb(GameMode m) => m switch
     {
         GameMode.DefendTheCastle => "Cut down the undead tide before it overruns the keep. A Warlord leads the final assault.",
-        GameMode.EndlessHorde => "Wave after wave, each deadlier than the last. Every fifth wave brings a Brute. How long will your legend last?",
+        GameMode.EndlessHorde => "Draft a power after every wave. Every third wave brings chaos; every fifth, a Brute. Forge a broken build. How long will your legend last?",
         _ => "The gates have fallen. Hold your ground until the reinforcements arrive at dawn.",
     };
 

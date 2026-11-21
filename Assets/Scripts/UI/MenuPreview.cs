@@ -40,13 +40,15 @@ public class MenuPreview : MonoBehaviour
     public void SetActive(bool on)
     {
         if (previewCamera != null) previewCamera.enabled = on;
+        // Hidden preview cloth/armor must not consume the gameplay CPU budget.
+        if(knight!=null)knight.gameObject.SetActive(on);
     }
 
     public void Drag(float dx) => dragVelocity = dx * 0.4f;
 
     void Update()
     {
-        if (knight == null) return;
+        if (knight == null||previewCamera==null||!previewCamera.enabled) return;
         dragVelocity = Mathf.Lerp(dragVelocity, 0f, 1f - Mathf.Exp(-4f * Time.unscaledDeltaTime));
         knight.Rotate(Vector3.up, (spinSpeed + dragVelocity * 60f) * Time.unscaledDeltaTime, Space.World);
     }

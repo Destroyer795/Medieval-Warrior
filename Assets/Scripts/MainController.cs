@@ -16,16 +16,16 @@ public class MainController : MonoBehaviour
 
         // the old hand-made canvas is replaced by MainMenuUI
         foreach (var c in FindObjectsByType<Canvas>(FindObjectsSortMode.None))
-            if (c.GetComponentInParent<MainMenuUI>() == null) c.gameObject.SetActive(false);
+            if (c.GetComponentInParent<MainMenuUI>() == null&&c.GetComponentInParent<BattleLoading>()==null) c.gameObject.SetActive(false);
 
         if (FindFirstObjectByType<MainMenuUI>() == null) new GameObject("Main Menu UI").AddComponent<MainMenuUI>();
     }
 
     public void StartGame()
     {
-        // GameManager in Semi-Final pulls in the Background (world) scene
-        SceneManager.LoadScene("Semi-Final", LoadSceneMode.Single);
+        BattleLoading.EnterBattle();
     }
+    void Start()=>BattleLoading.Prepare();
 
     public void QuitGame()
     {

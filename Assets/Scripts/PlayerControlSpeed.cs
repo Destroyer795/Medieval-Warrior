@@ -597,23 +597,30 @@ public class PlayerControlSpeed : MonoBehaviour
     void CheckForHits(int step, int variant)
     {
         Vector3 hitPosition = transform.position + transform.forward + Vector3.up;
+        bool whirlwind=step==2&&Boons.Stacks(BoonId.WhirlwindStrike)>0;
+        if(whirlwind)CombatBoons.Whirlwind(transform);
         bool phantom=step==2&&Boons.ReapersCleave;
-        Collider[] hitColliders = Physics.OverlapSphere(hitPosition, attackRange*(phantom?1.35f:1));
+        Collider[] hitColliders = Physics.OverlapSphere(hitPosition, attackRange*(whirlwind?1.5f:phantom?1.35f:1));
 
         HashSet<EnemyController> hitEnemies = new HashSet<EnemyController>();
         bool finisher = step == 2;
         float damage = (finisher ? 2f : 1f) * Boons.SwordDamage;
         float knock = finisher ? 7f : 2.5f;
         int landedHits=0;
+        bool hitTotem=false;
         Vector3 swingDirection=SwordMoves.All[variant].thrust?transform.forward:
             (transform.right*(step==1?-1:1)+transform.forward*.35f+Vector3.down*(finisher?.45f:0)).normalized;
 
         foreach (Collider hit in hitColliders)
         {
+            var totem=hit.GetComponentInParent<HordeTotem>();
+            if(totem!=null&&!hitTotem&&Vector3.Dot(transform.forward,(totem.Target-transform.position).normalized)>.1f&&
+                CombatBoons.ClearLine(transform.position+Vector3.up,hit.ClosestPoint(hitPosition),totem.transform))
+            {hitTotem=totem.ReceiveHit(damage,hit.ClosestPoint(hitPosition));if(hitTotem)landedHits++;}
             EnemyController enemy = hit.GetComponentInParent<EnemyController>();
             if (enemy == null || enemy.IsDead || hitEnemies.Contains(enemy)) continue;
             Vector3 dir = (enemy.transform.position - transform.position).normalized;
-            if (Vector3.Dot(transform.forward, dir) > (phantom?-.2f:SwordMoves.All[variant].thrust ? .65f : .3f))
+            if (Vector3.Dot(transform.forward, dir) > (whirlwind?-.85f:phantom?-.2f:SwordMoves.All[variant].thrust ? .65f : .3f))
             {
                 Vector3 swordOrigin = swordHand != null ? swordHand.position : hitPosition;
                 Vector3 contact = hit.ClosestPoint(swordOrigin);

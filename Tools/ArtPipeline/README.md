@@ -56,7 +56,11 @@ The pipeline saves compressed `.blend` files; intermediate mesh JSON and Blender
 backups remain local and are ignored by Git.
 
 The [Revenants pipeline](../../ArtSource/Revenants/README.md) uses `revenants.py`
-and its anatomy, hand, hair and skin modules to build eight undead forms.
+and its anatomy, hand, hair, skin and `revenant_dread.py` modules to build eight
+undead forms, fitted interchangeable gear and independently colored garments.
+The roster has 60 clips, including 34 combat variations. The editable Blender
+master retains 74 rig actions. A 120Hz authoring review checks
+wrist limits, frame continuity, looping feet and actual blade contact corridors.
 `RevenantBuilder.BuildAndSmoke` imports them and validates actual gameplay bone
 motion, weapon contacts, guard rules and body-part hits. `revenant_actions.py`
 transfers the reviewed generic motion back to the editable Blender rigs.
@@ -67,7 +71,8 @@ transfers the reviewed generic motion back to the editable Blender rigs.
 | `terrain_textures.py <sources> Assets/Environment/Textures` | `Grass_Lush_D/N`, `Grass_Meadow_D/N`, `Dirt_Path_D/N`, `Cobble_D/N`, `Rock_Mossy_D/N` (2048²), `GrassDense/Wild/Short.png` | Colour-grades the scans (grass is gradient-mapped to a vibrant stylised green) and paints the grass detail cards. |
 | `castle_and_knight.py .` | `Assets/Environment/Textures/Castle/*`, `Assets/Resources/Customization/*` | Brightens/warms the castle pack textures and derives normal maps; writes the knight atlas copy and the tabard/metal/leather mask. |
 | `ui_art.py Assets/Resources/UI` | all UI sprites and icons | Gold-and-iron panels, buttons, bars, banner, slots, crosshair, icons. Flower cards too. |
-| `sfx.py Assets/Resources/Audio` | horror/weapon/boon SFX, UI and ambience; preserves existing menu WAV | Aperiodic throat/breath/rumble synthesis and layered foley; frozen original menu recipe. See [audio source guide](../../ArtSource/Audio/README.md). |
+| `sfx.py Assets/Resources/Audio` | horror, weapon, boon, UI, ambience and trumpet cues | Procedural effects, recorded trumpet phrases and a protected menu theme. See [audio source guide](../../ArtSource/Audio/README.md). |
+| `trumpet_cues.py Assets/Resources/Audio` | `wave_horn.wav`, `boss_horn.wav`, `victory.wav`, `defeat.wav` | Rebuilds the four fanfares from the recorded takes. |
 | `extra_audio.py Assets/Resources/Audio` | `music_battle.wav`, `step0-3.wav` | Battle drums layer and footsteps. |
 
 Notes

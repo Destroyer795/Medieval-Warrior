@@ -53,10 +53,11 @@ public sealed class ShieldDefensePose
         chestFrameOffset=asset.chestFrameRotation;
         int spineIndex=Array.IndexOf(bones,spine);
         var positions=asset.body.vertices;var weights=asset.body.boneWeights;
+        var chestBind=asset.body.bindposes[spineIndex];var toChest=Quaternion.Inverse(chestFrameOffset);
         Bounds measured=new Bounds();bool started=false;
         for(int i=0;i<positions.Length;i++)if(weights[i].boneIndex0==spineIndex&&weights[i].weight0>.98f)
         {
-            Vector3 point=Quaternion.Inverse(chestFrameOffset)*asset.body.bindposes[spineIndex].MultiplyPoint3x4(positions[i]);
+            Vector3 point=toChest*chestBind.MultiplyPoint3x4(positions[i]);
             if(!started){measured=new Bounds(point,Vector3.zero);started=true;}else measured.Encapsulate(point);
         }
         chest=new Bounds(measured.center*rigScale,measured.size*rigScale);

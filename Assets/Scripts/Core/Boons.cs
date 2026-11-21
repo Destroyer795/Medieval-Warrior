@@ -3,7 +3,8 @@ using System.Linq;
 using UnityEngine;
 
 public enum BoonId { Vigour, SwiftDraw, KeenEdge, SecondWind, Piercing, FireArrows, Quiver, Bulwark, Vampiric, FleetFoot, Bloodlust,
-    ThunderGuard, ReapersCleave, SplinterVolley, VampiricRiposte }
+    ThunderGuard, ReapersCleave, SplinterVolley, VampiricRiposte,
+    ShockwaveParry, WhirlwindStrike, ExplosiveQuiver }
 
 // Upgrades the knight earns during a match (pick one of three). They reset every match.
 // Gameplay code reads the multipliers below; one-off effects happen in Apply.
@@ -33,6 +34,9 @@ public static class Boons
         new Def { id = BoonId.ReapersCleave, name = "Reaper's Cleave", description = "The third sword strike sweeps a wider arc and burns with phantom flame.", icon = "sword", maxStacks = 1 },
         new Def { id = BoonId.SplinterVolley, name = "Splinter Volley", description = "Arrows burst into shrapnel, damaging nearby undead. Works with piercing and fire.", icon = "arrow", maxStacks = 1 },
         new Def { id = BoonId.VampiricRiposte, name = "Vampiric Riposte", description = "A successful parry or perfect block restores 6 health.", icon = "potion", maxStacks = 1 },
+        new Def { id = BoonId.ShockwaveParry, name = "Shockwave Parry", description = "Perfect blocks chain lightning between undead, dealing damage and stunning them. Ranks add power and chain targets.", icon = "shield", maxStacks = int.MaxValue },
+        new Def { id = BoonId.WhirlwindStrike, name = "Whirlwind Strike", description = "Your third sword cut draws nearby undead inward and makes them bleed. Ranks increase the pull and bleeding damage.", icon = "sword", maxStacks = int.MaxValue },
+        new Def { id = BoonId.ExplosiveQuiver, name = "Explosive Quiver", description = "Headshots scatter delayed shrapnel bombs. Ranks increase blast damage. Combines with fire and piercing arrows.", icon = "arrow", maxStacks = int.MaxValue },
     };
 
     static readonly Dictionary<BoonId, int> stacks = new Dictionary<BoonId, int>();
@@ -44,12 +48,38 @@ public static class Boons
 
     public static void Reset() => stacks.Clear();
 
-    public static Def[] Roll(int count)
+    public static Def[] Roll(int count, bool synergistic = false)
     {
-        return all.Where(d => Stacks(d.id) < d.maxStacks)
-                  .OrderBy(_ => Random.value)
-                  .Take(count)
-                  .ToArray();
+        var pool = all.Where(d => Stacks(d.id) < d.maxStacks).ToList();
+        var result = new List<Def>();
+        while(result.Count<count && pool.Count>0)
+        {
+            // The first card is always a transformative power in Horde. The
+            // remaining cards favour existing builds without locking out pivots.
+            var eligible=synergistic&&result.Count==0 ? pool.Where(d=>IsSignature(d.id)).ToList() : pool;
+            if(eligible.Count==0)eligible=pool;
+            float total=eligible.Sum(d=>synergistic?DraftWeight(d.id):1f), roll=Random.value*total;
+            var chosen=eligible[eligible.Count-1];
+            foreach(var d in eligible){roll-=synergistic?DraftWeight(d.id):1f;if(roll<=0){chosen=d;break;}}
+            result.Add(chosen);pool.Remove(chosen);
+        }
+        return result.ToArray();
+    }
+
+    public static bool IsSignature(BoonId id)=>id==BoonId.ShockwaveParry||id==BoonId.WhirlwindStrike||id==BoonId.ExplosiveQuiver;
+    static float DraftWeight(BoonId id)=>1f+(Stacks(id)>0?1.3f:0f)+(HasSynergy(id)?2f:0f);
+    public static bool HasSynergy(BoonId id)
+    {
+        bool guard=Stacks(BoonId.ShockwaveParry)+Stacks(BoonId.ThunderGuard)+Stacks(BoonId.VampiricRiposte)+Stacks(BoonId.Bulwark)>0;
+        bool blade=Stacks(BoonId.WhirlwindStrike)+Stacks(BoonId.ReapersCleave)+Stacks(BoonId.KeenEdge)+Stacks(BoonId.Vampiric)>0;
+        bool bow=Stacks(BoonId.ExplosiveQuiver)+Stacks(BoonId.SplinterVolley)+Stacks(BoonId.FireArrows)+Stacks(BoonId.Piercing)>0;
+        switch(id)
+        {
+            case BoonId.ShockwaveParry:case BoonId.ThunderGuard:case BoonId.VampiricRiposte:case BoonId.Bulwark:return guard;
+            case BoonId.WhirlwindStrike:case BoonId.ReapersCleave:case BoonId.KeenEdge:case BoonId.Vampiric:return blade;
+            case BoonId.ExplosiveQuiver:case BoonId.SplinterVolley:case BoonId.FireArrows:case BoonId.Piercing:case BoonId.SwiftDraw:case BoonId.Quiver:return bow;
+            default:return false;
+        }
     }
 
     public static void Apply(BoonId id, GameObject player)

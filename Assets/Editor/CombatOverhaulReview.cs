@@ -26,9 +26,9 @@ public static class CombatOverhaulReview
             var hash=BitConverter.ToString(sha.ComputeHash(File.ReadAllBytes(folder+"/music_menu.wav"))).Replace("-","").ToLowerInvariant();
             if(hash!=MenuHash)throw new Exception("The protected menu WAV changed");
         }
-        foreach(string name in new[]{"parry","thunder_guard","phantom_cleave","splinter"})
+        foreach(string name in new[]{"parry","thunder_guard","phantom_cleave","splinter","wave_horn","boss_horn","victory","defeat"})
             if(Resources.Load<AudioClip>("Audio/"+name)==null)throw new Exception("Missing combat cue: "+name);
-        if(count!=40)throw new Exception("Unexpected soundbank size: "+count);
-        Debug.Log("[Combat audio] PASS: 40 imported mono WAVs; protected music_menu SHA-256 unchanged; new combat cues resolved");
+        if(count<40)throw new Exception("Incomplete soundbank: "+count);
+        Debug.Log($"[Combat audio] PASS: {count} imported mono WAVs. Protected menu hash and required combat cues verified.");
     }
 }

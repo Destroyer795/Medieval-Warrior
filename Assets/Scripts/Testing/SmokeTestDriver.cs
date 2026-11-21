@@ -38,6 +38,7 @@ public partial class SmokeTestDriver : MonoBehaviour
     void Awake()
     {
         GameSettings.TestMode = true;
+        BattleLoadMetrics.Enabled=File.Exists("Artifacts/StartupReviewOnly.txt");
         Application.logMessageReceived += OnLog;
     }
 
@@ -69,6 +70,22 @@ public partial class SmokeTestDriver : MonoBehaviour
         var savedMode = GameSettings.Mode;
         var savedDiff = GameSettings.Difficulty;
         GameSettings.Difficulty = Difficulty.Knight;
+        if(File.Exists("Artifacts/StartupReviewOnly.txt"))
+        {
+            yield return ReviewBattleStartup();Finish(savedMode,savedDiff);yield break;
+        }
+        if(File.Exists("Artifacts/HordeReviewOnly.txt"))
+        {
+            yield return StartHordeReview();Finish(savedMode,savedDiff);yield break;
+        }
+        if (File.Exists("Artifacts/LastStandReviewOnly.txt"))
+        {
+            GameSettings.Mode = GameMode.LastStand;
+            BattleLoading.EnterBattle();
+            yield return ReviewLastStand();
+            Finish(savedMode, savedDiff);
+            yield break;
+        }
 
         // ---------------------------------------------------------- menu
         yield return Wait(2.5f);
@@ -76,6 +93,7 @@ public partial class SmokeTestDriver : MonoBehaviour
         Check(menu != null, "main menu UI built");
         Check(Camera.main != null && Camera.main.GetComponent<MenuCameraOrbit>() != null, "menu camera orbits the castle");
         Check(SceneManager.GetSceneByName("Background").isLoaded, "castle world loaded behind the menu");
+        int initialWorldHandle=SceneManager.GetSceneByName("Background").handle;
         Capture("01_menu_title");
         if (menu != null)
         {
@@ -99,8 +117,13 @@ public partial class SmokeTestDriver : MonoBehaviour
         GameSettings.Mode = GameMode.DefendTheCastle;
         var mc = FindFirstObjectByType<MainController>();
         if (mc != null) mc.StartGame(); else SceneManager.LoadScene("Semi-Final");
-        yield return Wait(1.5f);
+        float loadDeadline=Time.realtimeSinceStartup+30f;
+        while((!BattleLoading.Ready||BattleLoading.IsTransitioning||GameManager.instance==null)&&Time.realtimeSinceStartup<loadDeadline)
+            yield return null;
+        yield return null;
         Check(SceneManager.GetSceneByName("Background").isLoaded, "game loads the world scene itself");
+        Check(SceneManager.GetSceneByName("Background").handle==initialWorldHandle,"battle entry retains the menu's existing castle world");
+        Check(BattleLoading.Ready&&!BattleLoading.IsTransitioning,"battle entry completes asynchronous combat preloading before play");
         var gm = GameManager.instance;
         Check(gm != null, "GameManager present");
         Check(FindFirstObjectByType<GameHUD>() != null, "HUD built");
@@ -195,6 +218,10 @@ public partial class SmokeTestDriver : MonoBehaviour
         foreach (var z in EnemyController.All.ToArray()) Destroy(z.gameObject);
         yield return null;
         health.InvulnerableUntil = float.PositiveInfinity;
+        if(File.Exists("Artifacts/RevenantReviewOnly.txt"))
+        {
+            yield return ReviewRevenants(player,health);Finish(savedMode,savedDiff);yield break;
+        }
         if(File.Exists("Artifacts/FeedbackReviewOnly.txt"))
         {
             yield return ReviewActionFeedback(player,health);Finish(savedMode,savedDiff);yield break;
@@ -809,6 +836,7 @@ public partial class SmokeTestDriver : MonoBehaviour
         gm.QuitGame();
         yield return Wait(3f);
         Check(FindFirstObjectByType<MainMenuUI>() != null, "returns to main menu");
+        Check(SceneManager.GetSceneByName("Background").handle==initialWorldHandle,"returning to the menu preserves the loaded world");
         Check(Time.timeScale == 1f, "time scale reset in menu");
         Capture("20_menu_again");
 
@@ -834,6 +862,8 @@ public partial class SmokeTestDriver : MonoBehaviour
         Check(Boons.Total == boonsBefore + 1 && !GameHUD.BoonsOpen, "boon applied");
         Check(Time.timeScale > 0.5f, "time resumes after the pick");
         Capture("33_boon_owned");
+        yield return ReviewHordeSystems(player=GameObject.FindWithTag("Player").GetComponent<PlayerControlSpeed>(),
+            GameObject.FindWithTag("Player").GetComponent<PlayerHealth>());
         health = GameObject.FindWithTag("Player").GetComponent<PlayerHealth>();
         health.TakeDamage(999f, null, 0f, true);
         yield return Wait(4.5f);
@@ -846,7 +876,9 @@ public partial class SmokeTestDriver : MonoBehaviour
         yield return Wait(6f);
         gm = GameManager.instance;
         Check(gm != null && gm.Mode == GameMode.LastStand && gm.Objective.StartsWith("Dawn"), "last stand timer running");
+        Check(SceneManager.GetSceneByName("Background").handle==initialWorldHandle,"restarting a run preserves the loaded world");
         Capture("40_last_stand");
+        yield return ReviewLastStand();
 
         Finish(savedMode, savedDiff);
     }
@@ -933,6 +965,10 @@ public partial class SmokeTestDriver : MonoBehaviour
         bool savedBlock=health.isShieldBlocking,savedParry=(bool)parryField.GetValue(health);
         var body=player.GetComponent<Rigidbody>();var constraints=body.constraints;var velocity=body.linearVelocity;body.constraints=RigidbodyConstraints.FreezeAll;
         bool playerEnabled=player.enabled;player.enabled=false;
+        var pacing=FindFirstObjectByType<GameManager>();bool pacingEnabled=pacing!=null&&pacing.enabled;
+        if(pacing!=null)pacing.enabled=false;
+        var spectators=EnemyController.All.Where(e=>e!=null&&e.gameObject.activeSelf).ToArray();
+        foreach(var spectator in spectators)spectator.gameObject.SetActive(false);
         try
         {
             health.InvulnerableUntil=0;health.isShieldBlocking=false;parryField.SetValue(health,false);health.currentHealth=1000;
@@ -956,12 +992,104 @@ public partial class SmokeTestDriver : MonoBehaviour
                     var footBefore=e.transform.InverseTransformPoint(foot.position);float footTravel=0;
                     for(int sample=0;sample<4;sample++){yield return Wait(.08f);footTravel=Mathf.Max(footTravel,Vector3.Distance(footBefore,e.transform.InverseTransformPoint(foot.position)));}
                     Check(footTravel>.04f,kind+" walk/run actually moves leg bones in Play mode");
+                    var leftAnkle=visual.Body.bones.First(b=>b.name=="Base HumanLLegFoot");
+                    var shoulder=visual.Body.bones.First(b=>b.name=="Base HumanRArmUpperarm");
+                    float forwardStep=-1,backStep=1,forwardReach=0,backReach=0;
+                    int footPasses=0;float previousStep=0;
+                    anim.SetFloat("Speed",Mathf.Lerp(visual.Form.walkSpeed,visual.Form.runSpeed,.65f));
+                    for(int phase=0;phase<=32;phase++)
+                    {
+                        anim.Play("Locomotion",0,phase/32f);anim.Update(0);
+                        float step=Vector3.Dot(leftAnkle.position-foot.position,e.transform.forward);
+                        float reach=Vector3.Dot(arm.position-shoulder.position,e.transform.forward);
+                        if(phase>0&&step*previousStep<0)footPasses++;
+                        previousStep=step;
+                        if(step>forwardStep){forwardStep=step;forwardReach=reach;}
+                        if(step<backStep){backStep=step;backReach=reach;}
+                        if(kind==ZombieType.Runner&&phase==5)
+                            CaptureFrom("runner-chase",e.transform.position+e.transform.forward*3f+e.transform.right*2f+Vector3.up*1.45f,
+                                e.transform.position+Vector3.up*.9f);
+                    }
+                    Check(footPasses==2&&forwardReach-backReach>.09f*e.transform.localScale.y,
+                        kind+" blends walk and run into one full stride with opposite arm swing");
                     anim.SetFloat("AttackStyle",0);anim.SetTrigger("attack");anim.Update(0);var armBefore=e.transform.InverseTransformPoint(arm.position);float armTravel=0;
                     for(int sample=0;sample<4;sample++){yield return Wait(.06f);armTravel=Mathf.Max(armTravel,Vector3.Distance(armBefore,e.transform.InverseTransformPoint(arm.position)));}
                     Check(armTravel>.015f,kind+" attack actually moves arm bones in Play mode");
                     float pelvisBefore=pelvis.position.y;anim.SetBool("dieForward",false);anim.SetTrigger("die");yield return Wait(.48f);
                     Check(Mathf.Abs(pelvis.position.y-pelvisBefore)>.04f,kind+" death actually lowers the animated body in Play mode");
                     anim.Rebind();anim.Update(0);Hunt(e);yield return Wait(.12f);
+                    var outfit=new MaterialPropertyBlock();visual.Body.GetPropertyBlock(outfit);
+                    Check(outfit.GetColor("_ClothTint")!=outfit.GetColor("_TrouserTint")&&outfit.GetColor("_ClothTint").maxColorComponent>.4f,
+                        kind+" retains independently colored, visible tunic and trousers in Play mode");
+                    Check(e.GetComponentsInChildren<Renderer>().Count(r=>r.enabled)<=3,kind+" appearance stays within three renderer draws");
+                    if(RevenantVisual.Armed(kind))
+                        Check(visual.SwordStyle>=0&&visual.SwordStyle<3&&visual.Form.swords[visual.SwordStyle]!=null,kind+" equips a shared palm-mounted sword variant");
+                    if(!RevenantVisual.Armed(kind))
+                    {
+                        bool enabledBefore=anim.enabled;anim.enabled=false;
+                        var contacts=new List<Vector3>();float motion=0;
+                        for(int style=0;style<visual.Form.attacks.Length;style++)
+                        {
+                            anim.SetFloat("AttackStyle",style);anim.Play("Attack",0,0);anim.Update(0);
+                            var start=visual.SwordHand.position+visual.ShieldHand.position*.37f;
+                            anim.Update(e.Stats.windup);
+                            var contact=visual.SwordHand.position+visual.ShieldHand.position*.37f;
+                            contacts.Add(contact);motion=Mathf.Max(motion,Vector3.Distance(start,contact));
+                        }
+                        int expected=kind==ZombieType.Bloater?4:kind==ZombieType.Spitter?3:5;
+                        Check(contacts.Count==expected&&motion>.10f&&contacts.SelectMany((a,i)=>contacts.Skip(i+1).Select(b=>Vector3.Distance(a,b))).Min()>.025f,
+                            kind+" Animator plays "+expected+" visibly distinct attacks at the authored contact time");
+                        if(kind==ZombieType.Bloater)
+                        {
+                            Call(e,"StartFuse");int first=e.AttackStyle;
+                            Call(e,"StartFuse");
+                            Check(e.AttackStyle!=first&&Mathf.Abs(anim.GetFloat("AttackMul")-e.AttackSpeed)<.001f,
+                                "Bloater chooses a different fuse pose with synchronized playback");
+                        }
+                        if(kind==ZombieType.Walker)
+                        {
+                            var chosen=new HashSet<int>();int previous=e.AttackStyle;bool noRepeats=true,ratesMatch=true;
+                            for(int attempt=0;attempt<16;attempt++)
+                            {
+                                Call(e,"BeginAttack");
+                                noRepeats&=e.AttackStyle!=previous&&e.AttackStyle>=0&&e.AttackStyle<expected;
+                                ratesMatch&=e.AttackSpeed>=.77f&&e.AttackSpeed<=1.23f&&Mathf.Abs(anim.GetFloat("AttackMul")-e.AttackSpeed)<.001f;
+                                chosen.Add(e.AttackStyle);previous=e.AttackStyle;
+                            }
+                            Check(noRepeats&&chosen.Count>=3,"unarmed AI selects varied attacks without immediate repetition");
+                            Check(ratesMatch,"unarmed AI rolls a bounded playback speed for each attack");
+                            foreach(bool fast in new[]{false,true})
+                            {
+                                for(int attempt=0;attempt<48;attempt++)
+                                {
+                                    Call(e,"BeginAttack");
+                                    if(fast?e.AttackSpeed>1.08f:e.AttackSpeed<.92f)break;
+                                }
+                                anim.Play("Attack",0,0);
+                                anim.Update(0);
+                                float elapsed=0,before=health.currentHealth;
+                                for(int frame=0;frame<300&&elapsed<1f&&health.currentHealth==before;frame++)
+                                {
+                                    yield return null;
+                                    elapsed+=Time.deltaTime;
+                                    Call(e,"Update");
+                                    anim.Update(Time.deltaTime);
+                                }
+                                var playback=anim.GetCurrentAnimatorStateInfo(0);
+                                float clipTime=playback.normalizedTime*visual.Form.attacks[e.AttackStyle].length;
+                                float expectedTime=e.Stats.windup/e.AttackSpeed;
+                                Check((fast?e.AttackSpeed>1.08f:e.AttackSpeed<.92f)&&health.currentHealth<before&&
+                                    elapsed>=expectedTime-.001f&&elapsed<=expectedTime+Time.deltaTime+.001f&&
+                                    playback.IsName("Attack")&&Mathf.Abs(clipTime-elapsed*e.AttackSpeed)<.02f,
+                                    "Walker "+(fast?"fast":"slow")+" attack lands in sync with its animation at "+elapsed.ToString("F2")+"s");
+                            }
+                        }
+                        anim.enabled=enabledBefore;anim.Rebind();anim.Update(0);Hunt(e);
+                    }
+                    // This assertion measures a standing actor, independently
+                    // of the run/attack sample clocks above and terrain IK order.
+                    anim.SetFloat("Speed",0);anim.SetFloat("MoveMul",1);anim.Play("Locomotion",0,0);anim.Update(0);
+                    yield return null;
                     var skin=visual.Body.sharedMesh;var points=skin.vertices;var weights=skin.boneWeights;
                     var matrices=visual.Body.bones.Select((b,i)=>b.localToWorldMatrix*skin.bindposes[i]).ToArray();float soleY=float.PositiveInfinity;
                     for(int i=0;i<points.Length;i++)
@@ -986,10 +1114,24 @@ public partial class SmokeTestDriver : MonoBehaviour
                     {
                         bool wasAnimating=anim.enabled;anim.enabled=false;Physics.SyncTransforms();
                         float beforeArrow=e.Health;
+                        var frozenArm=armZone.bounds.center;
                         var limbArrow=Arrow.Fire(armContact+e.transform.forward*2.1f,-e.transform.forward,25,.15f,0,player.transform);
                         yield return Wait(.18f);
+                        Check(Vector3.Distance(frozenArm,armZone.bounds.center)<.01f,"procedural posing does not accumulate on a disabled animation rig");
                         Check(e.Health<beforeArrow&&visual.Injuries.BloodCount==2,"a real arrow can wound an exposed arm through the anatomical hit volume");
                         if(limbArrow!=null)Destroy(limbArrow.gameObject);anim.enabled=wasAnimating;
+                        visual.React(-e.transform.forward);yield return Wait(.06f);
+                        var chest=visual.Body.bones.First(b=>b.name=="Base HumanRibcage");
+                        float scaleBefore=Time.timeScale;
+                        try
+                        {
+                            Time.timeScale=0;yield return null;
+                            var pausedRotation=chest.rotation;var pausedPosition=pelvis.position;
+                            yield return null;yield return null;
+                            Check(Quaternion.Angle(pausedRotation,chest.rotation)<.1f&&Vector3.Distance(pausedPosition,pelvis.position)<.001f,
+                                "pause holds terrain grounding and hit-recoil poses without accumulation");
+                        }
+                        finally{Time.timeScale=scaleBefore;}
                     }
                     if(kind==ZombieType.Bulwark)
                     {
@@ -1006,7 +1148,7 @@ public partial class SmokeTestDriver : MonoBehaviour
                     }
                     if(RevenantVisual.Armed(kind))
                     {
-                      for(int style=0;style<2;style++)
+                      for(int style=0;style<visual.Form.attacks.Length;style++)
                       {
                         Call(e,"BeginAttack");Clock(e,e.Stats.windup-.01f);float before=health.currentHealth;Call(e,"UpdateAttack");
                         type.GetField("<AttackStyle>k__BackingField",flags).SetValue(e,style);e.GetComponent<Animator>().SetFloat("AttackStyle",style);
@@ -1033,6 +1175,8 @@ public partial class SmokeTestDriver : MonoBehaviour
             health.currentHealth=savedHealth;health.InvulnerableUntil=savedImmune;health.isShieldBlocking=savedBlock;parryField.SetValue(health,savedParry);
             body.constraints=constraints;body.linearVelocity=velocity;
             player.enabled=playerEnabled;
+            foreach(var spectator in spectators)if(spectator!=null)spectator.gameObject.SetActive(true);
+            if(pacing!=null)pacing.enabled=pacingEnabled;
         }
     }
 
@@ -1278,6 +1422,7 @@ public partial class SmokeTestDriver : MonoBehaviour
         var go = new GameObject("Capture Camera");
         var cam = go.AddComponent<Camera>();
         cam.allowMSAA = true;
+        if(name.StartsWith("horde_"))cam.depthTextureMode=DepthTextureMode.Depth;
         cam.renderingPath = RenderingPath.Forward;
         cam.fieldOfView = 40f;
         cam.nearClipPlane = 0.05f;

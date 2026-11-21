@@ -124,6 +124,8 @@ public class Arrow : MonoBehaviour
         }
         else
         {
+            var totem=hit.collider.GetComponentInParent<HordeTotem>();
+            if(totem!=null)totem.ReceiveHit(damage,hit.point);
             BurstSplinters(hit.point,null);
             if (fire) FX.Embers(hit.point, 8);
             AudioManager.PlayAt("arrow_hit", hit.point, 0.8f);
@@ -203,6 +205,8 @@ public class Arrow : MonoBehaviour
         float dmg = damage * (headshot ? 2f : 1f);
         if(!enemy.ReceiveWeaponHit(dmg, velocity.normalized, knockback,point)){BurstSplinters(point,enemy);return false;}
         BurstSplinters(point,enemy);
+        if(headshot&&!clustered)
+        {clustered=true;ClusterVolley.Create(point,velocity.normalized,damage,fire);}
         if(headshot)FX.Impact(velocity.normalized,.28f,.055f);
         if (fire)
         {
@@ -221,6 +225,7 @@ public class Arrow : MonoBehaviour
         GameHUD.HitMarker(headshot);
         return true;
     }
+    bool clustered;
     void BurstSplinters(Vector3 point,EnemyController primary)
     {
         if(splintered||!Boons.SplinterVolley)return;

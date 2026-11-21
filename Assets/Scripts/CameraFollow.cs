@@ -44,6 +44,7 @@ public class CameraFollow : MonoBehaviour
 
     // Input heading is independent of camera follow lag and trauma shake.
     public Vector3 LookDirection => Quaternion.Euler(orbitPitch, orbitYaw, 0f) * Vector3.forward;
+    internal float DawnView { get; set; }
 
     void Start()
     {
@@ -89,7 +90,7 @@ public class CameraFollow : MonoBehaviour
         if (scrollInput != 0)
             currentDistance = Mathf.Clamp(currentDistance - scrollInput * zoomSpeed, minZoom, maxZoom);
 
-        bool aiming = player != null && player.CurrentWeapon == Weapon.Bow && (player.IsAiming || player.IsDrawing);
+        bool aiming = DawnView <= 0f && player != null && player.CurrentWeapon == Weapon.Bow && (player.IsAiming || player.IsDrawing);
         aimBlend = Mathf.MoveTowards(aimBlend, aiming ? 1f : 0f, dt * 4f);
         float e = aimBlend * aimBlend * (3f - 2f * aimBlend);
         // Mouse delta is already a per-frame displacement. Do not add another
@@ -107,7 +108,8 @@ public class CameraFollow : MonoBehaviour
     {
         if(target==null||Time.timeScale<.01f&&!CombatTime.IsHitStopped)return;
         float dt=Mathf.Min(Time.unscaledDeltaTime,.05f),e=aimBlend*aimBlend*(3-2*aimBlend);
-        Quaternion rotation = Quaternion.Euler(orbitPitch, orbitYaw, 0);
+        float pitch = Mathf.Lerp(orbitPitch, 6f, DawnView * .8f);
+        Quaternion rotation = Quaternion.Euler(pitch, orbitYaw, 0);
         Vector3 targetPoint = target.position + Vector3.up * 1.5f;
         if ((targetPoint - followPoint).sqrMagnitude > 100f)
         { followPoint = targetPoint; currentVelocity = Vector3.zero; }
@@ -120,7 +122,7 @@ public class CameraFollow : MonoBehaviour
         Vector3 focusPoint = followPoint;
         if (shoulderLength > 0.001f)
             focusPoint += shoulder.normalized * ClearDistance(followPoint, shoulder.normalized, shoulderLength);
-        float distance = Mathf.Lerp(currentDistance, aimDistance, e);
+        float distance = Mathf.Lerp(currentDistance, aimDistance, e) + 1.8f * DawnView;
         Vector3 back = -(rotation * Vector3.forward);
         float clear = ClearDistance(focusPoint, back, distance);
         // Obstruction retracts immediately; release eases out. Never smooth an

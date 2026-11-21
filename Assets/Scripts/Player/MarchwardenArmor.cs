@@ -16,23 +16,53 @@ public sealed class MarchwardenArmor : MonoBehaviour
     readonly List<int>[] clothCells=new List<int>[Around*High];
     Vector3[] projectedCloth,clothVertices;
     int[] clothTriangles;
+    ClothPlane[] clothPlanes;
+    struct ClothPlane
+    {
+        public Vector3 a,normal,u,v;
+        public float originOffset;
+        public ClothPlane(Vector3 a,Vector3 b,Vector3 c)
+        {
+            this.a=a;var ab=b-a;var ac=c-a;normal=Vector3.Cross(ab,ac);
+            float inverse=normal.sqrMagnitude>.00000000000001f?1/normal.sqrMagnitude:0;
+            if(inverse==0)normal=Vector3.zero;
+            float aa=Vector3.Dot(ab,ab),bb=Vector3.Dot(ac,ac),cross=Vector3.Dot(ab,ac);
+            u=(ab*bb-ac*cross)*inverse;v=(ac*aa-ab*cross)*inverse;
+            originOffset=-Vector3.Dot(normal,a)-normal.z*.046f;
+        }
+        public float Intersect(float height,Vector3 direction)
+        {
+            float denominator=normal.x*direction.x+normal.z*direction.z;
+            if(Mathf.Abs(denominator)<.00000001f)return float.NegativeInfinity;
+            float distance=-(normal.y*height+originOffset)/denominator;
+            if(distance<0)return float.NegativeInfinity;
+            var delta=new Vector3(direction.x*distance,height,-.046f+direction.z*distance)-a;
+            float x=Vector3.Dot(delta,u),y=Vector3.Dot(delta,v);
+            return x<-.0001f||x>1.0001f||y<-.0001f||x+y>1.0001f?float.NegativeInfinity:distance;
+        }
+    }
     Matrix4x4 worldToCharacter;
     Matrix4x4 pelvisToCharacter;
     float uniformScale;
     Vector3[] barTangents,childOffsets;
     Vector3[] pivots;
-    Quaternion[] restRotations,poseRotations,trialRotations;
+    Quaternion[] restRotations,poseRotations,trialRotations,twistedRotations;
     Matrix4x4[] trialFrames;
     float clothBottom,clothTop;
     float[] angles,velocities,twists;
     Vector3 previousPosition,previousVelocity;
     bool ready;
     public int JointCount=>joints!=null?joints.Length:0;
-    public float LegGap { get; private set; }
-    public float ClothGap { get; private set; }
+    float legGap=float.MaxValue,clothGap=float.MaxValue;
+    bool diagnosticsDirty;
+    public float LegGap { get {UpdateDiagnostics();return legGap;} }
+    public float ClothGap { get {UpdateDiagnostics();return clothGap;} }
     public float AttachmentError { get; private set; }
     public float MaximumAngle { get; private set; }
-    public int ClosestClothJoint { get; private set; }
+    int closestClothJoint;
+    public int ClosestClothJoint { get {UpdateDiagnostics();return closestClothJoint;} }
+    public int ContactQueries {get;private set;}
+    public int FallbackQueries {get;private set;}
 
     public static MarchwardenArmor Prepare(GameObject root,SkinnedMeshRenderer body,MarchwardenAsset data,MarchwardenCloth linen)
     {
@@ -68,10 +98,12 @@ public sealed class MarchwardenArmor : MonoBehaviour
         if(ready)return;
         angles=new float[joints.Length];velocities=new float[joints.Length];twists=new float[joints.Length];
         projectedCloth=new Vector3[data.tunic.vertexCount];clothTriangles=data.tunic.triangles;
+        clothPlanes=new ClothPlane[clothTriangles.Length/3];
         clothVertices=new Vector3[projectedCloth.Length];
         pelvisToCharacter=data.meshToCharacter*data.body.bindposes[Array.IndexOf(body.bones,pelvis)].inverse;
         barTangents=new Vector3[joints.Length];childOffsets=new Vector3[joints.Length];
         pivots=new Vector3[joints.Length];restRotations=new Quaternion[joints.Length];poseRotations=new Quaternion[joints.Length];trialRotations=new Quaternion[joints.Length];trialFrames=new Matrix4x4[joints.Length];
+        twistedRotations=new Quaternion[joints.Length];
         for(int i=0;i<joints.Length;i++)restRotations[i]=data.armorJoints[i].pelvisFrame.rotation;
         for(int i=0;i<joints.Length-1;i++)if(data.armorJoints[i+1].parent==i)childOffsets[i]=joints[i+1].localPosition;
         for(int i=0;i<clothCells.Length;i++)clothCells[i]=new List<int>(8);
@@ -91,6 +123,7 @@ public sealed class MarchwardenArmor : MonoBehaviour
         }
         for(int t=0;t<clothTriangles.Length;t+=3)
         {
+            clothPlanes[t/3]=new ClothPlane(clothVertices[clothTriangles[t]],clothVertices[clothTriangles[t+1]],clothVertices[clothTriangles[t+2]]);
             Vector3 a=projectedCloth[clothTriangles[t]],b=projectedCloth[clothTriangles[t+1]],c=projectedCloth[clothTriangles[t+2]];
             if(b.x-a.x>Around/2)b.x-=Around;else if(b.x-a.x<-Around/2)b.x+=Around;
             if(c.x-a.x>Around/2)c.x-=Around;else if(c.x-a.x<-Around/2)c.x+=Around;
@@ -112,22 +145,20 @@ public sealed class MarchwardenArmor : MonoBehaviour
         float x=(Mathf.Atan2(p.x,p.z+.046f)+Mathf.PI)*Around/(2*Mathf.PI),y=(p.y-.25f)*High/.65f;
         int ix=Mathf.FloorToInt(x),iy=Mathf.FloorToInt(y);float radius=float.NegativeInfinity;
         if(iy<0||iy>=High)return float.MaxValue;
-        Vector3 origin=new Vector3(0,p.y,-.046f),direction=new Vector3(p.x,0,p.z+.046f).normalized;
+        float length=new Vector2(p.x,p.z+.046f).magnitude;
+        if(length<.000001f)return float.MaxValue;
+        Vector3 direction=new Vector3(p.x/length,0,(p.z+.046f)/length);
         foreach(int triangle in clothCells[iy*Around+(ix%Around+Around)%Around])
         {
-            Vector3 a=clothVertices[clothTriangles[triangle]],b=clothVertices[clothTriangles[triangle+1]],c=clothVertices[clothTriangles[triangle+2]];
-            Vector3 edge=b-a,other=c-a,cross=Vector3.Cross(direction,other);float determinant=Vector3.Dot(edge,cross);
-            if(Mathf.Abs(determinant)<.00000001f)continue;
-            Vector3 delta=origin-a;float u=Vector3.Dot(delta,cross)/determinant;if(u<-.0001f||u>1.0001f)continue;
-            Vector3 q=Vector3.Cross(delta,edge);float v=Vector3.Dot(direction,q)/determinant;if(v<-.0001f||u+v>1.0001f)continue;
-            float distance=Vector3.Dot(other,q)/determinant;if(distance>=0)radius=Mathf.Max(radius,distance);
+            radius=Mathf.Max(radius,clothPlanes[triangle/3].Intersect(p.y,direction));
         }
         if(float.IsNegativeInfinity(radius))return float.MaxValue;
-        return (new Vector2(p.x,p.z+.046f).magnitude-radius-.002f)*uniformScale;
+        return (length-radius-.002f)*uniformScale;
     }
 
     float Clearance(int index,out float leg,out float fabric,bool complete=false)
     {
+        ContactQueries++;
         var spec=data.armorJoints[index];var frame=trialFrames[index];
         leg=float.MaxValue;fabric=float.MaxValue;
         for(int p=0;p<spec.probes.Length;p++)
@@ -158,8 +189,18 @@ public sealed class MarchwardenArmor : MonoBehaviour
 
     void SetAngle(int index,float angle)
     {
-        trialRotations[index]=poseRotations[index]*Quaternion.AngleAxis(twists[index],Vector3.up)*Quaternion.AngleAxis(-angle,Vector3.right);
-        trialFrames[index]=Matrix4x4.TRS(pivots[index],trialRotations[index],Vector3.one*uniformScale);
+        float half=-angle*Mathf.Deg2Rad*.5f;
+        var q=twistedRotations[index]*new Quaternion(Mathf.Sin(half),0,0,Mathf.Cos(half));trialRotations[index]=q;
+        // The same uniform-scale matrix, without native TRS calls for trials.
+        float xx=2*q.x*q.x,yy=2*q.y*q.y,zz=2*q.z*q.z,xy=2*q.x*q.y,xz=2*q.x*q.z,yz=2*q.y*q.z;
+        float wx=2*q.w*q.x,wy=2*q.w*q.y,wz=2*q.w*q.z;var p=pivots[index];float s=uniformScale;
+        trialFrames[index]=new Matrix4x4(new Vector4((1-yy-zz)*s,(xy+wz)*s,(xz-wy)*s,0),
+            new Vector4((xy-wz)*s,(1-xx-zz)*s,(yz+wx)*s,0),new Vector4((xz+wy)*s,(yz-wx)*s,(1-xx-yy)*s,0),new Vector4(p.x,p.y,p.z,1));
+    }
+    void SetTwist(int index,float angle)
+    {
+        twists[index]=angle;float half=angle*Mathf.Deg2Rad*.5f;
+        twistedRotations[index]=poseRotations[index]*new Quaternion(0,Mathf.Sin(half),0,Mathf.Cos(half));
     }
 
     public double LastStepMilliseconds { get; private set; }
@@ -172,6 +213,7 @@ public sealed class MarchwardenArmor : MonoBehaviour
     void Step()
     {
         if(!ready||Time.deltaTime<=0)return;
+        ContactQueries=FallbackQueries=0;
         float dt=Mathf.Min(Time.deltaTime,.05f);
         Vector3 velocity=(owner.position-previousPosition)/Mathf.Max(Time.deltaTime,.001f);
         Vector3 acceleration=(velocity-previousVelocity)/Mathf.Max(Time.deltaTime,.001f);
@@ -181,19 +223,20 @@ public sealed class MarchwardenArmor : MonoBehaviour
         uniformScale=Mathf.Abs(owner.lossyScale.x);
         Quaternion pelvisRotation=pelvis.rotation;
         for(int i=0;i<joints.Length;i++){poseRotations[i]=pelvisRotation*restRotations[i];barTangents[i]=poseRotations[i]*Vector3.right*(.04f*uniformScale);}
-        LegGap=ClothGap=float.MaxValue;AttachmentError=MaximumAngle=0;
+        AttachmentError=MaximumAngle=0;
         for(int i=0;i<joints.Length;i++)
         {
             pivots[i]=joints[i].position;
             var spec=data.armorJoints[i];Vector3 outward=poseRotations[i]*Vector3.forward;
             float target=Mathf.Clamp(-Vector3.Dot(acceleration,outward)*.28f,0,12);
             velocities[i]+=(100*(target-angles[i])-20*velocities[i])*dt;
-            twists[i]=Mathf.MoveTowards(twists[i],0,dt*24);
+            SetTwist(i,Mathf.MoveTowards(twists[i],0,dt*24));
             float free=Mathf.Clamp(angles[i]+velocities[i]*dt,0,115);SetAngle(i,free);
-            if(Clearance(i,out _,out _)<0)
+            float initialGap=Clearance(i,out _,out _);
+            if(initialGap<0)
             {
                 float low=free,high=free;bool found=false;
-                float best=free,bestGap=Clearance(i,out _,out _);
+                float best=free,bestGap=initialGap;
                 for(float candidate=free+5;candidate<=120;candidate+=5)
                 {SetAngle(i,candidate);high=candidate;float gap=Clearance(i,out _,out _);
                     if(gap>bestGap){bestGap=gap;best=candidate;}if(gap>=0){found=true;break;}low=candidate;}
@@ -207,15 +250,16 @@ public sealed class MarchwardenArmor : MonoBehaviour
                     float bestTwist=twists[i],bestPitch=free,bestScore=float.MaxValue;
                     for(int side=0;side<4;side++)
                     {
-                        twists[i]=side==0?-6:side==1?6:side==2?-12:12;
+                        SetTwist(i,side==0?-6:side==1?6:side==2?-12:12);
                         for(float pitch=0;pitch<=120;pitch+=5)
                         {
-                            SetAngle(i,pitch);float gap=Clearance(i,out _,out _);
                             float score=pitch*pitch+4*twists[i]*twists[i];
+                            if(score>=bestScore)break;
+                            FallbackQueries++;SetAngle(i,pitch);float gap=Clearance(i,out _,out _);
                             if(gap>=0&&score<bestScore){bestScore=score;bestTwist=twists[i];bestPitch=pitch;}
                         }
                     }
-                    twists[i]=bestTwist;free=bestPitch;
+                    SetTwist(i,bestTwist);free=bestPitch;
                 }
                 velocities[i]=0;SetAngle(i,free);
             }
@@ -223,9 +267,20 @@ public sealed class MarchwardenArmor : MonoBehaviour
             // Constraint trials stay in local math. Commit only the accepted
             // pose, avoiding hundreds of native hierarchy rebuilds per frame.
             joints[i].rotation=trialRotations[i];
-            Clearance(i,out float leg,out float fabric,true);LegGap=Mathf.Min(LegGap,leg);
-            if(fabric<ClothGap){ClothGap=fabric;ClosestClothJoint=i;}
             if(spec.parent<0)AttachmentError=Mathf.Max(AttachmentError,Vector3.Distance(joints[i].position,pelvis.TransformPoint(spec.pelvisFrame.GetColumn(3))));
+        }
+        diagnosticsDirty=true;
+    }
+    void UpdateDiagnostics()
+    {
+        if(!diagnosticsDirty)return;
+        diagnosticsDirty=false;legGap=clothGap=float.MaxValue;
+        // Full-mesh clearance reporting is an inspection operation. Constraint
+        // trials above already resolve every contact during ordinary gameplay.
+        for(int i=0;i<joints.Length;i++)
+        {
+            Clearance(i,out float leg,out float fabric,true);legGap=Mathf.Min(legGap,leg);
+            if(fabric<clothGap){clothGap=fabric;closestClothJoint=i;}
         }
     }
 }

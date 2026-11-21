@@ -1,0 +1,82 @@
+{
+    "label": "baseline",
+    "device": "NVIDIA GeForce RTX 4060 Laptop GPU",
+    "clickMilliseconds": 0.32989999999999988,
+    "maximumFrameMilliseconds": 3607.7961999999998,
+    "p95FrameMilliseconds": 25.87880000000041,
+    "allocatedBytes": 1066429641,
+    "frames": 434,
+    "enemies": 4,
+    "stages": [
+        {
+            "stage": "World synchronous reload",
+            "milliseconds": 0.2018,
+            "frame": 101
+        },
+        {
+            "stage": "Warrior rig and cloth setup",
+            "milliseconds": 75.7788,
+            "frame": 101
+        },
+        {
+            "stage": "Combat audio synchronous warmup",
+            "milliseconds": 364.7024,
+            "frame": 101
+        },
+        {
+            "stage": "GameManager.StartGameplay",
+            "milliseconds": 508.0362,
+            "frame": 101
+        },
+        {
+            "stage": "Revenant roster synchronous load",
+            "milliseconds": 3560.9512,
+            "frame": 291
+        },
+        {
+            "stage": "Revenant injury mesh readback",
+            "milliseconds": 3.1195,
+            "frame": 291
+        },
+        {
+            "stage": "Revenant install Walker",
+            "milliseconds": 3571.149,
+            "frame": 291
+        },
+        {
+            "stage": "Zombie spawn Walker",
+            "milliseconds": 3584.8428,
+            "frame": 291
+        },
+        {
+            "stage": "Revenant install Walker",
+            "milliseconds": 0.7604,
+            "frame": 291
+        },
+        {
+            "stage": "Zombie spawn Walker",
+            "milliseconds": 2.0073,
+            "frame": 291
+        },
+        {
+            "stage": "Revenant install Walker",
+            "milliseconds": 0.7644,
+            "frame": 291
+        },
+        {
+            "stage": "Zombie spawn Walker",
+            "milliseconds": 1.3775,
+            "frame": 291
+        },
+        {
+            "stage": "Revenant install Walker",
+            "milliseconds": 0.5738,
+            "frame": 327
+        },
+        {
+            "stage": "Zombie spawn Walker",
+            "milliseconds": 1.4529,
+            "frame": 327
+        }
+    ]
+}

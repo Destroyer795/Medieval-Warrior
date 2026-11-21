@@ -24,7 +24,7 @@ public class GameManager : MonoBehaviour
     public GameObject pauseMenuUI;
     public TextMeshProUGUI scoreText;
 
-    public enum MatchState { Intro, Playing, Intermission, Won, Lost }
+    public enum MatchState { Intro, Playing, Intermission, Won, Lost, Dawn }
 
     // ---------------- readable state
     public GameMode Mode { get; private set; }
@@ -40,6 +40,8 @@ public class GameManager : MonoBehaviour
     public float IntermissionLeft { get; private set; }
     public float MatchTime { get; private set; }
     public EnemyController Boss { get; private set; }
+    public HordeDirector Horde { get; private set; }
+    public LastStandDirector LastStand { get; private set; }
     public bool NewRecord { get; private set; }
 
     public readonly Dictionary<ZombieType, int> killsByType = new Dictionary<ZombieType, int>();
@@ -85,12 +87,15 @@ public class GameManager : MonoBehaviour
         // The castle, terrain and props live in the Background scene.
         // Load it here so the level also works when played straight from the editor.
         if (!SceneManager.GetSceneByName(WorldSceneName).isLoaded)
+        {
+            using var timing=BattleLoadMetrics.Measure("World synchronous reload");
             SceneManager.LoadScene(WorldSceneName, LoadSceneMode.Additive);
+        }
     }
 
     void OnDestroy()
     {
-        if (instance == this){RestoreAtmosphere();CombatTime.SetScale(1);instance = null;}
+        if (instance == this){if(Horde!=null)Horde.ClearWave();RestoreAtmosphere();CombatTime.SetScale(1);instance = null;}
     }
 
     void Start()
@@ -100,6 +105,7 @@ public class GameManager : MonoBehaviour
 
     void Update()
     {
+        if (State == MatchState.Dawn) return;
         if (GameInput.PauseDown)
         {
             if (gameEnded || ChoosingBoon) return;
@@ -107,11 +113,13 @@ public class GameManager : MonoBehaviour
             else Pause();
         }
         if (gameEnded || isPaused) return;
+        if (LastStand != null && playerHealth != null && playerHealth.IsDead) return;
+        if(State==MatchState.Intro&&!BattleLoading.Ready)return;
 
-        MatchTime += Time.deltaTime;
+        if (LastStand == null) MatchTime += Time.deltaTime;
         if (Combo > 0 && Time.time > comboExpires) Combo = 0;
         UpdateBattleMusic();
-        UpdateBattleAtmosphere();
+        if (LastStand == null) UpdateBattleAtmosphere();
 
         switch (State)
         {
@@ -121,8 +129,11 @@ public class GameManager : MonoBehaviour
                 break;
             case MatchState.Playing:
                 UpdateMode();
-                UpdateTips();
-                CheckBoonMilestones();
+                if (State == MatchState.Playing)
+                {
+                    UpdateTips();
+                    CheckBoonMilestones();
+                }
                 break;
             case MatchState.Intermission:
                 IntermissionLeft -= Time.deltaTime;
@@ -137,6 +148,7 @@ public class GameManager : MonoBehaviour
 
     void StartGameplay()
     {
+        using var timing=BattleLoadMetrics.Measure("GameManager.StartGameplay");
         Mode = GameSettings.Mode;
         currentKills = 0;
         Boons.Reset();
@@ -149,17 +161,26 @@ public class GameManager : MonoBehaviour
 
         var profile = GameSettings.Profile;
         targetKills = profile.defendTarget;
-        TimeLeft = profile.lastStandMinutes * 60f;
+        if (Mode == GameMode.LastStand) TimeLeft = LastStandDirector.Duration;
 
         // Reset player health safely
         var playerObj = GameObject.FindWithTag("Player");
         playerHealth = playerObj != null ? playerObj.GetComponent<PlayerHealth>() : null;
         if (playerHealth != null) playerHealth.ResetHealth();
+        Horde=gameObject.AddComponent<HordeDirector>();Horde.Prepare(playerHealth);
 
         if (FindFirstObjectByType<GameHUD>() == null) new GameObject("Game HUD").AddComponent<GameHUD>();
-        AudioManager.PlayMusic("ambient_meadow", 0.9f);
-        AudioManager.WarmCombatBank();
-        CaptureAtmosphere();
+        BattleLoading.Prepare();
+        if (Mode == GameMode.LastStand)
+        {
+            LastStand = gameObject.AddComponent<LastStandDirector>();
+            LastStand.Prepare(playerHealth);
+        }
+        else
+        {
+            AudioManager.PlayMusic("ambient_meadow", 0.9f);
+            CaptureAtmosphere();
+        }
 
         LockCursor(true);
         CombatTime.SetScale(1f);
@@ -173,7 +194,7 @@ public class GameManager : MonoBehaviour
     {
         GameMode.DefendTheCastle => $"Slay {targetKills} of the undead",
         GameMode.EndlessHorde => "Survive as many waves as you can",
-        _ => $"Hold out for {Mathf.RoundToInt(TimeLeft / 60f)} minutes until dawn",
+        _ => "The gates have fallen. Fall back to the courtyard as corruption closes in.",
     };
 
     void BeginPlay()
@@ -185,7 +206,7 @@ public class GameManager : MonoBehaviour
             for (int i = 0; i < 3; i++) Spawn(ZombieType.Walker);   // the first few are already shambling in
         }
         spawnTimer = 1f;
-        nextBruteTime = MatchTime + 70f;
+        nextBruteTime = 70f;
     }
 
     // ---------------- spawning per mode
@@ -216,30 +237,62 @@ public class GameManager : MonoBehaviour
                 break;
             }
             case GameMode.LastStand:
-            {
-                TimeLeft -= Time.deltaTime;
-                float total = p.lastStandMinutes * 60f;
-                float progress = 1f - Mathf.Clamp01(TimeLeft / total);
-                int cap = Mathf.RoundToInt(Mathf.Lerp(5, p.maxAlive + 4, progress));
-                TickSpawner(cap, Mathf.Lerp(2.2f, 0.7f, progress) / p.spawnRate, progress);
-                if (!warlordSpawned && progress >= 0.6f) { warlordSpawned = true; SpawnBoss(ZombieType.Warlord); }
-                if (MatchTime > nextBruteTime) { nextBruteTime = MatchTime + Mathf.Lerp(70f, 35f, progress); Spawn(ZombieType.Brute); }
-                if (TimeLeft <= 0f) { TimeLeft = 0f; WinGame(); }
+                UpdateLastStand(p);
                 break;
-            }
         }
     }
 
-    void TickSpawner(int cap, float interval, float progress, bool waveCounted = false)
+    void UpdateLastStand(GameSettings.DifficultyProfile profile)
+    {
+        float dt = Time.deltaTime;
+        if (dt <= 0f) return;
+        float previous = TimeLeft;
+        TimeLeft = Mathf.Max(0f, TimeLeft - dt);
+        MatchTime = LastStandDirector.Duration - TimeLeft;
+        if (TimeLeft == 0f)
+        {
+            State = MatchState.Dawn;
+            StartCoroutine(HoldUntilDawn());
+            return;
+        }
+
+        LastStand.Tick(TimeLeft, dt);
+        if (playerHealth != null && playerHealth.IsDead) return;
+        bool surge = LastStand.IsSurging;
+        if (surge && previous > LastStandDirector.SurgeSeconds) spawnTimer = 0f;
+        float progress = MatchTime / LastStandDirector.Duration;
+        int cap = surge ? profile.maxAlive + 7 : Mathf.RoundToInt(Mathf.Lerp(5, profile.maxAlive + 4, progress));
+        float interval = (surge ? 0.43f : Mathf.Lerp(2.2f, 0.9f, progress)) / profile.spawnRate;
+
+        if (!warlordSpawned && progress >= 0.6f)
+        {
+            warlordSpawned = true;
+            SpawnBoss(ZombieType.Warlord);
+        }
+        if (MatchTime >= nextBruteTime && EnemyController.All.Count < cap)
+        {
+            nextBruteTime = MatchTime + Mathf.Lerp(70f, 26f, progress);
+            Spawn(ZombieType.Brute);
+        }
+        TickSpawner(cap, interval, progress, surge: surge);
+    }
+
+    IEnumerator HoldUntilDawn()
+    {
+        yield return LastStand.PlayDawn();
+        WinGame();
+    }
+
+    void TickSpawner(int cap, float interval, float progress, bool waveCounted = false, bool surge = false)
     {
         spawnTimer -= Time.deltaTime;
         if (spawnTimer > 0f || EnemyController.All.Count >= cap) return;
         spawnTimer = interval * UnityEngine.Random.Range(0.7f, 1.3f);
-        Spawn(PickType(progress));
+        Spawn(PickType(progress, surge));
         if (waveCounted) waveSpawned++;
     }
 
-    ZombieType PickType(float progress)
+    ZombieType PickType(float progress, bool surge = false)
     {
         // weighted mix that unlocks nastier undead as the match goes on
         float runner = progress > 0.08f ? 0.22f : 0f;
@@ -249,6 +302,13 @@ public class GameManager : MonoBehaviour
         float swordsman = progress > .14f ? .20f : 0f;
         float bulwark = progress > .35f ? .12f : 0f;
         float walker = 1f;
+        if (surge)
+        {
+            runner *= 2.7f;
+            swordsman *= 2f;
+            bulwark *= 1.6f;
+            bloater *= 1.5f;
+        }
         float roll = UnityEngine.Random.value * (walker + runner + spitter + bloater + brute + swordsman + bulwark);
         if ((roll -= walker) < 0) return ZombieType.Walker;
         if ((roll -= runner) < 0) return ZombieType.Runner;
@@ -267,7 +327,10 @@ public class GameManager : MonoBehaviour
         var e = spawner != null ? spawner.Spawn(type, false) : null;
         if (e != null && type != ZombieType.Walker && introduced.Add(type))
         {
-            GameHUD.Announce($"{ZombieTypes.Get(type).name}: {ZombieTypes.Get(type).description}", new Color(1f, 0.75f, 0.45f));
+            string introduction = $"{e.Stats.name}: {e.Stats.description}";
+            Color color = new Color(1f, 0.75f, 0.45f);
+            if (LastStand != null) GameHUD.Toast(introduction, color, "skull", 4f, 25f, wrap: true);
+            else GameHUD.Announce(introduction, color);
             if(type==ZombieType.Brute&&Time.time-lastThreatCue>8)ThreatStinger(type);
         }
         return e;
@@ -278,10 +341,11 @@ public class GameManager : MonoBehaviour
     public int BoonsOffered { get; private set; }
     float nextBoonTime = 60f;
     int defendBoonsGiven;
+    Boons.Def[] offeredBoons;
 
     void CheckBoonMilestones()
     {
-        if (ChoosingBoon || gameEnded) return;
+        if (ChoosingBoon || gameEnded || (playerHealth != null && playerHealth.IsDead)) return;
         if (Mode == GameMode.DefendTheCastle)
         {
             int due = currentKills >= targetKills * 2 / 3 ? 2 : currentKills >= targetKills / 3 ? 1 : 0;
@@ -296,8 +360,10 @@ public class GameManager : MonoBehaviour
 
     public void OfferBoon()
     {
-        var choices = Boons.Roll(3);
+        if(ChoosingBoon||gameEnded||State==MatchState.Dawn)return;
+        var choices = Boons.Roll(3,Mode==GameMode.EndlessHorde);
         if (choices.Length == 0) return;
+        offeredBoons=choices;
         ChoosingBoon = true;
         BoonsOffered++;
         CombatTime.SetScale(0f);
@@ -308,8 +374,9 @@ public class GameManager : MonoBehaviour
 
     public void PickBoon(BoonId id)
     {
-        if (!ChoosingBoon) return;
+        if (!ChoosingBoon||offeredBoons==null||!Array.Exists(offeredBoons,d=>d.id==id)) return;
         Boons.Apply(id, playerHealth != null ? playerHealth.gameObject : GameObject.FindWithTag("Player"));
+        offeredBoons=null;
         ChoosingBoon = false;
         if (!isPaused && !gameEnded) { CombatTime.SetScale(1f); LockCursor(true); }
         GameHUD.Toast(Boons.Get(id).name + " gained", UIKit.Gold, Boons.Get(id).icon, 2.5f, 32);
@@ -318,6 +385,7 @@ public class GameManager : MonoBehaviour
 
     void UpdateBattleMusic()
     {
+        if (LastStand != null && LastStand.IsSurging) return;
         if (playerHealth == null) return;
         int near = 0;
         Vector3 p = playerHealth.transform.position;
@@ -340,16 +408,18 @@ public class GameManager : MonoBehaviour
     void UpdateBattleAtmosphere()
     {
         if(!atmosphereCaptured)return;
-        float pressure=Mode==GameMode.EndlessHorde?Mathf.Clamp01((Wave-1)/14f):Mode==GameMode.DefendTheCastle?
-            Mathf.Clamp01(currentKills/(float)Mathf.Max(1,targetKills)):Mathf.Clamp01(MatchTime/(GameSettings.Profile.lastStandMinutes*60));
+        float pressure=Mode==GameMode.EndlessHorde?Mathf.Clamp01((Wave-1)/14f):
+            Mathf.Clamp01(currentKills/(float)Mathf.Max(1,targetKills));
         if(Boss!=null&&!Boss.IsDead)pressure=Mathf.Max(pressure,.65f);
         AtmosphereLevel=Mathf.MoveTowards(AtmosphereLevel,pressure,Time.deltaTime*.1f);
         float level=AtmosphereLevel;
+        float moon=Horde!=null?Horde.MoonBlend:0;
         // Keep silhouettes readable with bounded darkening and cool fog/red light.
         RenderSettings.fog=baseFog||level>.15f;
         RenderSettings.fogDensity=Mathf.Lerp(baseFogDensity,Mathf.Clamp(baseFogDensity*1.8f,.0035f,.012f),level);
         RenderSettings.fogEndDistance=Mathf.Lerp(baseFogEnd,baseFogEnd*.78f,level);
         RenderSettings.fogColor=Color.Lerp(baseFogColor,new Color(.24f,.18f,.23f),level*.65f);
+        RenderSettings.fogColor=Color.Lerp(RenderSettings.fogColor,new Color(.29f,.10f,.11f),moon*.65f);
         RenderSettings.ambientIntensity=baseAmbientIntensity*Mathf.Lerp(1,.82f,level);
         RenderSettings.ambientSkyColor=Color.Lerp(baseAmbientSky,baseAmbientSky*new Color(.88f,.74f,.83f),level);
         RenderSettings.ambientEquatorColor=Color.Lerp(baseAmbientEquator,baseAmbientEquator*new Color(.9f,.76f,.84f),level);
@@ -357,6 +427,7 @@ public class GameManager : MonoBehaviour
         if(battleSun!=null)
         {
             battleSun.color=Color.Lerp(baseSunColor,new Color(1,.34f,.28f),level*.72f);
+            battleSun.color=Color.Lerp(battleSun.color,new Color(1,.19f,.13f),moon*.75f);
             battleSun.intensity=baseSunIntensity*Mathf.Lerp(1,.78f,level);
         }
     }
@@ -416,12 +487,14 @@ public class GameManager : MonoBehaviour
         waveSpawned = 0;
         spawnTimer = 1.5f;
         State = MatchState.Playing;
+        Horde.BeginWave(n);
         GameHUD.Banner("Wave " + n, n % 5 == 0 ? "A champion of the dead leads this assault" : "They rise again...", 2.6f);
         if(n%5!=0)AudioManager.Play2D("wave_horn", 0.9f);
         if (n % 5 == 0)
         {
-            SpawnBoss(n % 10 == 0 ? ZombieType.Warlord : ZombieType.Brute);
+            SpawnBoss(ZombieType.Brute);
             waveSpawned++;
+            if(n%10==0){SpawnBoss(ZombieType.Warlord);waveSpawned++;}
         }
     }
 
@@ -429,6 +502,7 @@ public class GameManager : MonoBehaviour
     {
         if (DamageTaken <= damageAtWaveStart) Feats.Unlock("untouchable");
         State = MatchState.Intermission;
+        Horde.ClearWave();
         IntermissionLeft = 9f;
         int bonus = 300 * Wave;
         Score += bonus;
@@ -446,7 +520,7 @@ public class GameManager : MonoBehaviour
 
     public void AddKill(EnemyController enemy)
     {
-        if (gameEnded) return;
+        if (gameEnded || State == MatchState.Dawn) return;
 
         currentKills++;
         var type = enemy != null ? enemy.type : ZombieType.Walker;
@@ -460,6 +534,7 @@ public class GameManager : MonoBehaviour
         if (Combo >= 15) Feats.Unlock("butcher");
         comboExpires = Time.time + Boons.ComboWindow;
         int points = (enemy != null && enemy.Stats != null ? enemy.Stats.points : 100) * ComboMultiplier;
+        if(enemy!=null&&Horde!=null)points*=Horde.ScoreMultiplier;
         if (enemy != null && enemy.isBoss) points *= 2;
         Score += points;
         UpdateScoreUI();
@@ -475,13 +550,14 @@ public class GameManager : MonoBehaviour
     {
         CombatTime.SetScale(0.25f);
         yield return new WaitForSecondsRealtime(1.3f);
-        if (!gameEnded && !isPaused && !ChoosingBoon) CombatTime.SetScale(1f);
+        if (!gameEnded && !isPaused && !ChoosingBoon && State != MatchState.Dawn) CombatTime.SetScale(1f);
     }
 
     public void RegisterArrowFired() => ArrowsFired++;
 
     public void RegisterArrowHit(EnemyController enemy, bool headshot)
     {
+        if (State == MatchState.Dawn) return;
         ArrowsHit++;
         if (headshot) { Headshots++; Score += 25; Feats.Add("headshots"); }
     }
@@ -500,13 +576,14 @@ public class GameManager : MonoBehaviour
     {
         GameMode.DefendTheCastle => $"Undead slain  {currentKills} / {targetKills}",
         GameMode.EndlessHorde => State == MatchState.Intermission ? $"Next wave in {Mathf.CeilToInt(IntermissionLeft)}" : $"Wave {Wave}  -  {WaveRemaining} remain",
-        _ => $"Dawn in {Mathf.FloorToInt(TimeLeft / 60f)}:{Mathf.FloorToInt(TimeLeft % 60f):00}",
+        _ => $"Dawn in {Mathf.CeilToInt(TimeLeft) / 60}:{Mathf.CeilToInt(TimeLeft) % 60:00}",
     };
 
     void WinGame() => EndMatch(true);
 
     public void GameOver()
     {
+        if (State == MatchState.Dawn) return;
         // In Endless Horde, death is the only ending: it still counts as a finished run
         EndMatch(false);
     }
@@ -514,7 +591,9 @@ public class GameManager : MonoBehaviour
     void EndMatch(bool victory)
     {
         if (gameEnded) return;
+        bool dawnVictory = State == MatchState.Dawn;
         gameEnded = true;
+        if(Horde!=null)Horde.ClearWave();
         State = victory ? MatchState.Won : MatchState.Lost;
         if (victory) Score += Mathf.RoundToInt(playerHealth != null ? playerHealth.currentHealth * 10f : 0f);
         NewRecord = GameSettings.SubmitScore(Mode, Score, Wave);
@@ -524,7 +603,8 @@ public class GameManager : MonoBehaviour
         AudioManager.Play2D(victory ? "victory" : "defeat", 1f);
         AudioManager.SetBattleIntensity(0f);
         MatchEnded?.Invoke(victory);
-        StartCoroutine(SlowToStop());
+        if (dawnVictory) CombatTime.SetScale(0f);
+        else StartCoroutine(SlowToStop());
         LockCursor(false);
     }
 
@@ -548,7 +628,7 @@ public class GameManager : MonoBehaviour
 
     public void Pause()
     {
-        if (gameEnded) return;
+        if (gameEnded || State == MatchState.Dawn) return;
         CombatTime.SetScale(0f);
         isPaused = IsPaused = true;
         LockCursor(false);
@@ -557,6 +637,7 @@ public class GameManager : MonoBehaviour
 
     public void Resume()
     {
+        if (State == MatchState.Dawn) return;
         CombatTime.SetScale(ChoosingBoon ? 0f : 1f);
         isPaused = IsPaused = false;
         LockCursor(true);
@@ -576,13 +657,13 @@ public class GameManager : MonoBehaviour
     public void RestartGame()
     {
         CombatTime.SetScale(1f);
-        SceneManager.LoadScene("Semi-Final", LoadSceneMode.Single);
+        BattleLoading.EnterBattle();
     }
 
     public void QuitGame()
     {
         CombatTime.SetScale(1f);
         LockCursor(false);
-        SceneManager.LoadScene("MainMenu", LoadSceneMode.Single);
+        BattleLoading.ReturnToMenu();
     }
 }

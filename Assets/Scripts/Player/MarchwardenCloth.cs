@@ -186,8 +186,9 @@ public sealed class MarchwardenCloth : MonoBehaviour
         public Vector3 start,end;
         public float radius;
         Vector3 delta;
+        Vector3 minimum,maximum;
         float inverseLengthSquared;
-        public CapsuleShape(Vector3 a,Vector3 b,float r){start=a;end=b;radius=r;delta=b-a;inverseLengthSquared=1/Mathf.Max(.000001f,delta.sqrMagnitude);}
+        public CapsuleShape(Vector3 a,Vector3 b,float r){start=a;end=b;radius=r;delta=b-a;inverseLengthSquared=1/Mathf.Max(.000001f,delta.sqrMagnitude);minimum=Vector3.Min(a,b)-Vector3.one*r;maximum=Vector3.Max(a,b)+Vector3.one*r;}
         public CapsuleShape(CapsuleCollider capsule)
         {
             Vector3 scale=capsule.transform.lossyScale;
@@ -196,6 +197,7 @@ public sealed class MarchwardenCloth : MonoBehaviour
             Vector3 center=capsule.transform.TransformPoint(capsule.center),axis=capsule.transform.up;
             start=center-axis*half;end=center+axis*half;
             delta=end-start;inverseLengthSquared=1/Mathf.Max(.000001f,delta.sqrMagnitude);
+            minimum=Vector3.Min(start,end)-Vector3.one*radius;maximum=Vector3.Max(start,end)+Vector3.one*radius;
         }
         public Vector3 Closest(Vector3 point)
         {
@@ -204,6 +206,7 @@ public sealed class MarchwardenCloth : MonoBehaviour
         public float Gap(Vector3 point)=>Vector3.Distance(point,Closest(point))-radius;
         public Vector3 Project(Vector3 point,float margin,Vector3 preferred)
         {
+            if(point.x<minimum.x-margin||point.x>maximum.x+margin||point.y<minimum.y-margin||point.y>maximum.y+margin||point.z<minimum.z-margin||point.z>maximum.z+margin)return point;
             Vector3 closest=Closest(point),delta=point-closest;float square=delta.sqrMagnitude;
             if(square>=(radius+margin)*(radius+margin))return point;
             float distance=Mathf.Sqrt(square);
@@ -227,7 +230,7 @@ public sealed class MarchwardenCloth : MonoBehaviour
     }
 
     public double LastStepMilliseconds { get; private set; }
-    void LateUpdate(){long start=System.Diagnostics.Stopwatch.GetTimestamp();if(ready)UpdateSurface();LastStepMilliseconds=(System.Diagnostics.Stopwatch.GetTimestamp()-start)*1000.0/System.Diagnostics.Stopwatch.Frequency;}
+    void LateUpdate(){long start=System.Diagnostics.Stopwatch.GetTimestamp();if(ready&&Time.timeScale>0&&Time.deltaTime>0)UpdateSurface();LastStepMilliseconds=(System.Diagnostics.Stopwatch.GetTimestamp()-start)*1000.0/System.Diagnostics.Stopwatch.Frequency;}
 
     void UpdateSurface()
     {

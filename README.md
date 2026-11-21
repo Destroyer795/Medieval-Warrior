@@ -21,7 +21,7 @@ The game continues to use Unity's built-in render pipeline.
 | Camera and performance | Raw mouse look updates before movement, with responsive follow and reusable obstruction-query buffers. Cached collision geometry, bind transforms and cloth contact data reduce garment-simulation work. Gamepad look retains smoothing. |
 | Runner AI | Random left/right flanks, varied routes and sprint bursts, rear-quarter interception, a short committed strike and immediate breakaway. Runners strike only from the rear; turning to face a winding-up Runner cancels its attack. |
 | Damage reactions | Ordinary nonlethal hits preserve all eight zombie types' movement and attack clocks. Parries and Thunder Guard create deliberate stagger openings; confirmed heavy finishers and arrow criticals add brief hit-stop. |
-| Zombie roster | Eight Blender forms with distinct gaunt, muscular and bloated builds. Curved cuirasses, corrected palm/knuckle frames, continuous trousers, matte surfaces, anatomical wounds and blood at actual hits. Nine bone-driven hit volumes support strikes to exposed limbs and heads. The roster has 42 generic clips and two distance meshes per form. |
+| Zombie roster | Eight Blender forms with distinct gaunt, muscular and bloated builds, sunken faces and modeled decayed teeth. Eight faded clothing combinations, independent trouser/facing colors, three fitted helmet styles and three palm-gripped sword variants. Four unarmed attacks, smoother carried strikes, matte surfaces and wounds at actual contacts. The roster has 50 generic clips and two distance meshes per form. |
 | Spitter acid | Each impact creates an irregular, ground-following puddle with wet shading, surface bubbles and satellite splashes. The damaging area follows the visible main puddle's outline and spread. |
 | Customization and preview | Coordinated linen/metal/leather presets, preserved saved customization, a sharper antialiased character preview and updated art credits. |
 
@@ -106,8 +106,9 @@ grass, flowers, forests, a mountain ring and roads that run to the real gates.
 - **Defend the Castle** – slay a set number of undead (by difficulty); the Warlord leads the
   final assault.
 - **Endless Horde** – escalating waves; every 5th wave brings a Brute champion, every 10th the
-  Warlord. Wounds are tended between waves.
-- **Last Stand** – survive until dawn (3–5 minutes) while the horde keeps growing.
+  Warlord alongside it. Wounds are tended between waves. Draft one of three powers
+  after every wave; every third wave brings Blood Moon, Toxic Fog or a Cursed Totem.
+- **Last Stand** – survive five minutes as corruption closes on the courtyard. Blood rain marks the halfway point, the horde surges in the final minute, and royal fire arrows arrive at dawn.
 
 Three difficulties (Squire / Knight / Warlord). High scores and best wave are saved.
 
@@ -121,6 +122,14 @@ undead on a parry/perfect block; **Reaper's Cleave** widens the third sword stri
 and ignites phantom flame; **Splinter Volley** adds a cluster-damaging shrapnel
 burst to arrows, including piercing and fire arrows; **Vampiric Riposte** restores
 six health on a successful parry. Each transformation is a single-stack upgrade.
+
+Endless builds now have three repeatable signature powers: **Shockwave Parry** chains
+lightning, **Whirlwind Strike** pulls undead into the third cut and inflicts bleed,
+and **Explosive Quiver** scatters delayed cluster bombs on headshots. Drafts favour
+compatible powers and always include a signature choice. Blood Moon trades faster
+undead for triple kill score; Toxic Fog poisons low alleys; Cursed Totem protects
+nearby undead until its obelisk is destroyed. See [Endless Horde](Docs/EndlessHorde.md)
+for build combinations, event counterplay and validation steps.
 
 **Combat feel and sound** — heavy finishers, arrow criticals and parries use
 55–75ms impact stops, directional camera kick, blood mist and sharper shield sparks.
@@ -279,11 +288,21 @@ topology and UV inspection on all 72 render/collision meshes. See the
 
 ## Validation and art regeneration
 
-The latest complete run passed **433 gameplay checks**, with no gameplay errors or
+Battle startup now preloads combat assets asynchronously and reuses the menu's
+castle world across runs. The measured first spawn fell from 3.58 seconds to
+20ms, with the original graphics settings retained. See the
+[startup/performance capture](Docs/validation/2026-11-17-startup-performance.md)
+for timings, the runtime animation budget and the remaining Ultra rendering cost.
+
+The latest complete run passed **463 gameplay checks**, with no gameplay errors or
 exceptions. The Revenants review also checks all eight meshes, walking sole
 contacts, live surface streams and sword trajectories. The earlier warrior review
 passed 48 combat/pose checks and its hand topology audit. Saved reports:
 
+- [Battle startup profiling with original graphics quality](Docs/validation/2026-11-17-startup-performance.md)
+- [Complete 463-check gameplay report](Docs/validation/2026-11-17-startup-gameplay.txt)
+- [Revenant anatomy, outfit/gear variety and smooth unarmed attacks](Docs/validation/2026-11-17-revenant-horror.md)
+- [Complete 459-check gameplay report](Docs/validation/2026-11-17-revenant-horror-gameplay.txt)
 - [Creature playback, complete sword strokes, bow release and slope traversal](Docs/validation/2026-11-17-action-feedback.md)
 - [Complete 433-check gameplay report](Docs/validation/2026-11-17-action-feedback-gameplay.txt)
 - [Horror audio, combat feedback and boon synergies](Docs/validation/2026-11-17-combat-audio.md)

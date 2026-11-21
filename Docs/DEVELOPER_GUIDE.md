@@ -39,7 +39,8 @@ the same lighting settings; the builder writes them into all three scenes.
 | `Arrow`, `BileGlob`, `AcidPool`, `Combat.Explode`, `Pickup` | Projectiles, area damage and loot. |
 | `FX` | Particle bursts built in code, hit-stop, screen shake. |
 | `CombatTime` | Owns the gameplay timescale and coalesces 50–80ms unscaled impact stops; pause, boons and cinematics replace the stop safely. |
-| `CombatBoons` | Contact-driven Thunder Guard, phantom burn and one-shot arrow shrapnel; respects physical visibility and shield guards. |
+| `CombatBoons`, `ClusterVolley` | Contact-driven thunder chains, third-cut pull/bleed, phantom burn, one-shot shrapnel and delayed headshot bombs; bounded effects and physical visibility checks. |
+| `HordeDirector`, `HordeTotem` | Every-third-wave events, Blood Moon speed/score/eyes, low-alley gas, reachable bridge guide and a weapon-damageable immortality objective. Scene-owned cleanup keeps retained-world restarts safe. |
 | `AudioManager` | `Play2D`, `PlayAt` (3D), `PlayMusic` and `SetBattleIntensity` (war-drum layer driven by how many zombies are near); clips come from `Resources/Audio` by name. |
 | `Boons` | Per-match upgrades: definitions, stacks, `Roll` (offer three), `Apply` (one-off effects) and the multipliers gameplay code reads (`SwordDamage`, `DrawSpeed`, `Pierce`, `FireArrows`, ...). `GameManager.OfferBoon` freezes time and `GameHUD.ShowBoons` shows the cards. |
 | `GameInput` | Every gameplay input in one place (keyboard/mouse + gamepad via the Input System). Use it instead of `Input.*`. |
@@ -61,16 +62,46 @@ with root motion on, so the agent and the animation fought each other.)
 
 ### Current Revenants roster
 
+Battle assets now prepare asynchronously through `BattleLoading`, starting on
+the menu. The generated `Resources/Revenants/Preload.json` lists individual clips
+and meshes so they integrate in small batches before the roster asset graph is
+loaded. Combat audio also loads/decodes in the background. Battle/menu/restart
+transitions preserve the existing `Background` scene and change only per-run UI,
+actors and navigation. The intro waits for combat preparation to finish.
+
+`RevenantAnimationOptimization` reduces runtime curves with dense pose checks
+while retaining the editable Blender actions. The bake refreshes the preload
+manifest and [animation budget](../ArtSource/Revenants/animation-budget.json).
+See the [startup profile and reproduction steps](validation/2026-11-17-startup-performance.md).
+
 The shipped enemies use `Resources/Revenants/Revenant.prefab`, installed by
 `RevenantVisual` during `EnemyController.Init`. The original prefab is an authoring
 reference. Eight forms share a 55-bone rig, four skin materials, optional hair,
-and two reduced distance meshes. The models and 56 editable rig actions live in
+and two reduced distance meshes. The models and 74 editable rig actions live in
 `ArtSource/Revenants/Revenants.blend`.
 
 `RevenantMotionCapture` evaluates source humanoid motion offline.
-`RevenantAnimationBuilder` writes 42 generic clips and updates controllers in place
+`RevenantAnimationBuilder` writes 60 generic clips and updates controllers in place
 to preserve GUIDs. Playback cadence follows measured stance velocity and agent
 speed. `RevenantGrounding` corrects the visible rig against physical floors.
+
+`revenant_dread.py` adds recessed mouths, individual worn teeth, garment facings,
+three fitted helmet silhouettes and three sword profiles. All sword options use
+the same palm frame and blade endpoints as contact detection. `RevenantVisual`
+selects one of eight paired dye palettes, independently tinting cloth, trousers
+and facings via property blocks. Optional helmets replace visible scalp hair;
+headgear hides at the far LOD. Bodies remain one skinned draw, with at most two
+rigid equipment draws. Shared materials and meshes are never cloned per spawn.
+
+Walkers, Runners and Brutes have five unarmed motions. Spitters have three
+retches, Bloaters have four fuse poses, and each armed form has four sword
+motions. AI selects a different style from the previous strike and rolls a speed
+for both the Animator and the attack clock. Blade contact windows are sampled
+in clip seconds. The Runner uses a tighter speed range for its rear-only lunge.
+Grounding and recoil apply only to a freshly evaluated animation pose; paused,
+disabled or culled rigs cannot accumulate additive transforms. See the
+[appearance and motion review](validation/2026-11-17-revenant-horror.md) for
+the art, editable-source and gameplay evidence.
 
 Armed attacks use cached blade trajectories during a short active window; contact
 detection never samples the live skeleton. `ReceiveWeaponHit` applies Bulwark
@@ -123,6 +154,22 @@ and progressively changes fog, ambient fill and sun colour with wave/progress/bo
 pressure, keeping bounded darkening for readable silhouettes. Champion waves play
 one boss stinger instead of overlapping wave/boss horns. Scene exit restores captured
 settings without overwriting the next scene's menu lighting.
+
+### Endless Horde director and signature builds
+
+Endless Horde adds three repeatable signature ranks to the draft table. Its first
+card is always a signature power; the other weighted choices favour existing build
+families without duplicating a card or exhausting the pool. A cleared wave pauses
+before its intermission countdown. `GameManager` validates the selected ID against
+the actual offered choices. See [EndlessHorde.md](EndlessHorde.md) for exact combat
+rules, event timing, source data rebuild and focused/full smoke instructions.
+
+`EnemyController` uses the director's speed multiplier at navigation/charge sites
+and a shared health floor for curse protection, including fire and bleed. Bloaters
+defer self-destruction while protected. The objective is separate from the enemy
+roster and is hit through real sword overlap and arrow collision paths. Event HUD
+guides and timed VFX use the existing Built-in rendering and UI systems; they do
+not change rendering quality settings.
 
 ### Regenerate horror and combat audio
 
@@ -198,8 +245,9 @@ Add a value to `BoonId` and a `Def` to the table in `Boons.cs`; give it a multip
 case in `Boons.Apply`, and read it where it matters (e.g. `PlayerControlSpeed`, `Arrow`).
 
 ### Tune difficulty or modes
-`GameSettings.Profiles` (health/damage/speed multipliers, spawn rate, Defend target, max alive,
-Last Stand length) and `GameManager.UpdateMode`.
+`GameSettings.Profiles` sets health, damage, speed, spawn rate, Defend target and alive caps.
+`GameManager.UpdateMode` paces the fights. `LastStandDirector` sets the five-minute clock,
+corruption bounds and phase timings.
 
 ### Add a sound
 Drop a `.wav` in `Assets/Resources/Audio` and call `AudioManager.PlayAt("name", position)`.

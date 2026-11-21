@@ -117,10 +117,13 @@ public partial class SmokeTestDriver
             Check(Time.timeScale==1,"arrow critical hit-stop restores gameplay time");
 
             typeof(GameManager).GetField("<Mode>k__BackingField",flags).SetValue(gm,GameMode.EndlessHorde);
-            typeof(GameManager).GetMethod("StartWave",flags).Invoke(gm,new object[]{5});
+            var startWave = typeof(GameManager).GetMethod("StartWave", flags);
+            startWave.Invoke(gm, new object[] { 2 });
+            Check(HearCue("wave_horn"), "ordinary waves play the recorded trumpet call at its original pitch");
+            startWave.Invoke(gm, new object[] { 5 });
             if(gm.Boss!=null){fixtures.Add(gm.Boss.gameObject);gm.Boss.enabled=false;}
             Check(gm.Boss!=null&&gm.Boss.type==ZombieType.Brute&&gm.Boss.isBoss,"fifth wave creates its Brute champion");
-            Check(FindFirstObjectByType<AudioManager>().GetComponentsInChildren<AudioSource>().Any(a=>a.clip!=null&&a.clip.name=="boss_horn"&&a.isPlaying),"champion wave plays the boss horn stinger");
+            Check(HearCue("boss_horn"), "champion waves play the recorded boss call at its original pitch");
             Check(FindObjectsByType<TMPro.TextMeshProUGUI>(FindObjectsSortMode.None).Any(t=>t.text.Contains("A BRUTE LEADS THE DEAD")),"champion wave displays a bold threat banner");
             float fog=RenderSettings.fogDensity,level=gm.AtmosphereLevel;
             typeof(GameManager).GetField("<Wave>k__BackingField",flags).SetValue(gm,15);

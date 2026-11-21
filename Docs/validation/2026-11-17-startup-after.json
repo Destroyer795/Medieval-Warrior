@@ -1,0 +1,155 @@
+{
+    "label": "quality-preserved-final",
+    "device": "NVIDIA GeForce RTX 4060 Laptop GPU",
+    "clickMilliseconds": 4.9156,
+    "maximumFrameMilliseconds": 390.5490000000002,
+    "p95FrameMilliseconds": 11.055299999999989,
+    "allocatedBytes": 1051296491,
+    "frames": 3164,
+    "enemies": 4,
+    "stages": [
+        {
+            "stage": "Warrior rig and cloth setup",
+            "milliseconds": 57.0389,
+            "frame": 4260
+        },
+        {
+            "stage": "GameManager.StartGameplay",
+            "milliseconds": 26.0071,
+            "frame": 4260
+        },
+        {
+            "stage": "Revenant injury mesh readback",
+            "milliseconds": 1.1293,
+            "frame": 4581
+        },
+        {
+            "stage": "Revenant install Walker",
+            "milliseconds": 6.0048,
+            "frame": 4581
+        },
+        {
+            "stage": "Zombie spawn Walker",
+            "milliseconds": 20.1204,
+            "frame": 4581
+        },
+        {
+            "stage": "Revenant install Walker",
+            "milliseconds": 0.5601,
+            "frame": 4581
+        },
+        {
+            "stage": "Zombie spawn Walker",
+            "milliseconds": 1.3088,
+            "frame": 4581
+        },
+        {
+            "stage": "Revenant install Walker",
+            "milliseconds": 0.4852,
+            "frame": 4581
+        },
+        {
+            "stage": "Zombie spawn Walker",
+            "milliseconds": 1.0505,
+            "frame": 4581
+        },
+        {
+            "stage": "Revenant install Walker",
+            "milliseconds": 0.5009,
+            "frame": 4685
+        },
+        {
+            "stage": "Zombie spawn Walker",
+            "milliseconds": 1.2164,
+            "frame": 4685
+        }
+    ],
+    "slowFrames": [
+        {
+            "milliseconds": 202.7958,
+            "phase": "Preparing animation clips",
+            "nextPhase": "Preparing animation clips",
+            "frame": 2404
+        },
+        {
+            "milliseconds": 390.5490000000002,
+            "phase": "Activating Semi-Final",
+            "nextPhase": "Starting character",
+            "frame": 4260
+        },
+        {
+            "milliseconds": 89.49340000000007,
+            "phase": "Starting character",
+            "nextPhase": "Playing",
+            "frame": 4261
+        }
+    ],
+    "steady": {
+        "enemies": 12,
+        "width": 1920,
+        "height": 1080,
+        "batches": 5112,
+        "triangles": 34712756,
+        "quality": "Ultra",
+        "meanFrameMilliseconds": 31.1691643153527,
+        "p95FrameMilliseconds": 33.638400000000277,
+        "maximumFrameMilliseconds": 43.9413999999997,
+        "mainThreadP95Milliseconds": 33.8953,
+        "armorP95Milliseconds": 6.727,
+        "clothP95Milliseconds": 2.5232,
+        "quiverP95Milliseconds": 0.0839,
+        "meanGcBytesPerFrame": 33587,
+        "armorContactQueries": 107,
+        "armorFallbackQueries": 0,
+        "largestVisibleMeshGroups": [
+            {
+                "mesh": "57a04a7dff8956f4299182fd6145b5b5_n1277366460620338370_LOD0",
+                "objects": 4,
+                "triangles": 337824,
+                "instancing": true
+            },
+            {
+                "mesh": "Combined Mesh (root: scene) 5",
+                "objects": 14,
+                "triangles": 279860,
+                "instancing": true
+            },
+            {
+                "mesh": "d8d157ebfb23cdf4ba94e99d8458f7d2_8104117749616084085_LOD0",
+                "objects": 1,
+                "triangles": 266668,
+                "instancing": true
+            },
+            {
+                "mesh": "Combined Mesh (root: scene) 12",
+                "objects": 13,
+                "triangles": 262730,
+                "instancing": true
+            },
+            {
+                "mesh": "Combined Mesh (root: scene) 9",
+                "objects": 10,
+                "triangles": 200600,
+                "instancing": true
+            },
+            {
+                "mesh": "Combined Mesh (root: scene) 18",
+                "objects": 10,
+                "triangles": 199600,
+                "instancing": true
+            },
+            {
+                "mesh": "Combined Mesh (root: scene) 6",
+                "objects": 9,
+                "triangles": 180900,
+                "instancing": true
+            },
+            {
+                "mesh": "Combined Mesh (root: scene) 11",
+                "objects": 9,
+                "triangles": 180180,
+                "instancing": true
+            }
+        ]
+    }
+}

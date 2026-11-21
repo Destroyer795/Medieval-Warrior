@@ -1,0 +1,8 @@
+PASS
+PASS  startup fixture begins on the real main menu
+PASS  startup reaches a playable battle
+PASS  startup first wave spawns normally
+PASS  startup reuses its resident world and combat bank
+PASS  gameplay performs no cold roster/audio load
+PASS  early gameplay has no quarter-second loading stall
+PASS  no errors/exceptions logged (0)

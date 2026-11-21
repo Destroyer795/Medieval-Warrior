@@ -234,7 +234,7 @@ public class MainMenuUI : MonoBehaviour
         loading.alpha = 1f;
         AudioManager.StopMusic();
         yield return null;
-        SceneManager.LoadScene("Semi-Final", LoadSceneMode.Single);
+        BattleLoading.EnterBattle();
     }
 
     void Quit()

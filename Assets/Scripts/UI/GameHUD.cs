@@ -9,7 +9,8 @@ public class GameHUD : MonoBehaviour
     static GameHUD instance;
 
     Canvas canvas;
-    RectTransform root;
+    RectTransform root, combatRoot;
+    CanvasGroup combatGroup;
 
     // vitals
     Image healthFill, healthGhost, staminaFill, emblemField, emblemCharge, vignette;
@@ -18,7 +19,9 @@ public class GameHUD : MonoBehaviour
     RectTransform healthFrame;
 
     // objective / score
-    TextMeshProUGUI objectiveText, scoreText, comboText;
+    TextMeshProUGUI objectiveText, scoreText, comboText, lastStandStatus;
+    RectTransform eventRoot,eventMarker;
+    TextMeshProUGUI eventTitle,eventDetail,eventTarget;
     Image objectiveIcon, comboBar;
     RectTransform bossRoot;
     Image bossFill;
@@ -61,21 +64,30 @@ public class GameHUD : MonoBehaviour
         instance.bannerRoot.gameObject.SetActive(true);
     }
 
+    internal static void BeginDawn()
+    {
+        if (instance != null) instance.bannerTimer = Mathf.Min(instance.bannerTimer, .25f);
+    }
+
     public static void Announce(string text, Color color) => Toast(text, color, "skull", 2.8f, 40);
 
-    public static void Toast(string text, Color color, string icon = null, float life = 1.8f, float size = 30)
+    public static void Toast(string text, Color color, string icon = null, float life = 1.8f, float size = 30, bool wrap = false)
     {
         if (instance == null) return;
         // don't stack identical messages
         foreach (var tr in instance.transients)
             if (tr.rt != null && tr.rt.parent == instance.toastRoot && tr.rt.GetComponentInChildren<TextMeshProUGUI>().text == text) return;
         var row = UIKit.HList(instance.toastRoot, 10);
-        row.Layout(46);
+        row.Layout(wrap ? 60 : 46);
         row.childForceExpandHeight = false;
         if (icon != null) UIKit.Icon(row.transform, icon, 38).Layout(38, 38);
         var t = UIKit.Text(row.transform, text, size, color);
-        t.textWrappingMode = TextWrappingModes.NoWrap;
-        var fit = t.gameObject.AddComponent<ContentSizeFitter>(); fit.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
+        if (wrap) t.Layout(60, 830);
+        else
+        {
+            t.textWrappingMode = TextWrappingModes.NoWrap;
+            var fit = t.gameObject.AddComponent<ContentSizeFitter>(); fit.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
+        }
         instance.transients.Add(((RectTransform)row.transform, Time.unscaledTime, life));
     }
 
@@ -107,11 +119,14 @@ public class GameHUD : MonoBehaviour
         boonRoot = UIKit.Rect("Boons", root).Fill();
         var dim = UIKit.Img(boonRoot, null, new Color(0.02f, 0.01f, 0.01f, 0.65f), "Dim");
         dim.rectTransform.Fill(); dim.raycastTarget = true;
-        var title = UIKit.Text(boonRoot, "Choose a Boon", 64, UIKit.Gold, TextAlignmentOptions.Center, true);
+        var title = UIKit.Text(boonRoot, gm!=null&&gm.Mode==GameMode.EndlessHorde?$"WAVE {gm.Wave} SURVIVED • CHOOSE YOUR POWER":"Choose a Boon", 48, UIKit.Gold, TextAlignmentOptions.Center, true);
         title.rectTransform.Place(new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0, 330), new Vector2(1200, 90));
         var row = UIKit.HList(boonRoot, 40);
         ((RectTransform)row.transform).Place(new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0, -20), new Vector2(1300, 460));
         row.childForceExpandWidth = false; row.childControlWidth = false;
+        var hint=UIKit.Text(boonRoot,"Choose 1 of 3 • Matching powers strengthen your build • 1 / 2 / 3 to select",26,UIKit.Parchment,TextAlignmentOptions.Center);
+        hint.rectTransform.Place(new Vector2(.5f,.5f),new Vector2(.5f,.5f),new Vector2(0,-315),new Vector2(1300,60));
+        int cardIndex=0;
         foreach (var def in choices)
         {
             var card = UIKit.Img(row.transform, "panel_parchment", Color.white, "Boon " + def.name);
@@ -120,21 +135,23 @@ public class GameHUD : MonoBehaviour
             card.Layout(460, 380);
             var icon = UIKit.Icon(card.transform, def.icon, 120);
             icon.rectTransform.Place(new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0, -40), new Vector2(120, 120));
-            var name = UIKit.Text(card.transform, def.name, 38, UIKit.Ink, TextAlignmentOptions.Center, true);
+            var name = UIKit.Text(card.transform, def.name, 32, UIKit.Ink, TextAlignmentOptions.Center, true);
             name.fontSharedMaterial = name.font.material;
             name.rectTransform.Place(new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0, -180), new Vector2(340, 56));
-            var desc = UIKit.Text(card.transform, def.description, 28, UIKit.Ink, TextAlignmentOptions.Top);
+            var desc = UIKit.Text(card.transform, def.description, 25, UIKit.Ink, TextAlignmentOptions.Top);
             desc.fontSharedMaterial = desc.font.material;
-            desc.rectTransform.Place(new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0, -250), new Vector2(320, 140));
+            desc.rectTransform.Place(new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0, -244), new Vector2(320, 150));
             int owned = Boons.Stacks(def.id);
-            if (owned > 0)
+            if (owned > 0||Boons.HasSynergy(def.id)||Boons.IsSignature(def.id))
             {
-                var have = UIKit.Text(card.transform, $"Owned: {owned}", 24, new Color(0.45f, 0.1f, 0.08f), TextAlignmentOptions.Bottom);
+                string label=owned>0?$"UPGRADE → RANK {owned+1}":Boons.HasSynergy(def.id)?"BUILD SYNERGY":"SIGNATURE POWER";
+                var have = UIKit.Text(card.transform, label, 21, new Color(0.45f, 0.1f, 0.08f), TextAlignmentOptions.Bottom);
                 have.fontSharedMaterial = have.font.material;
                 have.rectTransform.Place(new Vector2(0.5f, 0), new Vector2(0.5f, 0), new Vector2(0, 30), new Vector2(320, 34));
             }
             var b = card.gameObject.AddComponent<Button>();
             b.transition = Selectable.Transition.None;
+            if(cardIndex++==0)b.Select();
             var id = def.id;
             b.onClick.AddListener(() => PickBoon(id));
             card.gameObject.AddComponent<UIHoverFx>().hoverScale = 1.06f;
@@ -158,7 +175,7 @@ public class GameHUD : MonoBehaviour
     {
         if (boonStrip == null)
         {
-            var h = UIKit.HList(root, 6, TextAnchor.UpperLeft);
+            var h = UIKit.HList(combatRoot, 6, TextAnchor.UpperLeft);
             boonStrip = (RectTransform)h.transform;
             boonStrip.Place(new Vector2(0, 1), new Vector2(0, 1), new Vector2(170, -150), new Vector2(600, 40));
             h.childForceExpandWidth = false; h.childControlWidth = false;
@@ -194,6 +211,8 @@ public class GameHUD : MonoBehaviour
         canvas = UIKit.Canvas("HUD Canvas", 10);
         canvas.transform.SetParent(transform, false);
         root = (RectTransform)canvas.transform;
+        combatRoot = UIKit.Rect("Combat HUD", root).Fill();
+        combatGroup = combatRoot.gameObject.AddComponent<CanvasGroup>();
 
         BuildVignette();
         BuildVitals();
@@ -223,17 +242,18 @@ public class GameHUD : MonoBehaviour
         if (playerHealth != null) playerHealth.Damaged += OnPlayerDamaged;
         EnemyController.Damaged += OnEnemyDamaged;
         if (gm != null) objectiveIcon.sprite = UIKit.Sprite("icon_" + (gm.Mode == GameMode.DefendTheCastle ? "swords" : gm.Mode == GameMode.EndlessHorde ? "horde" : "hourglass"));
+        if (gm != null && gm.Mode == GameMode.LastStand) bossRoot.anchoredPosition = new Vector2(0f, -144f);
     }
 
     void BuildVignette()
     {
-        vignette = UIKit.Img(root, "vignette", new Color(0.7f, 0f, 0f, 0f), "Damage Vignette");
+        vignette = UIKit.Img(combatRoot, "vignette", new Color(0.7f, 0f, 0f, 0f), "Damage Vignette");
         vignette.rectTransform.Fill();
     }
 
     void BuildVitals()
     {
-        var group = UIKit.Rect("Vitals", root).Place(new Vector2(0, 1), new Vector2(0, 1), new Vector2(30, -26), new Vector2(760, 170));
+        var group = UIKit.Rect("Vitals", combatRoot).Place(new Vector2(0, 1), new Vector2(0, 1), new Vector2(30, -26), new Vector2(760, 170));
 
         // heraldic shield in the player's colours
         emblemField = UIKit.Img(group, "emblem", Color.white, "Emblem");
@@ -281,14 +301,29 @@ public class GameHUD : MonoBehaviour
 
     void BuildObjective()
     {
-        var plaque = UIKit.Img(root, "panel_iron", new Color(1, 1, 1, 0.95f), "Objective");
+        var plaque = UIKit.Img(combatRoot, "panel_iron", new Color(1, 1, 1, 0.95f), "Objective");
         plaque.rectTransform.Place(new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(40, -20), new Vector2(560, 74));
         objectiveIcon = UIKit.Icon(plaque.transform, "swords", 50);
         objectiveIcon.rectTransform.Place(new Vector2(0, 0.5f), new Vector2(0, 0.5f), new Vector2(22, 0), new Vector2(50, 50));
         objectiveText = UIKit.Text(plaque.transform, "", 32, UIKit.Parchment);
         objectiveText.rectTransform.Fill(); objectiveText.rectTransform.offsetMin = new Vector2(80, 6); objectiveText.rectTransform.offsetMax = new Vector2(-24, -6);
+        lastStandStatus = UIKit.Text(plaque.transform, "", 21, UIKit.Parchment, TextAlignmentOptions.Center, true);
+        lastStandStatus.rectTransform.Place(new Vector2(.5f, 0f), new Vector2(.5f, 1f), new Vector2(0f, 1f), new Vector2(720, 28));
+        lastStandStatus.gameObject.SetActive(false);
 
-        var scoreRow = UIKit.Rect("Score", root).Place(new Vector2(1, 1), new Vector2(1, 1), new Vector2(-34, -26), new Vector2(420, 120));
+        var eventPanel=UIKit.Img(combatRoot,"panel_iron",new Color(.8f,.8f,.8f,.94f),"Horde Event");eventRoot=eventPanel.rectTransform;
+        eventRoot.Place(new Vector2(.5f,1),new Vector2(.5f,1),new Vector2(40,-216),new Vector2(640,88));
+        eventTitle=UIKit.Text(eventRoot,"",24,UIKit.Gold,TextAlignmentOptions.Center,true);
+        eventTitle.rectTransform.Place(new Vector2(.5f,1),new Vector2(.5f,1),new Vector2(0,-8),new Vector2(600,32));
+        eventDetail=UIKit.Text(eventRoot,"",21,UIKit.Parchment,TextAlignmentOptions.Center);
+        eventDetail.rectTransform.Place(new Vector2(.5f,0),new Vector2(.5f,0),new Vector2(0,9),new Vector2(604,36));
+        eventRoot.gameObject.SetActive(false);
+        eventMarker=UIKit.Rect("Horde objective beacon",combatRoot);
+        eventMarker.sizeDelta=new Vector2(260,75);
+        eventTarget=UIKit.Text(eventMarker,"",24,UIKit.Gold,TextAlignmentOptions.Center,true);eventTarget.rectTransform.Fill();
+        eventMarker.gameObject.SetActive(false);
+
+        var scoreRow = UIKit.Rect("Score", combatRoot).Place(new Vector2(1, 1), new Vector2(1, 1), new Vector2(-34, -26), new Vector2(420, 120));
         var crown = UIKit.Icon(scoreRow, "crown", 46);
         crown.rectTransform.Place(new Vector2(1, 1), new Vector2(1, 1), new Vector2(0, 0), new Vector2(46, 46));
         scoreText = UIKit.Text(scoreRow, "0", 42, UIKit.Gold, TextAlignmentOptions.TopRight, true);
@@ -302,7 +337,7 @@ public class GameHUD : MonoBehaviour
 
     void BuildBossBar()
     {
-        bossRoot = UIKit.Rect("Boss", root).Place(new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0, -112), new Vector2(820, 90));
+        bossRoot = UIKit.Rect("Boss", combatRoot).Place(new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0, -112), new Vector2(820, 90));
         bossName = UIKit.Text(bossRoot, "The Warlord", 30, new Color(1f, 0.45f, 0.35f), TextAlignmentOptions.Bottom, true);
         bossName.rectTransform.Place(new Vector2(0.5f, 1), new Vector2(0.5f, 1), Vector2.zero, new Vector2(800, 38));
         var bar = UIKit.Rect("Bar", bossRoot).Place(new Vector2(0.5f, 0), new Vector2(0.5f, 0), Vector2.zero, new Vector2(820, 52));
@@ -314,7 +349,7 @@ public class GameHUD : MonoBehaviour
 
     void BuildWeapons()
     {
-        var group = UIKit.Rect("Weapons", root).Place(new Vector2(1, 0), new Vector2(1, 0), new Vector2(-34, 30), new Vector2(320, 170));
+        var group = UIKit.Rect("Weapons", combatRoot).Place(new Vector2(1, 0), new Vector2(1, 0), new Vector2(-34, 30), new Vector2(320, 170));
         swordSlot = Slot(group, "sword", "1", new Vector2(-170, 34));
         bowSlot = Slot(group, "bow", "2", new Vector2(-40, 34));
         var arrowIcon = UIKit.Icon(group, "arrow", 40);
@@ -336,9 +371,9 @@ public class GameHUD : MonoBehaviour
 
     void BuildCrosshair()
     {
-        crosshair = UIKit.Img(root, "crosshair", Color.white, "Crosshair");
+        crosshair = UIKit.Img(combatRoot, "crosshair", Color.white, "Crosshair");
         crosshair.rectTransform.Place(new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(56, 56));
-        hitmarker = UIKit.Img(root, "hitmarker", Color.white, "Hitmarker");
+        hitmarker = UIKit.Img(combatRoot, "hitmarker", Color.white, "Hitmarker");
         hitmarker.rectTransform.Place(new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), Vector2.zero, new Vector2(48, 48));
         hitmarker.enabled = false;
     }
@@ -355,17 +390,17 @@ public class GameHUD : MonoBehaviour
         bannerSub.rectTransform.Place(new Vector2(0.5f, 0), new Vector2(0.5f, 0), Vector2.zero, new Vector2(1000, 50));
         bannerRoot.gameObject.SetActive(false);
 
-        var toasts = UIKit.VList(root, 6, null, TextAnchor.LowerCenter);
+        var toasts = UIKit.VList(combatRoot, 6, null, TextAnchor.LowerCenter);
         toastRoot = (RectTransform)toasts.transform;
         toastRoot.Place(new Vector2(0.5f, 0), new Vector2(0.5f, 0), new Vector2(0, 230), new Vector2(900, 300));
         toasts.childForceExpandWidth = false;
         toasts.childControlWidth = true;
 
-        var feed = UIKit.VList(root, 4, null, TextAnchor.LowerLeft);
+        var feed = UIKit.VList(combatRoot, 4, null, TextAnchor.LowerLeft);
         feedRoot = (RectTransform)feed.transform;
         feedRoot.Place(new Vector2(0, 0), new Vector2(0, 0), new Vector2(34, 30), new Vector2(520, 260));
 
-        hintText = UIKit.Text(root, "WASD move  ·  Shift sprint  ·  Space dodge  ·  LMB attack  ·  RMB block / aim  ·  Q swap weapon  ·  Esc pause", 22, new Color(1, 1, 1, 0.8f));
+        hintText = UIKit.Text(combatRoot, "WASD move  ·  Shift sprint  ·  Space dodge  ·  LMB attack  ·  RMB block / aim  ·  Q swap weapon  ·  Esc pause", 22, new Color(1, 1, 1, 0.8f));
         hintText.rectTransform.Place(new Vector2(0.5f, 0), new Vector2(0.5f, 0), new Vector2(0, 12), new Vector2(1500, 34));
 
         fpsText = UIKit.Text(root, "", 20, Color.white, TextAlignmentOptions.TopLeft);
@@ -408,7 +443,9 @@ public class GameHUD : MonoBehaviour
     {
         shade.gameObject.SetActive(true);
         bannerRoot.gameObject.SetActive(false);
-        string title = victory ? "Victory" : gm.Mode == GameMode.EndlessHorde ? "Your Legend Ends" : "Defeat";
+        string title = victory
+            ? (gm.Mode == GameMode.LastStand ? LastStandDirector.VictoryLine : "Victory")
+            : (gm.Mode == GameMode.EndlessHorde ? "Your Legend Ends" : "Defeat");
         endPage = SharedPanels.Page(root, "End", new Vector2(1000, 860), title);
         endPage.transform.SetAsLastSibling();
 
@@ -476,7 +513,7 @@ public class GameHUD : MonoBehaviour
     void OnEnemyDamaged(EnemyController e, float amount, Vector3 at)
     {
         if (!GameSettings.ShowDamageNumbers) return;
-        var t = UIKit.Text(root, Mathf.Max(1, Mathf.RoundToInt(amount * 10)).ToString(), amount >= 2f ? 38 : 30, amount >= 2f ? new Color(1f, 0.6f, 0.2f) : Color.white, TextAlignmentOptions.Center, true);
+        var t = UIKit.Text(combatRoot, Mathf.Max(1, Mathf.RoundToInt(amount * 10)).ToString(), amount >= 2f ? 38 : 30, amount >= 2f ? new Color(1f, 0.6f, 0.2f) : Color.white, TextAlignmentOptions.Center, true);
         t.rectTransform.sizeDelta = new Vector2(160, 50);
         numbers.Add((t, at + new Vector3(Random.Range(-0.3f, 0.3f), 0.2f, Random.Range(-0.3f, 0.3f)), Time.unscaledTime));
         if (numbers.Count > 24) { Destroy(numbers[0].t.gameObject); numbers.RemoveAt(0); }
@@ -488,6 +525,9 @@ public class GameHUD : MonoBehaviour
     {
         if (cam == null) cam = Camera.main;
         float dt = Time.unscaledDeltaTime;
+        if (gm != null && gm.LastStand != null &&
+            (gm.State == GameManager.MatchState.Dawn || gm.State == GameManager.MatchState.Won))
+            combatGroup.alpha = Mathf.MoveTowards(combatGroup.alpha, 0f, dt / .85f);
 
         if (playerHealth != null)
         {
@@ -499,7 +539,11 @@ public class GameHUD : MonoBehaviour
             // low health heartbeat
             float low = f < 0.3f && !playerHealth.IsDead ? (0.25f + Mathf.Sin(Time.unscaledTime * 6f) * 0.12f) * (1f - f / 0.3f) : 0f;
             vignetteAlpha = Mathf.Max(low, vignetteAlpha - dt * 0.9f);
-            vignette.color = new Color(0.7f, 0f, 0f, vignetteAlpha);
+            var stand = gm != null ? gm.LastStand : null;
+            bool inCorruption = stand != null && gm.State == GameManager.MatchState.Playing && stand.Clearance < 0f;
+            vignette.color = inCorruption
+                ? new Color(.28f, .025f, .22f, Mathf.Max(vignetteAlpha, .5f))
+                : new Color(.7f, 0f, 0f, vignetteAlpha);
             healthFrame.localScale = Vector3.Lerp(healthFrame.localScale, Vector3.one, 1f - Mathf.Exp(-10f * dt));
         }
 
@@ -514,7 +558,8 @@ public class GameHUD : MonoBehaviour
             bowSlot.rectTransform.localScale = Vector3.Lerp(bowSlot.rectTransform.localScale, Vector3.one * (bow ? 1f : 0.86f), 1f - Mathf.Exp(-12f * dt));
             arrowText.text = player.Arrows + " / " + player.maxArrows;
             arrowText.color = player.Arrows == 0 ? new Color(1f, 0.4f, 0.3f) : UIKit.Parchment;
-            crosshair.enabled = bow && !(gm != null && (gm.IsPaused || gm.State == GameManager.MatchState.Won || gm.State == GameManager.MatchState.Lost));
+            crosshair.enabled = bow && !(gm != null && (gm.IsPaused || gm.State == GameManager.MatchState.Won ||
+                gm.State == GameManager.MatchState.Lost || gm.State == GameManager.MatchState.Dawn));
             float spread = bow ? Mathf.Lerp(1.5f, 0.75f, player.DrawAmount) * (player.IsAiming ? 0.85f : 1f) : 1f;
             crosshair.rectTransform.localScale = Vector3.one * spread;
             crosshair.color = player.DrawAmount >= 0.99f ? new Color(1f, 0.85f, 0.4f) : Color.white;
@@ -540,7 +585,13 @@ public class GameHUD : MonoBehaviour
             }
         }
 
-        UpdateBanner(dt);
+        UpdateModeObjective();
+        if(boonRoot!=null&&boonChoices!=null)
+        {
+            int choice=GameInput.BoonChoiceDown;
+            if(choice>=0)DebugPickBoon(choice);
+        }
+        if (gm == null || gm.LastStand == null || (!gm.ChoosingBoon && !gm.IsPaused)) UpdateBanner(dt);
         UpdateTransients();
         UpdateNumbers();
         UpdateEnemyBars();
@@ -556,6 +607,48 @@ public class GameHUD : MonoBehaviour
             fpsFrames++; fpsTimer += dt;
             if (fpsTimer > 0.5f) { fpsText.text = Mathf.RoundToInt(fpsFrames / fpsTimer) + " fps"; fpsFrames = 0; fpsTimer = 0; }
         }
+    }
+
+    void UpdateModeObjective()
+    {
+        var stand = gm != null ? gm.LastStand : null;
+        bool showStand = stand != null && gm.State == GameManager.MatchState.Playing && !gm.IsPaused && !gm.ChoosingBoon;
+        lastStandStatus.gameObject.SetActive(showStand);
+        if (showStand)
+        {
+            float clearance = stand.Clearance;
+            lastStandStatus.color = clearance <= 8f ? new Color(1f, .47f, .35f) : UIKit.Gold;
+            lastStandStatus.text = clearance < 0f ? "CORRUPTION  •  RETURN TO THE COURTYARD" :
+                $"{stand.PhaseName}  •  {Mathf.CeilToInt(clearance)} m TO CORRUPTION";
+            eventRoot.gameObject.SetActive(false);
+            eventMarker.gameObject.SetActive(false);
+            if (clearance <= 8f) ShowObjectiveMarker(stand.Center + Vector3.up * 1.5f, "COURTYARD", UIKit.Gold);
+            return;
+        }
+
+        var director=gm!=null?gm.Horde:null;
+        bool visible=director!=null&&director.Current!=HordeEvent.None&&gm.State==GameManager.MatchState.Playing&&!gm.ChoosingBoon;
+        eventRoot.gameObject.SetActive(visible);eventMarker.gameObject.SetActive(false);
+        if(!visible)return;
+        eventTitle.text=director.Title;eventTitle.color=director.EventColor;eventDetail.text=director.Objective;
+        Vector3 target;string label;
+        if(director.Totem!=null&&!director.Totem.IsBroken){target=director.Totem.Target+Vector3.up*1.9f;label="DESTROY THE TOTEM";}
+        else if(director.Current==HordeEvent.ToxicFog&&director.HasRefuge){target=director.Refuge+Vector3.up*1.5f;label="HIGH BRIDGE";}
+        else return;
+        ShowObjectiveMarker(target, label, director.EventColor);
+    }
+
+    void ShowObjectiveMarker(Vector3 target, string label, Color color)
+    {
+        if(cam==null||player==null)return;
+        var viewport=cam.WorldToViewportPoint(target);
+        if(viewport.z<0){viewport.x=1-viewport.x;viewport.y=1-viewport.y;}
+        Vector2 point=new Vector2((viewport.x-.5f)*root.rect.width,(viewport.y-.5f)*root.rect.height);
+        point.x=Mathf.Clamp(point.x,-root.rect.width*.5f+150,root.rect.width*.5f-150);
+        point.y=Mathf.Clamp(point.y,-root.rect.height*.5f+130,root.rect.height*.5f-225);
+        eventMarker.anchorMin=eventMarker.anchorMax=eventMarker.pivot=new Vector2(.5f,.5f);eventMarker.anchoredPosition=point;
+        eventTarget.text=$"◆ {label}\n{Mathf.RoundToInt(Vector3.Distance(player.transform.position,target))} m";
+        eventTarget.color=color;eventMarker.gameObject.SetActive(true);
     }
 
     void UpdateBanner(float dt)
@@ -611,7 +704,7 @@ public class GameHUD : MonoBehaviour
                 if (sp.z <= 0 || sp.z > 40f) continue;
                 if (used >= barPool.Count)
                 {
-                    var r = UIKit.Rect("Enemy Bar", root);
+                    var r = UIKit.Rect("Enemy Bar", combatRoot);
                     r.sizeDelta = new Vector2(90, 12);
                     var bg = UIKit.Img(r, "bar_bg", new Color(1, 1, 1, 0.9f), "Bg"); bg.rectTransform.Fill();
                     var fill = BarFill(r, new Color(0.85f, 0.15f, 0.12f));
@@ -644,7 +737,7 @@ public class GameHUD : MonoBehaviour
                 if (used >= 6) break;
                 if (used >= threatPool.Count)
                 {
-                    var img = UIKit.Icon(root, "threat", 54);
+                    var img = UIKit.Icon(combatRoot, "threat", 54);
                     threatPool.Add(img);
                 }
                 var t = threatPool[used++];

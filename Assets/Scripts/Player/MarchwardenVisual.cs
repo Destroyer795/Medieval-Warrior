@@ -8,8 +8,10 @@ public class MarchwardenVisual : MonoBehaviour
     public SkinnedMeshRenderer Body { get; private set; }
     public Transform Sword { get; private set; }
     public Transform Shield { get; private set; }
-    public Vector3 LeftPalmPosition=>Body.bones[System.Array.FindIndex(Body.bones,b=>b.name=="Bip001 L Hand")].TransformPoint(data.leftPalm.GetColumn(3));
-    public Vector3 RightPalmPosition=>Body.bones[data.swordBone].TransformPoint(data.rightPalm.GetColumn(3));
+    Transform[] bodyBones;
+    int leftPalmIndex;
+    public Vector3 LeftPalmPosition=>bodyBones[leftPalmIndex].TransformPoint(data.leftPalm.GetColumn(3));
+    public Vector3 RightPalmPosition=>bodyBones[data.swordBone].TransformPoint(data.rightPalm.GetColumn(3));
     public float SwordGripError=>Vector3.Distance(RightPalmPosition,Sword.TransformPoint(new Vector3(-.352f,0,0)));
     public float ShieldGripError=>Vector3.Distance(LeftPalmPosition,Shield.TransformPoint(data.shieldGripMount.GetColumn(3)));
     public MarchwardenCloth Linen { get; private set; }
@@ -34,9 +36,11 @@ public class MarchwardenVisual : MonoBehaviour
 
     void Awake()
     {
+        using var timing=BattleLoadMetrics.Measure("Warrior rig and cloth setup");
         data = Asset;
         Body = GetComponentInChildren<SkinnedMeshRenderer>();
         if (data == null || Body == null) return;
+        bodyBones=Body.bones;leftPalmIndex=System.Array.FindIndex(bodyBones,b=>b.name=="Bip001 L Hand");
         MarchwardenStature.Ensure(gameObject,data);
         Body.sharedMesh = data.body;
         var animationBounds=data.body.bounds;
@@ -173,7 +177,7 @@ public class MarchwardenVisual : MonoBehaviour
 
     void SetMount(Transform prop, int bone, Matrix4x4 mount)
     {
-        var m = Body.bones[bone].localToWorldMatrix * mount;
+        var m = bodyBones[bone].localToWorldMatrix * mount;
         prop.SetPositionAndRotation(m.GetColumn(3), Quaternion.LookRotation(m.GetColumn(2), m.GetColumn(1)));
     }
 

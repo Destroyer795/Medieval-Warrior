@@ -138,8 +138,28 @@ public partial class SmokeTestDriver
             director.Activate(HordeEvent.ToxicFog);
             Check(director.FogCount>0,"Toxic Fog populates the verified low village passages");
             var decks=(List<Vector3>)typeof(HordeDirector).GetField("bridges",flags).GetValue(director);
-            Check(director.HasRefuge,$"Toxic Fog identifies a high stone bridge refuge ({decks.Count} cached deck points)");
-            if(director.HasRefuge)Check(!director.InGas(director.Refuge),"the bridge guide points to a safe deck rather than an alley below it");
+            // The elevated Keep bridge and the village floor occupy different islands
+            // in the shipped bake. Verify the guide from both the floor and a real deck.
+            var routeToDeck = new NavMeshPath();
+            bool reachable = decks.Any(p => !director.InGas(p) &&
+                NavMesh.CalculatePath(player.transform.position, p, NavMesh.AllAreas, routeToDeck) &&
+                routeToDeck.status == NavMeshPathStatus.PathComplete);
+            Check(director.HasRefuge == reachable, "the fog guide only offers decks reachable from the knight");
+            Check(decks.Count > 0, "the castle bridge has walkable deck samples");
+            if (decks.Count > 0)
+            {
+                Vector3 saved = body.position;
+                player.transform.position = body.position = decks[0];
+                Physics.SyncTransforms();
+                director.Activate(HordeEvent.ToxicFog);
+                Check(director.HasRefuge && !director.InGas(director.Refuge) &&
+                    NavMesh.CalculatePath(decks[0], director.Refuge, NavMesh.AllAreas, routeToDeck) &&
+                    routeToDeck.status == NavMeshPathStatus.PathComplete,
+                    "the fog guide selects a safe reachable bridge deck from the elevated route");
+                player.transform.position = body.position = saved;
+                Physics.SyncTransforms();
+                director.Activate(HordeEvent.ToxicFog);
+            }
             var lanes=(List<HordeDirector.Lane>)typeof(HordeDirector).GetField("fog",flags).GetValue(director);
             Vector3 low=(lanes[0].start+lanes[0].end)*.5f;
             Check(director.InGas(low)&&!director.InGas(low+Vector3.up*2),"gas occupancy respects local alley height and leaves elevated surfaces safe");

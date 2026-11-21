@@ -9,8 +9,13 @@ using UnityEngine.AI;
 
 public partial class SmokeTestDriver
 {
-    [Serializable] class FeedbackRoute {public string between;public Vector2 start,end;public float maxGrade,maxTerrainSlope;}
-    [Serializable] class FeedbackSlopes {public FeedbackRoute[] lanes;}
+    [Serializable] class FeedbackRoute
+    {
+        public string between = "";
+        public Vector2 start = default, end = default;
+        public float maxGrade = 0f, maxTerrainSlope = 0f;
+    }
+    [Serializable] class FeedbackSlopes { public FeedbackRoute[] lanes = Array.Empty<FeedbackRoute>(); }
     IEnumerator ReviewActionFeedback(PlayerControlSpeed player,PlayerHealth health)
     {
         var gm=GameManager.instance;bool managerEnabled=gm.enabled;var body=player.GetComponent<Rigidbody>();

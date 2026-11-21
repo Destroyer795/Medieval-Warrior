@@ -6,14 +6,15 @@ public class Arrow : MonoBehaviour
     Vector3 velocity;
     float damage, knockback;
     Transform owner;
-    bool stuck, fire, falling, stuckInEnemy;
+    bool stuck, falling, stuckInEnemy;
+    public bool isFire { get; private set; }
     bool splintered;
     EnemyController stuckIn;
     Vector3 fallVelocity, spin;
     int pierce;
     float age;
     GameObject flame;
-    public bool IsFlaming => fire && flame != null;
+    public bool IsFlaming => isFire && flame != null;
     readonly System.Collections.Generic.HashSet<EnemyController> pierced = new System.Collections.Generic.HashSet<EnemyController>();
 
     const float Length = 0.9f;
@@ -29,7 +30,7 @@ public class Arrow : MonoBehaviour
         a.knockback = knockback;
         a.owner = owner;
         a.pierce = pierce;
-        a.fire = fire;
+        a.isFire = fire;
         if (fire) a.flame = FX.AttachFlame(go.transform, Vector3.forward * Length, 0.65f, true);
 
         var trail = go.AddComponent<TrailRenderer>();
@@ -55,7 +56,7 @@ public class Arrow : MonoBehaviour
     void Update()
     {
         age += Time.deltaTime;
-        if (fire && (age > 6f || stuckInEnemy && (stuckIn == null || !stuckIn.IsBurning))) Extinguish();
+        if (isFire && (age > 6f || stuckInEnemy && (stuckIn == null || !stuckIn.IsBurning))) Extinguish();
         if (falling) { UpdateFall(); return; }
         if (stuck)
         {
@@ -133,7 +134,7 @@ public class Arrow : MonoBehaviour
             var totem=hit.collider.GetComponentInParent<HordeTotem>();
             if(totem!=null)totem.ReceiveHit(damage,hit.point);
             BurstSplinters(hit.point,null);
-            if (fire) FX.Embers(hit.point, 8);
+            if (isFire) FX.Embers(hit.point, 8);
             AudioManager.PlayAt("arrow_hit", hit.point, 0.8f);
             FX.Dust(hit.point, 0.25f, 5);
             BecomePickup();   // walk over it to get it back
@@ -200,7 +201,7 @@ public class Arrow : MonoBehaviour
 
     void Extinguish()
     {
-        fire = false;
+        isFire = false;
         FX.Extinguish(flame);
         flame = null;
     }
@@ -212,9 +213,9 @@ public class Arrow : MonoBehaviour
         if(!enemy.ReceiveWeaponHit(dmg, velocity.normalized, knockback,point)){BurstSplinters(point,enemy);return false;}
         BurstSplinters(point,enemy);
         if(headshot&&!clustered)
-        {clustered=true;ClusterVolley.Create(point,velocity.normalized,damage,fire);}
+        {clustered=true;ClusterVolley.Create(point,velocity.normalized,damage,isFire);}
         if(headshot)FX.Impact(velocity.normalized,.28f,.055f);
-        if (fire)
+        if (isFire)
         {
             FX.Embers(point, 12);
             if (!enemy.IsDead) enemy.Ignite(4f, 1f);
@@ -235,6 +236,6 @@ public class Arrow : MonoBehaviour
     void BurstSplinters(Vector3 point,EnemyController primary)
     {
         if(splintered||!Boons.SplinterVolley)return;
-        splintered=true;CombatBoons.Splinters(point,velocity.normalized,primary,damage,fire);
+        splintered=true;CombatBoons.Splinters(point,velocity.normalized,primary,damage,isFire);
     }
 }

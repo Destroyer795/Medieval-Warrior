@@ -123,7 +123,7 @@ public class PlayerHealth : MonoBehaviour
                 }
                 amount *= 0.15f;
                 blocked = true;
-                knockback *= 0.3f;
+                knockback = GameManager.instance != null && GameManager.instance.Gate != null ? 0f : knockback * .3f;
                 if (controller != null && !Boons.FreeBlocking) controller.DrainStamina(12f);
             }
         }

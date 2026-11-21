@@ -70,6 +70,10 @@ public partial class SmokeTestDriver : MonoBehaviour
         var savedMode = GameSettings.Mode;
         var savedDiff = GameSettings.Difficulty;
         GameSettings.Difficulty = Difficulty.Knight;
+        if (File.Exists("Artifacts/SiegeReviewOnly.txt"))
+        {
+            yield return ReviewSiege(); Finish(savedMode, savedDiff); yield break;
+        }
         if(File.Exists("Artifacts/StartupReviewOnly.txt"))
         {
             yield return ReviewBattleStartup();Finish(savedMode,savedDiff);yield break;
@@ -112,6 +116,8 @@ public partial class SmokeTestDriver : MonoBehaviour
         Check(preview!=null&&preview.knight.GetComponent<MarchwardenStature>()!=null&&
             Mathf.Abs(preview.knight.GetComponent<MarchwardenStature>().Multiplier-1.10f)<.001f,
             "customisation preview loads the ten-percent-taller warrior");
+
+        yield return ReviewSiege();
 
         // ---------------------------------------------------------- Defend the Castle
         GameSettings.Mode = GameMode.DefendTheCastle;
@@ -827,10 +833,14 @@ public partial class SmokeTestDriver : MonoBehaviour
         }
         Check(Boons.Total >= 2, $"Defend the Castle offered boons at 1/3 and 2/3 ({Boons.Total})");
         yield return Wait(2.2f);   // the Warlord appears at 75% and needs a moment to rise
-        Check(gm.Boss != null, "the Warlord leads the final assault");
+        Check(gm.Boss != null && gm.Boss.SiegeEscort && gm.State == GameManager.MatchState.Playing &&
+            EnemyController.All.Count(e => e != null && e.SiegeEscort && e.type == ZombieType.Bulwark) == 2 &&
+            EnemyController.All.Count(e => e != null && e.SiegeEscort && e.type == ZombieType.Swordsman) == 2,
+            "the quota alone cannot win; the Warlord leads two Bulwarks and two Swordsmen");
+        int expectedDefenseBonus = gm.Gate != null ? Mathf.RoundToInt(gm.Gate.Integrity * 3000) : -1;
         if (gm.Boss != null && !gm.Boss.IsDead) gm.Boss.TakeDamage(9999f, fwd, 0f);
         yield return Wait(2.5f);
-        Check(gm.State == GameManager.MatchState.Won, "Defend the Castle can be won");
+        Check(gm.State == GameManager.MatchState.Won && gm.GateBonus == expectedDefenseBonus, "Defend victory grants the surviving gate integrity bonus");
         Capture("19_victory");
 
         gm.QuitGame();
@@ -845,7 +855,7 @@ public partial class SmokeTestDriver : MonoBehaviour
         FindFirstObjectByType<MainController>().StartGame();
         yield return Wait(9f);
         gm = GameManager.instance;
-        Check(gm != null && gm.Wave >= 1, $"endless horde wave started (wave {gm?.Wave})");
+        Check(gm != null && gm.Gate == null && gm.Wave >= 1, $"endless horde wave started (wave {gm?.Wave})");
         Capture("30_endless");
         // clear wave 1 by force: a boon choice must appear and freeze time
         for (int i = 0; i < 40 && gm.Wave == 1 && !GameHUD.BoonsOpen; i++)
@@ -875,7 +885,7 @@ public partial class SmokeTestDriver : MonoBehaviour
         gm.RestartGame();
         yield return Wait(6f);
         gm = GameManager.instance;
-        Check(gm != null && gm.Mode == GameMode.LastStand && gm.Objective.StartsWith("Dawn"), "last stand timer running");
+        Check(gm != null && gm.Gate == null && gm.Mode == GameMode.LastStand && gm.Objective.StartsWith("Dawn"), "last stand timer running");
         Check(SceneManager.GetSceneByName("Background").handle==initialWorldHandle,"restarting a run preserves the loaded world");
         Capture("40_last_stand");
         yield return ReviewLastStand();

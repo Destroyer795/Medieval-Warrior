@@ -21,7 +21,7 @@ scene.collection.children.link(kit)
 parts = {}
 
 
-def material(name, color, texture=None, tile=None):
+def material(name, color, texture=None, tile=None, normal=None):
     mat = bpy.data.materials.new(name)
     mat.diffuse_color = (*color, 1)
     mat.use_nodes = True
@@ -44,29 +44,54 @@ def material(name, color, texture=None, tile=None):
             links.new(mapping.outputs[0], atlas.inputs[0])
             uv = atlas.outputs[0]
         links.new(uv, image.inputs['Vector'])
-        links.new(image.outputs['Color'], shader.inputs['Base Color'])
+        color_output = image.outputs['Color']
+        if tile is not None:
+            finish = nodes.new('ShaderNodeVertexColor')
+            finish.layer_name = 'Finish'
+            shade = nodes.new('ShaderNodeSeparateColor')
+            links.new(finish.outputs['Color'], shade.inputs['Color'])
+            mix = nodes.new('ShaderNodeMixRGB')
+            mix.blend_type = 'MULTIPLY'
+            mix.inputs[0].default_value = 1
+            links.new(color_output, mix.inputs[1])
+            links.new(shade.outputs['Blue'], mix.inputs[2])
+            color_output = mix.outputs[0]
+        links.new(color_output, shader.inputs['Base Color'])
+        if normal:
+            relief = nodes.new('ShaderNodeTexImage')
+            relief.image = bpy.data.images.load(str(TEX / normal), check_existing=True)
+            relief.image.colorspace_settings.name = 'Non-Color'
+            links.new(uv, relief.inputs['Vector'])
+            tangent = nodes.new('ShaderNodeNormalMap')
+            tangent.inputs['Strength'].default_value = .82
+            links.new(relief.outputs['Color'], tangent.inputs['Color'])
+            links.new(tangent.outputs['Normal'], shader.inputs['Normal'])
     return mat
 
 
-stone = material('Wall | existing castle slates', (.41,.38,.31), 'Masonry/Albedo.png')
-rubble = material('Footings | existing rubble', (.30,.29,.24), 'Masonry/RubbleAlbedo.png')
-trim = material('Carved limestone', (.62,.57,.46), 'Albedo.png', 10)
-oak = material('Old oak boards', (.30,.185,.085), 'Albedo.png', 7)
-beam = material('Oiled oak', (.18,.13,.085), 'Albedo.png', 2)
-iron = material('Forged iron', (.13,.14,.14), 'Albedo.png', 6)
+stone = material('Wall | existing castle slates', (.41,.38,.31), 'Masonry/Albedo.png', normal='Masonry/Normal.png')
+rubble = material('Footings | existing rubble', (.30,.29,.24), 'Masonry/RubbleAlbedo.png', normal='Masonry/RubbleNormal.png')
+trim = material('Carved limestone', (.62,.57,.46), 'Albedo.png', 10, 'Normal.png')
+oak = material('Old oak boards', (.30,.185,.085), 'Albedo.png', 7, 'Normal.png')
+beam = material('Oiled oak', (.18,.13,.085), 'Albedo.png', 2, 'Normal.png')
+iron = material('Forged iron', (.13,.14,.14), 'Albedo.png', 6, 'Normal.png')
+tile_for = {trim:10, oak:7, beam:2, iron:6}
 feather = material('Linen fletching', (.60,.54,.39))
 red = material('Oxide red field', (.25,.043,.023))
 gold = material('Ochre embroidery', (.61,.39,.13))
 
 # Each part is one separately editable mesh. The doors pivot on their hinge lines.
 def solid(part, mat, coords, faces):
-    verts, polygons, slots, indices = parts.setdefault(part, ([], [], [], []))
+    verts, polygons, slots, indices, surface_data = parts.setdefault(part, ([], [], [], [], []))
     if mat not in slots:
         slots.append(mat)
     start = len(verts)
     verts.extend(coords)
     polygons.extend(tuple(start+i for i in face) for face in faces)
     indices.extend([slots.index(mat)] * len(faces))
+    extent = [max(v[i] for v in coords)-min(v[i] for v in coords) for i in range(3)]
+    grain_axis = max(range(3), key=lambda i:extent[i])
+    surface_data.extend([(grain_axis, rng.random(), rng.random(), rng.uniform(.76, 1.0))] * len(faces))
 
 
 faces_box = [(3,2,1,0),(4,5,6,7),(0,1,5,4),(1,2,6,5),(2,3,7,6),(3,0,4,7)]
@@ -83,50 +108,90 @@ def panel(part, mat, points, front, back):
           [((i+1)%n,i,i+n,(i+1)%n+n) for i in range(n)])
 
 
+def paving(part, x0, x1, y0, y1, top, courses):
+    """Jointed limestone over a continuous mortar bed. Dimensions are finished edges."""
+    width, depth = x1-x0, y1-y0
+    box(part,stone,(x0+x1)/2,(y0+y1)/2,top-.125,width-.025,depth-.025,.13)
+    for row in range(courses):
+        cy = y0+(row+.5)*depth/courses
+        x = x0
+        while x1-x > .01:
+            length = min(x1-x, rng.uniform(.68,1.17) * (.62 if row%2 and x==x0 else 1))
+            if x1-x-length < .29:
+                length = x1-x
+            box(part,trim,x+length/2,cy,top-.04,length-.012,depth/courses-.012,.08)
+            x += length
+
+
+def stair_flight(part, side):
+    width, run, count, top = 2.30, .28, 34, 6.23
+    center = side*8.43
+    rear = 1.65+count*run
+    toe = 3.22 if side < 0 else 2.24
+    rise = (top-toe)/count
+    # A single sloped backing carries the stone steps, with no coincident sides between risers.
+    section = [(rear,-2.4),(1.65,-2.4),(1.65,top-.11),(rear,toe-.11)]
+    def backing(cx, width, lift):
+        solid(part, stone, [(cx+sign*width/2,y,z+(lift if j>=2 else 0))
+              for sign in (-1,1) for j,(y,z) in enumerate(section)],
+              [(0,1,2,3),(7,6,5,4)] + [((j+1)%4,j,j+4,(j+1)%4+4) for j in range(4)])
+    backing(center, width-.10, 0)
+    backing(side*9.68, .27, .48)
+    for j in range(count):
+        cy = rear-(j+.5)*run
+        z = toe+(j+1)*rise
+        split = center + (.27 if j%2 else -.23)
+        for a,b in ((center-width/2,split),(split,center+width/2)):
+            box(part,trim,(a+b)/2,cy,z-(rise+.12)/2,b-a-.009,run-.003,rise+.12)
+        box(part,stone,side*9.68,cy,z+.46,.31,run-.005,.29)
+
+
 for side, label in ((-1,'West'),(1,'East')):
     wing = label+' curtain'
-    box(wing,rubble,side*9.7,0,-.45,9.6,3.3,3.0)
-    box(wing,stone,side*9.7,0,3.53,9.6,3.05,5.10)
-    box(wing,trim,side*9.7,0,6.12,9.7,3.3,.22)
-    for i in range(8):
-        x = side*(5.45+i*1.19)
-        box(wing,stone,x,-1.38,6.65,1.19,.46,.9)
-        box(wing,stone,x,-1.38,7.30,.72,.50,.68)
-        box(wing,trim,x,-1.38,7.67,.79,.57,.12)
+    box(wing,rubble,side*10.36,0,-.45,8.28,3.3,3.0)
+    box(wing,stone,side*10.285,0,3.54,8.43,3.05,5.10)
+    paving(wing,*sorted((side*6.285,side*14.55)),-1.65,1.65,6.23,6)
+    box(wing,stone,side*10.265,-1.43,6.41,8.47,.38,.36)
+    for i in range(7):
+        x = side*(6.64+i*1.19)
+        box(wing,stone,x,-1.43,6.77,.50,.42,.38)
+        box(wing,trim,x,-1.43,6.99,.56,.48,.08)
     tower = label+' gate pier'
     x = side*4.27
     box(tower,rubble,x,0,-.45,3.9,5.5,3.0)
     box(tower,stone,x,0,3.78,3.6,5.15,5.58)
-    for z,w,h in ((.65,4.05,.27),(5.35,3.85,.18),(6.70,4.03,.29)):
+    for z,w,h in ((.65,4.05,.27),(5.35,3.85,.18)):
         box(tower,trim,x,0,z,w,5.55,h)
+    box(tower,stone,x,0,6.63,4.00,5.52,.18)
+    paving(tower,x-2.015,x+2.015,-2.775,2.775,6.845,9)
     # Open upper landing connects the stairs and curtain. Towers terminate at the front.
     for j in range(3):
-        box(tower,stone,x+(j-1)*1.22,-2.47,7.38,.83,.55,1.13)
-        box(tower,trim,x+(j-1)*1.22,-2.47,7.96,.91,.64,.12)
+        box(tower,stone,x+(j-1)*1.22,-2.47,7.06,.57,.45,.45)
+        box(tower,trim,x+(j-1)*1.22,-2.47,7.31,.64,.51,.08)
     for j in (0, 1):
-        box(tower,stone,x+side*1.58,-2.04+j*.67,7.32,.55,.52,.96)
+        box(tower,stone,x+side*1.58,-2.04+j*.67,7.13,.42,.46,.57)
     for j in range(7):
         box(tower,trim,x+side*1.52,-2.6,1.12+j*.85,.56,.17,.37)
     # Bifurcated stair access, with a continuous clear landing onto the curtain.
     stair = label+' stair'
-    for j in range(34):
-        top = 6.23*(j+1)/34
-        y = 10.77-j*.28
-        box(stair,stone,side*7.18,y,top/2,2.23,.284,top)
-        box(stair,trim,side*7.18,y,top-.055,2.30,.32,.11)
-        box(stair,stone,side*8.43,y,top/2+.3,.30,.29,top+.60)
+    stair_flight(stair,side)
+    step_run=(7.80-6.285)/7
     for j in range(7):
         top=6.23+(j+1)*.615/7
-        box(tower,trim,side*(7.60-j*.22),.28,(top+6.15)/2,.24,1.65,top-6.15)
+        cx=side*(7.80-(j+.5)*step_run)
+        for a,b in ((-1.15,.16),(.16,1.65)):
+            box(tower,trim,cx,(a+b)/2,(top+6.17)/2,step_run-.003,b-a-.008,top-6.17)
     # Return to the old curtain behind both stairs. West meets Wall (22), east Wall (24)/(25).
     ret=label+' courtyard return'
-    length=20.2 if side<0 else 18.2
+    length=14.68
     cx=side*14.06
-    box(ret,rubble,cx,length/2,-.29,1.65,length,3.20)
-    box(ret,stone,cx,length/2,3.13,1.47,length,3.74)
-    box(ret,trim,cx,length/2,5.03,1.63,length,.16)
+    box(ret,rubble,cx,(length+1.65)/2,-.29,1.65,length-1.65,3.20)
+    box(ret,stone,cx,(length+1.525)/2,3.13,1.47,length-1.525,3.74)
+    paving(ret,cx-.815,cx+.815,1.53,length,5.11,math.ceil((length-1.53)/.69))
     for j in range(math.ceil(length/1.25)):
-        cy=.54+j*1.25
+        cy=2.06+j*1.25
+        if cy+.425>length:
+            break
         box(ret,stone,cx,cy,5.44,1.34,.77,.72)
         box(ret,trim,cx,cy,5.83,1.49,.85,.12)
     for j in range(1,4):
@@ -145,15 +210,19 @@ for side, label in ((-1,'West'),(1,'East')):
     # Heraldic fork-tail pennon.
     x = side*4.25
     panel(tower,red,[(x-.52,5.96),(x-.52,3.82),(x,4.12),(x+.52,3.82),(x+.52,5.96)],-2.73,-2.69)
-    box(tower,gold,x,-2.757,5.10,.095,.03,1.47)
+    box(tower,gold,x,-2.757,4.83,.095,.03,.94)
+    box(tower,gold,x,-2.757,5.62,.095,.03,.45)
     box(tower,gold,x,-2.757,5.35,.54,.03,.09)
     box(tower,iron,x,-2.76,6.0,1.26,.10,.10)
     rack = label+' arrow shelter'
     x = side*11.3
     for dx in (-1.03,1.03):
         box(rack,beam,x+dx,.58,7.02,.15,.15,1.64)
-    box(rack,beam,x,.55,7.87,2.50,1.12,.15)
-    box(rack,oak,x,.47,6.54,1.86,.62,.55)
+    for j in range(5):
+        box(rack,oak,x,.55+(j-2)*.225,7.87,2.50,.219,.15)
+    box(rack,beam,x,.47,6.51,1.78,.56,.47)
+    for j in range(7):
+        box(rack,oak,x+(j-3)*.263,.47,6.54,.255,.62,.55)
     for j in range(18):
         a=x + (j%9-4)*.171
         b=.35+(j//9)*.25
@@ -170,19 +239,26 @@ for i in range(17):
 for side in (-1,1):
     for i in range(7):
         box('Arch and gallery',trim,side*2.60,-2.25,(i+.5)*.49,.51,.58,.47)
-    box('Arch and gallery',beam,side*1.86,-.52,6.51,1.66,4.30,.36)
-    for j in range(6):
-        box('Arch and gallery',oak,side*1.86,-2.53+j*.38,6.77,1.67,.365,.15)
-for j in range(8):
-    box('Arch and gallery',oak,0,.06+j*.26,6.77,5.52,.25,.15)
+    for x in (1.18,2.13):
+        box('Arch and gallery',beam,side*x,-.26,6.55,.21,4.92,.29)
+    for j in range(9):
+        y=-2.70+(j+.5)*.28
+        box('Arch and gallery',oak,side*1.6625,y,6.77,1.185,.272,.15)
+for j in range(9):
+    y=-.18+(j+.5)*.26
+    split = -.84 if j%2 else .72
+    for a,b in ((-2.255,split),(split,2.255)):
+        box('Arch and gallery',oak,(a+b)/2,y,6.77,b-a-.009,.253,.15)
+for side in (-1,1):
+    box('Arch and gallery',stone,side*2.34,-2.61,6.98,.82,.40,.27)
 for j in range(6):
     x=(j-2.5)*.92
-    box('Arch and gallery',stone,x,-2.61,7.12,.93,.53,.67)
-    box('Arch and gallery',trim,x,-2.61,7.65,.51,.56,.41)
+    if j in (0,5):
+        box('Arch and gallery',trim,x,-2.61,7.23,.40,.43,.26)
     box('Arch and gallery',trim,x,-2.62,6.45,.47,.83,.54)
 
 # Visible stock and a separate presentation lever beside the open mouth.
-for j,(x,y,z) in enumerate([(-1.53,-.73,7.49),(-1.85,.50,7.23),(1.85,.56,7.22)]):
+for j,(x,y,z) in enumerate([(-1.53,-.73,7.49),(2.92,1.9,7.21),(3.82,1.9,7.21),(-2.92,1.9,7.21),(-3.82,1.9,7.21)]):
     bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=2,radius=.47,location=(x,y,z))
     obj=bpy.context.object
     obj.name='Drop stone '+str(j+1)
@@ -205,7 +281,7 @@ panel('Tipping cradle',iron,[(-1.10,7.11),(-1.01,7.11),(-.72,7.78),(-.82,7.82)],
 box('Tipping cradle',oak,-.77,.16,7.81,.16,.41,.13)
 for x in (-1.06,1.06):
     box('Drop channel',iron,x,-1.43,6.85,.08,2.50,.10)
-for name,(verts,faces,slots,indices) in parts.items():
+for name,(verts,faces,slots,indices,surface_data) in parts.items():
     mesh=bpy.data.meshes.new(name)
     mesh.from_pydata(verts,[],faces)
     mesh.update()
@@ -214,15 +290,22 @@ for name,(verts,faces,slots,indices) in parts.items():
     for mat in slots:
         mesh.materials.append(mat)
     uv=mesh.uv_layers.new()
-    for poly,idx in zip(mesh.polygons,indices):
+    finish=mesh.color_attributes.new('Finish','FLOAT_COLOR','CORNER')
+    for poly,idx,(grain,u_offset,v_offset,value) in zip(mesh.polygons,indices,surface_data):
         poly.material_index=idx
+        mat=slots[idx]
         axis=max(range(3),key=lambda i:abs(poly.normal[i]))
+        u,v=[i for i in range(3) if i!=axis]
+        if mat in (oak,beam) and v==grain:
+            u,v=v,u
+        tile=tile_for.get(mat,0)
+        repeat = 2.5 if mat==stone else 2.0 if mat==rubble else 1.35 if mat in (oak,beam) else .87
         for li in poly.loop_indices:
-            x,y,z=mesh.vertices[mesh.loops[li].vertex_index].co
-            uv.data[li].uv=((y,z) if axis==0 else (x,z) if axis==1 else (x,y))
-            uv.data[li].uv /= 3.1 if slots[idx] in (stone,rubble) else 1.45
+            p=mesh.vertices[mesh.loops[li].vertex_index].co
+            uv.data[li].uv=(p[u]/repeat+u_offset,p[v]/repeat+v_offset)
+            finish.data[li].color=((tile%4)/3,(tile//4)/3,value,1)
     bevel=obj.modifiers.new('Worn edges','BEVEL')
-    bevel.width=.032
+    bevel.width=.014
     bevel.segments=2
     obj.modifiers.new('Face normals','WEIGHTED_NORMAL')
     if name=='Tipping cradle':
@@ -249,15 +332,18 @@ def ground_height(x,z):
 cobbles=material('Approach | existing worn cobbles',(.36,.32,.25),'../../../Environment/Textures/Cobble_D.jpg')
 road_v=[]
 road_f=[]
-for j in range(99):
+for j in range(214):
     y=-22+j*.45
     width=2.13+max(0,-y-2)*.053
     centre=.32*math.sin(y*.18)
     for i in range(13):
         x=centre+width*(i/6-1)
-        world_x=14+x*math.cos(.39)-y*math.sin(.39)
-        world_z=75-x*math.sin(.39)-y*math.cos(.39)
-        road_v.append((x,y,ground_height(world_x,world_z)+.54+.055))
+        world_x=-14.3-x
+        world_z=-60.6+y
+        natural = ground_height(world_x,world_z)
+        grade = -7.73 + 6.83*min(1,max(0,y/36)) + .9*min(1,max(0,(y-36)/30))
+        blend = min(1,max(0,(y+2)/2))*min(1,max(0,(68-y)/2))
+        road_v.append((x,y,natural+(grade-natural)*blend+7.73+.065))
         a=j*13+i
         if i and j:
             road_f.append((a-14,a-13,a,a-1))
@@ -281,14 +367,14 @@ for img in bpy.data.images:
         img.filepath=bpy.path.relpath(img.filepath,start=str(OUT))
 bpy.ops.wm.save_as_mainfile(filepath=str(OUT/'OuterGatehouse.blend'),compress=True,relative_remap=False)
 
-# Game import uses the same weathered atlas as the castle. Each face stays
-# inside one atlas cell; the masonry shader supplies metre-scale stone relief.
+# The original castle shader projects wall and foundation scans in metres. Other
+# faces retain metric UVs, with atlas cell and per-piece patina in the vertex colour.
 runtime_dir=ROOT/'Assets/Resources/Foregate'
 runtime_dir.mkdir(parents=True,exist_ok=True)
 runtime=bpy.data.collections.new('Unity export')
 scene.collection.children.link(runtime)
 surface=bpy.data.materials.new('Castle fabric')
-tile_for={stone:0,rubble:1,trim:10,beam:2,oak:7,iron:6,feather:3}
+joinery=bpy.data.materials.new('Foregate dressed stone and timber')
 for original in list(kit.objects):
     obj=original.copy()
     obj.data=original.data.copy()
@@ -298,18 +384,26 @@ for original in list(kit.objects):
     runtime.objects.link(obj)
     mesh=obj.data
     uv=mesh.uv_layers.active or mesh.uv_layers.new()
+    atlas_cell=mesh.uv_layers.new(name='Atlas cell')
     new_materials=[]
     new_indices=[]
     for poly in mesh.polygons:
         mat=mesh.materials[poly.material_index]
-        target=surface if mat in tile_for else mat
+        tile=tile_for.get(mat,0)
+        for li in poly.loop_indices:
+            atlas_cell.data[li].uv=(tile%4,tile//4)
+        target=joinery if mat in tile_for else surface if mat in (stone,rubble) else mat
         if target not in new_materials:
             new_materials.append(target)
         new_indices.append(new_materials.index(target))
-        if mat not in tile_for:
+        if mat not in (stone,rubble):
             continue
-        tile=tile_for[mat]
+        tile=0 if mat==stone else 1
         coords=[uv.data[i].uv.copy() for i in poly.loop_indices]
+        if not original.data.uv_layers:
+            axis=max(range(3),key=lambda k:abs(poly.normal[k]))
+            axes=[k for k in range(3) if k!=axis]
+            coords=[Vector(tuple(mesh.vertices[i].co[k] for k in axes)) for i in poly.vertices]
         low=Vector((min(v.x for v in coords),min(v.y for v in coords)))
         scale=max(1,max(v.x-low.x for v in coords),max(v.y-low.y for v in coords))
         offset=Vector((tile%4+.012,tile//4+.012))
@@ -330,7 +424,7 @@ for obj in runtime.objects:
 bpy.ops.export_scene.fbx(filepath=str(runtime_dir/'OuterGatehouse.fbx'),use_selection=True,
                          object_types={'MESH','EMPTY'},apply_unit_scale=True,
                          apply_scale_options='FBX_SCALE_UNITS',bake_anim=False,
-                         use_custom_props=False,path_mode='STRIP',mesh_smooth_type='FACE')
+                         use_custom_props=False,path_mode='STRIP',mesh_smooth_type='FACE',colors_type='LINEAR')
 for obj in list(runtime.objects):
     bpy.data.objects.remove(obj,do_unlink=True)
 for obj in kit.objects:
@@ -343,7 +437,7 @@ context=bpy.data.collections.new('Measured site')
 scene.collection.children.link(context)
 ref=json.loads((ROOT/'Tools/ArtPipeline/Buildings/reference.json').read_text())
 nodes=ref['scenes'][-1]['nodes']
-kit_to_world=Matrix.Translation((14,-75,-.54)) @ Matrix.Rotation(.39,4,'Z')
+kit_to_world=Matrix.Translation((-14.3,60.6,-7.73)) @ Matrix.Rotation(math.pi,4,'Z')
 basis=Matrix(((1,0,0,0),(0,0,-1,0),(0,1,0,0),(0,0,0,1)))
 source=ROOT/'ArtSource/Buildings/Buildings.blend'
 with bpy.data.libraries.load(str(source),link=True) as (src,dst):
@@ -351,7 +445,9 @@ with bpy.data.libraries.load(str(source),link=True) as (src,dst):
 templates={obj.get('Unity source key'):obj for obj in dst.objects if obj}
 moves={item['id']:item for item in json.loads((ROOT/'Tools/ArtPipeline/Buildings/path-layout.json').read_text())['moves']}
 placement={p['path']:p for p in ref['scenes'][-1]['placements']}
-old_tower=None
+displaced_instances={p['id'].rsplit('-',1)[-1] for p in placement.values()
+                     if p['path'] in ('Wall (7)','House (3)','House (20)')}
+displaced_objects=[]
 for node in nodes:
     template=templates.get(node['key'])
     if not template:
@@ -368,8 +464,8 @@ for node in nodes:
                 mat[i][3]+=move['to'][k]-move['from'][k]
     obj=bpy.data.objects.new(node['path'],template.data)
     context.objects.link(obj)
-    if node['path']=='TowerB (8)':
-        old_tower=obj
+    if node['id'].rsplit('-',1)[-1] in displaced_instances:
+        displaced_objects.append(obj)
     obj.matrix_world=kit_to_world.inverted() @ basis @ mat @ basis.inverted()
 
 points=[]
@@ -377,7 +473,7 @@ indices=[]
 side=111
 for j in range(side):
     for i in range(side):
-        x,z=-110+i*2,-55+j*2
+        x,z=-110+i*2,-110+j*2
         points.append(kit_to_world.inverted() @ Vector((x,-z,ground_height(x,z))))
         if i and j:
             a=j*side+i
@@ -426,8 +522,8 @@ def shot(name,at,target,lens):
 kit.hide_render=True
 shot('01-existing-front',(21,-37,14),(0,1,3.8),40)
 kit.hide_render=False
-if old_tower:
-    old_tower.hide_render=True
+for obj in displaced_objects:
+    obj.hide_render=True
 shot('02-proposed-front',(21,-37,14),(0,1,3.8),40)
-shot('03-wall-walk',(-14,16,14),(0,-.5,5.2),34)
+shot('03-wall-walk',(-7,10,14),(0,-.5,5.4),27)
 shot('04-drop-gallery',(5.2,5.7,12.3),(0,-1,6.4),36)

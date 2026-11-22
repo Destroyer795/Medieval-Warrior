@@ -82,6 +82,9 @@ public class EnemyController : MonoBehaviour
     int runnerEvadedSwing=-1;
     NavMeshPath runnerPath;
     OuterSiege outerOrder;
+    bool outerAttackKnight;
+    bool siegePrefersKnight;
+    float nextSiegeTargetCheck;
     int outerLane;
     float marchSpeed;
     int outerStage;
@@ -179,13 +182,16 @@ public class EnemyController : MonoBehaviour
         revenant=RevenantVisual.Install(gameObject,t);
         renderers=new Renderer[]{revenant.Body};
         var diff = GameSettings.Profile;
+        var horde = GameManager.instance;
+        var pressure = HordeDirector.Pressure(horde != null && horde.Mode == GameMode.EndlessHorde ? horde.Wave : 0);
 
-        MaxHealth = Health = Stats.health * diff.enemyHealth * (boss && t != ZombieType.Warlord ? 2.5f : 1f);
+        MaxHealth = Health = Stats.health * diff.enemyHealth * pressure.Health *
+            (boss && t != ZombieType.Warlord ? 2.5f : 1f);
         health = Mathf.CeilToInt(Health);
-        damage = Stats.damage * diff.enemyDamage;
+        damage = Stats.damage * diff.enemyDamage * pressure.Damage;
         attackRange = Stats.attackRange;
         timeBetweenAttacks = Stats.cooldown;
-        baseSpeed = Stats.speed * diff.enemySpeed * UnityEngine.Random.Range(0.9f, 1.12f);
+        baseSpeed = Stats.speed * diff.enemySpeed * pressure.Speed * UnityEngine.Random.Range(0.9f, 1.12f);
         transform.localScale = Vector3.one * Stats.scale * (boss && t != ZombieType.Warlord ? 1.15f : 1f);
 
         if (navAgent != null)
@@ -318,18 +324,24 @@ public class EnemyController : MonoBehaviour
         if (Time.deltaTime <= 0 || GameManager.instance.State != GameManager.MatchState.Playing || Health <= 0) return;
         if (IsStaggered) return;
         if (state == State.Staggered) SetState(State.Hunt);
-        if (state == State.Attack && !outerOrder.Breached)
+        if (state == State.Attack && (!outerOrder.Breached || outerAttackKnight))
         {
             stateTimer += Time.deltaTime * AttackSpeed;
             if (!hitDealt && stateTimer >= Stats.windup)
             {
                 hitDealt = true;
-                outerOrder.TakeDamage(damage);
+                if (outerAttackKnight)
+                {
+                    if (KnightAccessible(attackRange + .25f))
+                        playerHealth.TakeDamage(damage, transform, type == ZombieType.Brute ? 6f : 0f);
+                }
+                else outerOrder.Strike(damage);
             }
             if (stateTimer >= Stats.windup + .45f)
             {
                 attackTimer = Time.time + Mathf.Min(2, timeBetweenAttacks);
                 SetState(State.Hunt);
+                outerAttackKnight = false;
             }
             return;
         }
@@ -337,20 +349,38 @@ public class EnemyController : MonoBehaviour
         bool rush = outerOrder.Breached;
         if (rush && !outerOrder.PassageClear) return;
         Vector3 station = outerOrder.MarchPoint(this, outerLane, rush ? outerStage : -1);
+        if (KnightAccessible(5f) &&
+            DistanceToPlayer < Vector3.Distance(transform.position, station) + attackRange)
+        {
+            FaceTowards(player.position, 11);
+            if (DistanceToPlayer <= attackRange)
+            {
+                if (Time.time >= attackTimer)
+                {
+                    outerAttackKnight = true;
+                    BeginAttackMotion(State.Attack);
+                }
+                return;
+            }
+            Vector3 direction = Flat(player.position - transform.position).normalized;
+            MarchOnGround(direction * (DistanceToPlayer - attackRange), baseSpeed);
+            return;
+        }
         Vector3 delta = Flat(station - transform.position);
         if (delta.sqrMagnitude > .025f)
         {
             FaceTowards(station, 11);
-            marchSpeed = rush ? Mathf.Max(5.8f, baseSpeed) : baseSpeed;
-            Vector3 next = transform.position + Vector3.ClampMagnitude(delta, marchSpeed * Time.deltaTime);
-            next.y = outerOrder.GroundHeight(next);
-            transform.position = next;
+            MarchOnGround(delta, rush ? Mathf.Max(5.8f, baseSpeed) : baseSpeed);
             return;
         }
         if (!rush)
         {
             FaceTowards(transform.position - outerOrder.Structure.Outward, 10);
-            if (Time.time >= attackTimer && outerOrder.AtFront(this, outerLane)) BeginAttackMotion(State.Attack);
+            if (Time.time >= attackTimer && outerOrder.AtFront(this, outerLane))
+            {
+                outerAttackKnight = false;
+                BeginAttackMotion(State.Attack);
+            }
         }
         else if (outerStage < 2) outerStage++;
         else
@@ -362,6 +392,17 @@ public class EnemyController : MonoBehaviour
             SetState(type == ZombieType.Spitter ? State.Kite : State.Hunt);
         }
     }
+
+    void MarchOnGround(Vector3 delta, float speed)
+    {
+        marchSpeed = speed;
+        Vector3 next = transform.position + Vector3.ClampMagnitude(delta, speed * Time.deltaTime);
+        next.y = outerOrder.GroundHeight(next);
+        transform.position = next;
+    }
+
+    bool KnightAccessible(float reach) => player != null && playerHealth != null && !playerHealth.IsDead &&
+        Mathf.Abs(player.position.y - transform.position.y) < 1.7f && DistanceToPlayer < reach && HasLineOfSight();
 
     float DistanceToPlayer => Vector3.Distance(Flat(transform.position), Flat(player.position));
     void UpdateVoice()
@@ -404,6 +445,13 @@ public class EnemyController : MonoBehaviour
     {
         bool artillery = type == ZombieType.Spitter;
         if (!artillery && (!IsBreacher || Time.time < divertedUntil)) return false;
+        if (Time.time >= nextSiegeTargetCheck)
+        {
+            nextSiegeTargetCheck = Time.time + .4f;
+            float threshold = Vector3.Distance(transform.position, siegeGate.Approach) + (siegePrefersKnight ? .75f : -.35f);
+            siegePrefersKnight = KnightAccessible(threshold);
+        }
+        if (siegePrefersKnight) return false;
         ReleaseToken();
         Vector3 station = artillery ? siegeGate.Battery(GetInstanceID()) : siegeGate.Approach;
         float range = artillery ? 1.25f : Mathf.Max(.65f, attackRange - .6f);

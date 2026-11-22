@@ -38,13 +38,20 @@ public class GameManager : MonoBehaviour
     {
         get
         {
-            if (LastStand != null && LastStand.GraveActive) return .2f;
+            if ((LastStand != null && LastStand.GraveActive) || HordeGraveActive) return .2f;
             if (Horde != null && Horde.GobletActive) return 2f;
             return RecoveryRemaining > 0f ? .65f : 1f;
         }
     }
     const float RecoveryDuration = 12f;
     bool graveWasActive;
+    internal LastStandGrave HordeGrave { get; private set; }
+    internal bool HordeGraveActive => HordeGrave != null && HordeGrave.Active;
+    bool hordeGraveRaised, draftPending;
+    float nextHordeGraveAttempt;
+    const int GraveWave = 8;
+    const float HordeIntermission = 9f;
+    const float HordeDraftDelay = 2f;
     public int Combo { get; private set; }
     public float ComboTimeLeft => Mathf.Max(0f, comboExpires - Time.time);
     public int ComboMultiplier => 1 + Mathf.Min(Combo, 20) / 5;
@@ -57,7 +64,7 @@ public class GameManager : MonoBehaviour
     public OuterSiege Outer { get; private set; }
     public KeepGate Gate { get; private set; }
     public int GateBonus { get; private set; }
-    bool warlordSlain;
+    bool finalOuterPush;
     public HordeDirector Horde { get; private set; }
     public LastStandDirector LastStand { get; private set; }
     public bool NewRecord { get; private set; }
@@ -123,7 +130,7 @@ public class GameManager : MonoBehaviour
 
     void Update()
     {
-        if (State == MatchState.Dawn) return;
+        if (State == MatchState.Dawn || ChoosingBoon) return;
         if (GameInput.PauseDown)
         {
             if (gameEnded || ChoosingBoon) return;
@@ -131,7 +138,7 @@ public class GameManager : MonoBehaviour
             else Pause();
         }
         if (gameEnded || isPaused) return;
-        if (LastStand != null && playerHealth != null && playerHealth.IsDead) return;
+        if (playerHealth != null && playerHealth.IsDead) return;
         if(State==MatchState.Intro&&!BattleLoading.Ready)return;
 
         if (LastStand == null) MatchTime += Time.deltaTime;
@@ -154,8 +161,7 @@ public class GameManager : MonoBehaviour
                 }
                 break;
             case MatchState.Intermission:
-                IntermissionLeft -= Time.deltaTime;
-                if (IntermissionLeft <= 0f) StartWave(Wave + 1);
+                UpdateHordeIntermission(Time.deltaTime);
                 break;
         }
     }
@@ -254,29 +260,96 @@ public class GameManager : MonoBehaviour
         switch (Mode)
         {
             case GameMode.DefendTheCastle:
-            {
-                float progress = Mathf.Clamp01(currentKills / (float)targetKills);
-                if (Outer != null && Outer.Cinematic) return;
-                int cap = Mathf.RoundToInt(Mathf.Lerp(Outer != null && !Outer.Breached ? 8 : 4, p.maxAlive, progress));
-                if (!warlordSpawned && progress >= 0.75f)
-                {
-                    LaunchFinalAssault();
-                }
-                if (currentKills < targetKills) TickSpawner(cap, 2.4f / p.spawnRate, progress);
-                if (currentKills >= targetKills && warlordSlain && Gate.Health > 0 && !playerHealth.IsDead) WinGame();
+                UpdateSiege(p);
                 break;
-            }
             case GameMode.EndlessHorde:
-            {
-                int cap = Mathf.Min(4 + Wave, p.maxAlive + 4);
-                if (waveSpawned < waveToSpawn) TickSpawner(cap, Mathf.Max(0.5f, 1.8f / p.spawnRate - Wave * 0.05f), Mathf.Clamp01(Wave / 12f), true);
-                else if (EnemyController.All.Count == 0) WaveCleared();
+                UpdateHorde(p);
                 break;
-            }
             case GameMode.LastStand:
                 UpdateLastStand(p);
                 break;
         }
+    }
+
+    void UpdateHorde(GameSettings.DifficultyProfile profile)
+    {
+        if (HordeGrave != null && HordeGrave.Revealing)
+        {
+            HordeGrave.TickReveal(Time.deltaTime);
+            return;
+        }
+        if (graveWasActive && !HordeGraveActive) RecoveryRemaining = RecoveryDuration;
+        graveWasActive = HordeGraveActive;
+
+        // The duel gets its own space between the normal encounters. Retry
+        // when the knight moves if the current terrain cannot stage the shot.
+        if (!hordeGraveRaised && Wave >= GraveWave && Wave % 5 != 0 &&
+            Horde.Current == HordeEvent.None && EnemyController.All.Count <= 3 &&
+            waveSpawned * 2 >= waveToSpawn && Time.time >= nextHordeGraveAttempt &&
+            playerHealth != null && !playerHealth.IsDead)
+        {
+            nextHordeGraveAttempt = Time.time + 1f;
+            HordeGrave = LastStandGrave.TryRaise(transform, playerHealth, playerHealth.transform.position, 42f);
+            if (HordeGrave != null)
+            {
+                hordeGraveRaised = true;
+                graveWasActive = true;
+                return;
+            }
+        }
+        int cap = Mathf.Min(4 + Wave, profile.maxAlive + 4);
+        if (waveSpawned < waveToSpawn)
+            TickSpawner(cap, Mathf.Max(.5f, 1.8f / profile.spawnRate - Wave * .05f), Mathf.Clamp01(Wave / 12f), true);
+        else if (EnemyController.All.Count == 0 && !HordeGraveActive)
+            WaveCleared();
+    }
+
+    void UpdateHordeIntermission(float delta)
+    {
+        if (ChoosingBoon) return;
+        IntermissionLeft -= delta;
+        if (draftPending && IntermissionLeft <= HordeIntermission - HordeDraftDelay)
+        {
+            draftPending = false;
+            OfferBoon();
+            if (ChoosingBoon) return;
+        }
+        if (IntermissionLeft <= 0f) StartWave(Wave + 1);
+    }
+
+    void UpdateSiege(GameSettings.DifficultyProfile profile)
+    {
+        if (Outer.Cinematic) return;
+        if (!Outer.Breached)
+        {
+            if (Outer.HoldSeconds >= OuterSiege.OuterDuration)
+            {
+                WinGame();
+                return;
+            }
+            if (Outer.FinalAssault && !finalOuterPush)
+            {
+                finalOuterPush = true;
+                GameHUD.Banner("THE FINAL PUSH", "Keep the doors standing until the assault breaks", 3.4f);
+                AudioManager.Play2D("wave_horn", .9f);
+                for (int i = 0; i < 12; i++)
+                    Spawn(i % 4 == 0 ? ZombieType.Bulwark : ZombieType.Walker);
+            }
+            int cap = Outer.FinalAssault ? 30 : Mathf.RoundToInt(Mathf.Lerp(7, 21, Outer.OuterProgress));
+            float interval = Outer.FinalAssault ? .45f : Mathf.Lerp(2.1f, .75f, Outer.OuterProgress);
+            TickSpawner(cap, interval / profile.spawnRate, Outer.OuterProgress);
+            return;
+        }
+
+        if (Outer.KeepSeconds >= OuterSiege.KeepDuration)
+        {
+            WinGame();
+            return;
+        }
+        float progress = Outer.KeepSeconds / OuterSiege.KeepDuration;
+        if (!warlordSpawned && progress >= .68f) LaunchFinalAssault();
+        int innerCap = Mathf.RoundToInt(Mathf.Lerp(4, profile.maxAlive, progress));
+        TickSpawner(innerCap, 2.4f / profile.spawnRate, progress);
     }
 
     void UpdateLastStand(GameSettings.DifficultyProfile profile)
@@ -327,7 +400,7 @@ public class GameManager : MonoBehaviour
 
     void TickSpawner(int cap, float interval, float progress, bool waveCounted = false, bool surge = false)
     {
-        if (LastStand != null && LastStand.GraveActive)
+        if ((LastStand != null && LastStand.GraveActive) || HordeGraveActive)
             cap = 3; // Includes the duelist. Survivors from before the reveal stay on the field.
         else if (Horde != null && Horde.GobletActive)
             cap = Mathf.CeilToInt(cap * 1.5f);
@@ -377,7 +450,7 @@ public class GameManager : MonoBehaviour
         {
             string introduction = $"{e.Stats.name}: {e.Stats.description}";
             Color color = new Color(1f, 0.75f, 0.45f);
-            if (LastStand != null) GameHUD.Toast(introduction, color, "skull", 4f, 25f, wrap: true);
+            if (Mode != GameMode.DefendTheCastle) GameHUD.Toast(introduction, color, "skull", 4f, 25f, wrap: true);
             else GameHUD.Announce(introduction, color);
             if(type==ZombieType.Brute&&Time.time-lastThreatCue>8)ThreatStinger(type);
         }
@@ -397,7 +470,7 @@ public class GameManager : MonoBehaviour
             (playerHealth != null && playerHealth.IsDead)) return;
         if (Mode == GameMode.DefendTheCastle)
         {
-            int due = currentKills >= targetKills * 2 / 3 ? 2 : currentKills >= targetKills / 3 ? 1 : 0;
+            int due = Outer.KeepSeconds >= 28f ? 2 : Outer.HoldSeconds >= 45f ? 1 : 0;
             if (defendBoonsGiven < due) { defendBoonsGiven++; OfferBoon(); }
         }
         else if (Mode == GameMode.LastStand && MatchTime >= nextBoonTime)
@@ -546,6 +619,7 @@ public class GameManager : MonoBehaviour
     void StartWave(int n)
     {
         Wave = n;
+        draftPending = false;
         damageAtWaveStart = DamageTaken;
         if (n >= 10) Feats.Unlock("unbroken");
         var p = GameSettings.Profile;
@@ -567,16 +641,17 @@ public class GameManager : MonoBehaviour
     void WaveCleared()
     {
         if (DamageTaken <= damageAtWaveStart) Feats.Unlock("untouchable");
+        if (Wave == 20) Feats.Unlock("last_oath");
         State = MatchState.Intermission;
         if (Horde.GobletActive || Horde.Current != HordeEvent.None) RecoveryRemaining = RecoveryDuration;
         Horde.ClearWave();
-        IntermissionLeft = 9f;
+        IntermissionLeft = HordeIntermission;
+        draftPending = true;
         int bonus = 300 * Wave;
         Score += bonus;
-        if (playerHealth != null) playerHealth.Heal(playerHealth.maxHealth * 0.25f);
-        GameHUD.Banner($"Wave {Wave} Cleared", $"+{bonus} bonus  -  wounds tended", 3f);
+        if (playerHealth != null) playerHealth.Heal(playerHealth.maxHealth * .15f);
+        GameHUD.Banner($"Wave {Wave} Cleared", $"+{bonus} bonus   ·   Draft in 2 seconds", 2f);
         AudioManager.Play2D("victory", 0.6f);
-        OfferBoon();
     }
 
     // =======================
@@ -609,7 +684,6 @@ public class GameManager : MonoBehaviour
         Killed?.Invoke(enemy, points);
         if (enemy != null && enemy == Boss)
         {
-            if (Gate != null && enemy.type == ZombieType.Warlord) warlordSlain = true;
             GameHUD.Banner(enemy.Stats.name + " Slain!", "", 2.5f);
             StartCoroutine(BossSlowMotion());
         }
@@ -641,11 +715,23 @@ public class GameManager : MonoBehaviour
             scoreText.text = $"Zombies Defeated: {currentKills} / {targetKills}";
     }
 
+    static string ClockLabel(float seconds)
+    {
+        int remaining = Mathf.CeilToInt(Mathf.Max(0f, seconds));
+        return $"{remaining / 60}:{remaining % 60:00}";
+    }
+
     public string Objective => Mode switch
     {
-        GameMode.DefendTheCastle when Outer != null && !Outer.Breached => $"Hold the Outer Wall   {Mathf.Min(currentKills, targetKills)} / {targetKills}",
-        GameMode.DefendTheCastle => $"Defend the Keep   {Mathf.Min(currentKills, targetKills)} / {targetKills}",
-        GameMode.EndlessHorde => State == MatchState.Intermission ? $"Next wave in {Mathf.CeilToInt(IntermissionLeft)}" : $"Wave {Wave}  -  {WaveRemaining} remain",
+        GameMode.DefendTheCastle when Outer != null && !Outer.Breached =>
+            $"{(Outer.FinalAssault ? "Final Push" : "Hold the Outer Wall")}   {ClockLabel(OuterSiege.OuterDuration - Outer.HoldSeconds)}",
+        GameMode.DefendTheCastle when Outer != null => $"Survive at the Keep   {ClockLabel(OuterSiege.KeepDuration - Outer.KeepSeconds)}",
+        GameMode.DefendTheCastle => "Hold the Castle",
+        GameMode.EndlessHorde when State == MatchState.Intermission && draftPending =>
+            $"Draft in {Mathf.CeilToInt(Mathf.Max(0f, IntermissionLeft - (HordeIntermission - HordeDraftDelay)))}",
+        GameMode.EndlessHorde when State == MatchState.Intermission => $"Next wave in {Mathf.CeilToInt(IntermissionLeft)}",
+        GameMode.EndlessHorde when HordeGraveActive => "Defeat your revenant",
+        GameMode.EndlessHorde => $"Wave {Wave}   ·   {WaveRemaining} remain",
         _ => $"Dawn in {Mathf.CeilToInt(TimeLeft) / 60}:{Mathf.CeilToInt(TimeLeft) % 60:00}",
     };
 
@@ -664,6 +750,7 @@ public class GameManager : MonoBehaviour
         bool dawnVictory = State == MatchState.Dawn;
         gameEnded = true;
         if (Outer != null) Outer.EndCinematic();
+        if (HordeGrave != null) HordeGrave.EndEncounter();
         if(Horde!=null)Horde.ClearWave();
         State = victory ? MatchState.Won : MatchState.Lost;
         if (victory) Score += Mathf.RoundToInt(playerHealth != null ? playerHealth.currentHealth * 10f : 0f);

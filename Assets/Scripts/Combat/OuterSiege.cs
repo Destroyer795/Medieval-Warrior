@@ -4,6 +4,9 @@ using UnityEngine;
 // Owns the playable wall and the short ground route joining its door to the baked village.
 public sealed class OuterSiege : MonoBehaviour
 {
+    internal const float FinalAssaultAt = 90f;
+    internal const float OuterDuration = 125f;
+    internal const float KeepDuration = 100f;
     public ForegateStructure Structure { get; private set; }
     public float Health { get; private set; }
     public float MaxHealth { get; private set; }
@@ -11,7 +14,11 @@ public sealed class OuterSiege : MonoBehaviour
     public bool Breached => Health <= 0;
     public bool Cinematic { get; private set; }
     public float HoldSeconds { get; private set; }
-    public bool StoneReady => Time.time >= stoneReadyAt;
+    public float KeepSeconds { get; private set; }
+    internal bool FinalAssault => HoldSeconds >= FinalAssaultAt;
+    internal float OuterProgress => Mathf.Clamp01(HoldSeconds / FinalAssaultAt);
+    public int StonesRemaining { get; private set; }
+    public bool StoneReady => StonesRemaining > 0 && Time.time >= stoneReadyAt;
     internal bool PassageClear => Breached && (!Cinematic || breachTime >= .28f);
 
     GameManager match;
@@ -21,6 +28,7 @@ public sealed class OuterSiege : MonoBehaviour
     Vector3 handoff, stoneHome;
     Quaternion stoneRotation, cradleRotation;
     readonly List<EnemyController> victims = new List<EnemyController>();
+    readonly List<Vector3> keepEntries = new();
     // Four abreast through the opening. A killed front rank makes room for the next.
     readonly List<EnemyController>[] ranks =
     {
@@ -28,6 +36,7 @@ public sealed class OuterSiege : MonoBehaviour
         new List<EnemyController>(), new List<EnemyController>()
     };
     int deployment;
+    int keepDeployment;
     float stoneReadyAt, stoneFall = -1, breachTime, nextImpact;
     bool restoreControl;
 
@@ -47,17 +56,21 @@ public sealed class OuterSiege : MonoBehaviour
         outer.Structure.transform.SetParent(match.transform, true);
         outer.MaxHealth = GameSettings.Difficulty switch
         {
-            Difficulty.Squire => 480, Difficulty.Warlord => 310, _ => 400
+            Difficulty.Squire => 580, Difficulty.Warlord => 480, _ => 540
         };
         outer.Health = outer.MaxHealth;
-        outer.handoff = match.Gate.Road;
-        for (int depth = 20; depth <= 36; depth += 2)
+        outer.handoff = match.Gate.Approach;
+        // Keep the march in the cleared avenue until the plaza in front of the sanctuary.
+        for (int depth = 65; depth <= 74; depth++)
         {
             Vector3 probe = outer.Ground(outer.Structure.World(0, 0, depth));
-            if (!match.Gate.TryReach(match.Gate.Approach, probe, 2f, out var entry)) continue;
+            if (!match.Gate.TryReach(match.Gate.Approach, probe, 2f, out var entry) ||
+                UnityEngine.AI.NavMesh.Raycast(entry, match.Gate.Approach, out _, UnityEngine.AI.NavMesh.AllAreas)) continue;
             outer.handoff = entry;
             break;
         }
+        outer.FindKeepEntries();
+        outer.StonesRemaining = 1 + outer.Structure.ReserveStones;
         outer.stoneHome = outer.Structure.ReadyStone.localPosition;
         outer.stoneRotation = outer.Structure.ReadyStone.localRotation;
         outer.cradleRotation = outer.Structure.Cradle.localRotation;
@@ -88,16 +101,41 @@ public sealed class OuterSiege : MonoBehaviour
 
     internal EnemyController Deploy(ZombieSpawner spawner, ZombieType type, bool boss)
     {
+        // Leave the breach route active for part of the reinforcement stream.
+        // The other lanes start at the front of the keep, on its connected NavMesh.
+        if (Breached && keepEntries.Count > 0)
+        {
+            int entry = keepDeployment++ % (keepEntries.Count + 1);
+            if (entry < keepEntries.Count)
+                return spawner.SpawnAt(type, boss, keepEntries[entry], match.Gate.Approach, false);
+        }
+
         // Instantiate on the connected island, then detach the agent before the first frame.
         var enemy = spawner.SpawnAt(type, boss, handoff, match.Gate.Approach, false);
         if (enemy == null) return null;
         int index = deployment++;
         int lane = index % ranks.Length;
         float slot = LaneOffset(lane);
-        var start = Ground(Structure.World(slot * 1.4f, 0, -12 - index % 4 * 2.2f));
+        float spread = Breached ? 2.2f : 4.8f;
+        float depth = Breached ? 16f : 32f;
+        var start = Ground(Structure.World(slot * spread, 0, -depth - index / 4 % 4 * 3f));
         if (!Breached) ranks[lane].Add(enemy);
         enemy.SetOuterOrder(this, start, lane);
         return enemy;
+    }
+
+    void FindKeepEntries()
+    {
+        foreach (int lateral in new[] { -9, 0, 9, -5, 5 })
+        {
+            Vector3 from = match.Gate.Approach;
+            Vector3 offset = match.Gate.Outward * (lateral == 0 ? 23f : 17f) +
+                match.Gate.transform.right * lateral;
+            if (!match.Gate.TryReach(from, Ground(from + offset), 3f, out var at) ||
+                Vector3.Dot(at - from, match.Gate.Outward) < 10f) continue;
+            if (keepEntries.Exists(existing => (existing - at).sqrMagnitude < 16f)) continue;
+            keepEntries.Add(at);
+        }
     }
 
     static float LaneOffset(int lane) => (lane - 1.5f) * .93f;
@@ -111,7 +149,7 @@ public sealed class OuterSiege : MonoBehaviour
         {
             var queue = ranks[lane];
             queue.RemoveAll(member => member == null || member.IsDead);
-            return Ground(Structure.World(slot, 0, -1f - Mathf.Max(0, queue.IndexOf(enemy)) * 1.25f));
+            return Ground(Structure.World(slot, 0, -3.25f - Mathf.Max(0, queue.IndexOf(enemy)) * 1.25f));
         }
         return stage switch
         {
@@ -145,6 +183,12 @@ public sealed class OuterSiege : MonoBehaviour
         FrameBreach();
     }
 
+    internal void Strike(float damage)
+    {
+        float pressure = FinalAssault ? 1.12f : Mathf.Lerp(.21f, .49f, OuterProgress);
+        TakeDamage(damage * pressure);
+    }
+
     void FrameBreach()
     {
         Vector3 focus = Structure.World(0, 1.9f, -.3f);
@@ -165,6 +209,7 @@ public sealed class OuterSiege : MonoBehaviour
     {
         if (!Active) return;
         if (!Breached) HoldSeconds += Time.deltaTime;
+        else if (!Cinematic) KeepSeconds += Time.deltaTime;
         if (Cinematic)
         {
             breachTime += Time.unscaledDeltaTime;
@@ -191,7 +236,12 @@ public sealed class OuterSiege : MonoBehaviour
         {
             if (!Active || Cinematic) return "";
             string key = GameInput.UsingGamepad ? "B" : "R";
-            if (AtCradle) return StoneReady ? $"{key}  Drop stone" : $"Stone ready in {Mathf.CeilToInt(stoneReadyAt - Time.time)}s";
+            if (AtCradle)
+            {
+                if (StonesRemaining == 0) return "Stone supply empty";
+                return StoneReady ? $"{key}  Drop stone   {StonesRemaining} left" :
+                    $"Loading stone   {StonesRemaining} left";
+            }
             if (AtArmory) return knight.Arrows < knight.maxArrows ? $"{key}  Refill quiver" : "Quiver full";
             return "";
         }
@@ -208,7 +258,8 @@ public sealed class OuterSiege : MonoBehaviour
         }
         if (!AtCradle || !StoneReady) return false;
         stoneFall = 0;
-        stoneReadyAt = Time.time + 8;
+        StonesRemaining--;
+        stoneReadyAt = Time.time + 2.5f;
         AudioManager.PlayAt("keep_impact", Structure.Cradle.position, .6f);
         return true;
     }
@@ -220,6 +271,7 @@ public sealed class OuterSiege : MonoBehaviour
         {
             if (StoneReady && !stone.gameObject.activeSelf)
             {
+                Structure.LoadNextStone();
                 stone.localPosition = stoneHome;
                 stone.localRotation = stoneRotation;
                 stone.gameObject.SetActive(true);
@@ -230,7 +282,7 @@ public sealed class OuterSiege : MonoBehaviour
         Structure.Cradle.localRotation = cradleRotation * Quaternion.AngleAxis(-64 *
             Mathf.Sin(Mathf.PI * Mathf.Min(1, stoneFall / .8f)), Vector3.forward);
         Vector3 lip = Structure.World(0, 7.3f, -1.3f);
-        Vector3 impact = Ground(lip) + Vector3.up * .35f;
+        Vector3 impact = Ground(Structure.World(0, 0, -3.55f)) + Vector3.up * .35f;
         float flight = Mathf.Clamp01((stoneFall - .23f) / .87f);
         if (stoneFall <= .23f)
             stone.position = Vector3.Lerp(stone.parent.TransformPoint(stoneHome), lip, stoneFall / .23f);

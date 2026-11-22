@@ -44,7 +44,7 @@ public class MenuPreview : MonoBehaviour
         if(knight!=null)knight.gameObject.SetActive(on);
     }
 
-    public void Drag(float dx) => dragVelocity = dx * 0.4f;
+    public void Drag(float dx) => dragVelocity = -dx * 0.4f;
 
     void Update()
     {

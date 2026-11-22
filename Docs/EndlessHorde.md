@@ -1,9 +1,20 @@
 # Endless Horde
 
-Every cleared wave heals 25% of maximum health, awards its wave bonus and pauses
-for a three-card power draft. Select with the mouse, controller UI navigation or
-number keys 1–3. The nine-second intermission starts counting down after selection.
-A Brute leads every fifth wave; every tenth wave adds a Warlord alongside it.
+Every cleared wave restores 15% of maximum health and awards a wave bonus. Two
+seconds later the three-card draft pauses the battle. Select with the mouse,
+controller UI navigation or number keys 1–3. The seven remaining seconds of the
+intermission resume after selection. A Brute leads every fifth wave, and every
+tenth wave adds a Warlord.
+
+At wave 5 and every five waves after it, a new tier raises enemy health, movement
+speed and damage. The objective plaque and tier label show the current rank.
+Clearing wave 20 awards Last Oath. Wave 25 introduces the sharper Abyss increase.
+
+The Verdant Goblet is near the opening spawn at the central keep. Drink once per
+run to double spawn speed, enemy movement and kill score until the wave ends.
+The revenant encounter can begin from wave 8 when the arena is quiet. The rising
+grave reveals a double of the knight, and regular reinforcements slow during
+the duel.
 
 ## Builds and drafting
 

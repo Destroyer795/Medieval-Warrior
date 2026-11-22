@@ -155,6 +155,7 @@ public partial class SmokeTestDriver : MonoBehaviour
         {
             if (!gm.Outer.Breached) gm.Outer.TakeDamage(gm.Outer.MaxHealth);
             yield return Wait(1.3f);
+            gm.Outer.enabled = false; // Keep the siege clock from ending the independent combat fixtures.
             // Open village training ground in Semi-Final, clear of both gate structures.
             var courtyardStart = new Vector3(-12.79f, -.28f, -1.82f);
             var courtyardHeading = Quaternion.Euler(0f, -27.18f, 0f);
@@ -607,6 +608,8 @@ public partial class SmokeTestDriver : MonoBehaviour
             Check(anim == null || !anim.applyRootMotion, $"{e.type} has root motion off");
         }
 
+        yield return ReviewBowContact(player);
+
         // bow
         player.Equip(Weapon.Bow);
         player.DebugAim(true);
@@ -849,20 +852,23 @@ public partial class SmokeTestDriver : MonoBehaviour
         // victory
         health.InvulnerableUntil = Time.time + 30f;
         while (gm.currentKills < gm.targetKills) gm.AddKill(null);
-        // the kill milestones offer boons (time freezes until one is picked)
+        var keepClock = typeof(OuterSiege).GetField("<KeepSeconds>k__BackingField",
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+        keepClock.SetValue(gm.Outer, 70f);
+        gm.Outer.enabled = true;
         for (int i = 0; i < 6; i++)
         {
             yield return Wait(0.3f);
             if (GameHUD.BoonsOpen) { if (i == 0) Capture("18b_defend_boon"); GameHUD.DebugPickBoon(i % 3); }
         }
-        Check(Boons.Total >= 2, $"Defend the Castle offered boons at 1/3 and 2/3 ({Boons.Total})");
-        yield return Wait(2.2f);   // the Warlord appears at 75% and needs a moment to rise
+        Check(Boons.Total >= 2, $"Defend the Castle offered timed boons ({Boons.Total})");
+        yield return Wait(2.2f);
         Check(gm.Boss != null && gm.Boss.SiegeEscort && gm.State == GameManager.MatchState.Playing &&
             EnemyController.All.Count(e => e != null && e.SiegeEscort && e.type == ZombieType.Bulwark) == 2 &&
             EnemyController.All.Count(e => e != null && e.SiegeEscort && e.type == ZombieType.Swordsman) == 2,
-            "the quota alone cannot win; the Warlord leads two Bulwarks and two Swordsmen");
+            "the Warlord leads two Bulwarks and two Swordsmen before the survival timer ends");
         int expectedDefenseBonus = gm.Gate != null ? Mathf.RoundToInt(gm.Gate.Integrity * 3000) : -1;
-        if (gm.Boss != null && !gm.Boss.IsDead) gm.Boss.TakeDamage(9999f, fwd, 0f);
+        keepClock.SetValue(gm.Outer, OuterSiege.KeepDuration - .05f);
         yield return Wait(2.5f);
         Check(gm.State == GameManager.MatchState.Won && gm.GateBonus == expectedDefenseBonus, "Defend victory grants the surviving gate integrity bonus");
         Capture("19_victory");
@@ -900,6 +906,12 @@ public partial class SmokeTestDriver : MonoBehaviour
             GameObject.FindWithTag("Player").GetComponent<PlayerHealth>());
         health = GameObject.FindWithTag("Player").GetComponent<PlayerHealth>();
         health.TakeDamage(999f, null, 0f, true);
+        var deathFacing = health.transform.up;
+        yield return Wait(.99f);
+        Check(Vector3.Angle(deathFacing, health.transform.up) > 45f &&
+            gm.State != GameManager.MatchState.Lost && gm.State != GameManager.MatchState.Won,
+            "the knight buckles and falls before the defeat overlay");
+        Capture("34_knight_collapse");
         yield return Wait(4.5f);
         Check(gm.State == GameManager.MatchState.Lost, "death ends the run");
         Capture("31_defeat");

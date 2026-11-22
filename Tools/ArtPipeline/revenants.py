@@ -462,10 +462,14 @@ def decay_color(p):
         w=math.exp(-d**4)*.87*smooth((p.z-.015)/.06);base=base*(1-w)+np.array((.48,.12,.085))*w
     return tuple(np.clip(base,.035,1.15))
 
+exec((ROOT/'Tools/ArtPipeline/revenant_neck.py').read_text(),globals())
+
 def export_objects(label,objects,grips):
     vertices=[];normals=[];colors=[];uvs=[];tiles=[];indices=[];bw=[]
     deps=bpy.context.evaluated_depsgraph_get()
+    neck_joints=tuple(jid(name) for name in ('Ribcage','Neck','Head'))
     for o in objects:
+        fix_neck=label in ('Brute','Brute_LOD1','Brute_LOD2') and o.name=='Brute continuous anatomical body'
         ev=o.evaluated_get(deps);d=ev.to_mesh();d.calc_loop_triangles()
         remap={};attrs=d.color_attributes.get('Decay');uvl=d.uv_layers.active.data
         for tri in d.loop_triangles:
@@ -476,7 +480,9 @@ def export_objects(label,objects,grips):
                 if key not in remap:
                     remap[key]=len(vertices);vertices.append(vec(U(o.matrix_world@v.co)));normals.append(vec(U(v.normal)))
                     colors.append(list(attrs.data[vi].color) if attrs else [1,1,1,1]);uvs.append(dict(x=float(uv0.x),y=float(uv0.y)));tiles.append(o['surface'])
-                    ws=sorted([(g.group,g.weight) for g in v.groups],key=lambda x:-x[1])[:4]
+                    ws=[(g.group,g.weight) for g in v.groups]
+                    if fix_neck:ws=brute_neck_weights(U(o.matrix_world@v.co),ws,neck_joints)
+                    ws=sorted(ws,key=lambda pair:-pair[1])[:4]
                     if not ws:ws=[(jid('Pelvis'),1)]
                     total=sum(w for b,w in ws);bw.append([(b,w/total) for b,w in ws]+[(0,0)]*(4-len(ws)))
                 corners.append(remap[key])

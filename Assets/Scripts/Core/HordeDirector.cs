@@ -8,6 +8,41 @@ public enum HordeEvent { None, BloodMoon, ToxicFog, CursedTotem }
 // One wave owns an event. Scene-owned hazards never survive a draft or restart.
 public sealed class HordeDirector : MonoBehaviour
 {
+    internal readonly struct Tier
+    {
+        public readonly string Name;
+        public readonly Color Accent;
+        public readonly float Health, Speed, Damage;
+
+        public Tier(string name, Color accent, float health, float speed, float damage)
+        {
+            Name = name;
+            Accent = accent;
+            Health = health;
+            Speed = speed;
+            Damage = damage;
+        }
+    }
+
+    static readonly Tier[] Tiers =
+    {
+        new("I · Rising", new Color(.87f, .75f, .51f), 1f, 1f, 1f),
+        new("II · Relentless", new Color(.62f, .85f, .96f), 1.18f, 1.06f, 1.12f),
+        new("III · Dread", new Color(.80f, .69f, .99f), 1.43f, 1.13f, 1.25f),
+        new("IV · Bloodbound", new Color(.99f, .68f, .49f), 1.75f, 1.20f, 1.43f),
+        new("V · Last Oath", new Color(1f, .84f, .43f), 2.18f, 1.27f, 1.63f),
+        new("VI · Abyss", new Color(1f, .54f, .57f), 3.25f, 1.42f, 2.15f)
+    };
+
+    internal static Tier Pressure(int wave)
+    {
+        int rank = Mathf.Max(0, wave / 5);
+        if (rank < Tiers.Length) return Tiers[rank];
+        var abyss = Tiers[Tiers.Length - 1];
+        int beyond = rank - (Tiers.Length - 1);
+        return new Tier(abyss.Name, abyss.Accent, abyss.Health * (1f + .27f * beyond),
+            abyss.Speed + Mathf.Min(.25f, .045f * beyond), abyss.Damage * (1f + .22f * beyond));
+    }
     [Serializable] public class Lane { public Vector3 start, end; public float width; }
     [Serializable] public class Arena { public Lane[] lanes; public string[] bridgeKeys; }
     public HordeEvent Current { get; private set; }
@@ -61,10 +96,12 @@ public sealed class HordeDirector : MonoBehaviour
     bool gobletUsed;
     HordeGoblet.Site gobletSite;
     bool gobletSiteFound;
+    internal Vector3 OpeningSpawn { get; private set; }
 
     public void Prepare(PlayerHealth knight)
     {
         health=knight;player=knight!=null?knight.transform:null;
+        if (player != null) OpeningSpawn = player.position;
         random=new System.Random(Environment.TickCount);
         var json=Resources.Load<TextAsset>("Horde/Arena");
         if(json!=null)arena=JsonUtility.FromJson<Arena>(json.text);
@@ -75,7 +112,7 @@ public sealed class HordeDirector : MonoBehaviour
         ClearWave();
         if (!gobletUsed && GameManager.instance != null && GameManager.instance.Mode == GameMode.EndlessHorde && player != null)
         {
-            if (!gobletSiteFound) gobletSiteFound = HordeGoblet.TryFindSite(player.position, out gobletSite);
+            if (!gobletSiteFound) gobletSiteFound = HordeGoblet.TryFindSite(OpeningSpawn, out gobletSite);
             if (gobletSiteFound) Goblet = HordeGoblet.Create(gobletSite, transform);
         }
         if(wave%3!=0)return;

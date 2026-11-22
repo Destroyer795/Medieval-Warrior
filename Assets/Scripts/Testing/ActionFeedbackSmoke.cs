@@ -21,11 +21,15 @@ public partial class SmokeTestDriver
         var gm=GameManager.instance;bool managerEnabled=gm.enabled;var body=player.GetComponent<Rigidbody>();
         Vector3 originalPosition=body.position;Quaternion originalRotation=body.rotation;float capture=Time.captureDeltaTime;
         float effectsVolume=GameSettings.SfxVolume;var flags=BindingFlags.Instance|BindingFlags.NonPublic;
+        var groanTimer = typeof(EnemyController).GetField("groanTimer", flags);
+        var ambient = EnemyController.All.Where(e => e != null)
+            .ToDictionary(e => e, e => (float)groanTimer.GetValue(e));
         float stamina=player.Stamina;bool exhausted=(bool)typeof(PlayerControlSpeed).GetField("exhausted",flags).GetValue(player);
         GameObject creature=null;
         try
         {
             gm.enabled=false;GameSettings.SfxVolume=.9f;AudioManager.SetBattleIntensity(0,true);
+            foreach (var bystander in ambient.Keys) groanTimer.SetValue(bystander, float.PositiveInfinity);
             var audio=FindFirstObjectByType<AudioManager>();
             foreach(var voice in audio.GetComponentsInChildren<AudioSource>())
                 if(voice.clip!=null&&voice.clip.name.StartsWith("zombie_groan",StringComparison.Ordinal))voice.Stop();
@@ -41,7 +45,7 @@ public partial class SmokeTestDriver
                 if(i>0)
                 {
                     yield return Wait(.42f);
-                    typeof(EnemyController).GetField("groanTimer",flags).SetValue(enemy,0f);
+                    groanTimer.SetValue(enemy,0f);
                 }
                 string name="zombie_groan"+i;float until=Time.unscaledTime+2.3f;AudioSource emitted=null;
                 while(Time.unscaledTime<until&&emitted==null)
@@ -118,6 +122,8 @@ public partial class SmokeTestDriver
         finally
         {
             if(creature!=null)Destroy(creature);player.DebugMove(null);Time.captureDeltaTime=capture;
+            foreach (var voice in ambient)
+                if (voice.Key != null) groanTimer.SetValue(voice.Key, voice.Value);
             body.position=originalPosition;body.rotation=originalRotation;body.linearVelocity=Vector3.zero;
             typeof(PlayerControlSpeed).GetField("<Stamina>k__BackingField",flags).SetValue(player,stamina);
             typeof(PlayerControlSpeed).GetField("exhausted",flags).SetValue(player,exhausted);

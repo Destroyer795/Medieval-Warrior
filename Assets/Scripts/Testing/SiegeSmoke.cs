@@ -28,13 +28,18 @@ public partial class SmokeTestDriver
         health.InvulnerableUntil = float.PositiveInfinity;
         var body = player.GetComponent<Rigidbody>();
         yield return ReviewOuterGate(gm, player, body);
+        gm.enabled = false;
+        foreach (var enemy in EnemyController.All.ToArray()) Destroy(enemy.gameObject);
+        yield return null;
+        if (gm.Outer != null)
+        {
+            yield return WalkForegate(gm.Outer.Structure, player, body);
+            yield return ShoveAcrossRoadShoulder(gm.Outer.Structure, player, body);
+        }
         body.position = gate.Road;
         player.transform.position = gate.Road;
         Physics.SyncTransforms();
         body.isKinematic = true;
-        gm.enabled = false;
-        foreach (var enemy in EnemyController.All.ToArray()) Destroy(enemy.gameObject);
-        yield return null;
         bool Route(Vector3 from, Vector3 to)
         {
             var path = new NavMeshPath();
@@ -73,6 +78,8 @@ public partial class SmokeTestDriver
         yield return Wait(.65f);
         var agent = breacher.GetComponent<NavMeshAgent>();
         Check((agent.destination - player.transform.position).sqrMagnitude < 4, "weapon contact diverts a breacher to the knight");
+        player.transform.position = gate.Road;
+        Physics.SyncTransforms();
         deadline = Time.realtimeSinceStartup + 8;
         while ((gate.Health >= before - breacher.Stats.damage) && Time.realtimeSinceStartup < deadline) yield return null;
         Check(gate.Health < before - breacher.Stats.damage, "the distracted Walker returns and strikes the gate again");
@@ -165,12 +172,91 @@ public partial class SmokeTestDriver
         yield return Wait(2);
     }
 
+    IEnumerator ShoveAcrossRoadShoulder(ForegateStructure wall, PlayerControlSpeed knight, Rigidbody body)
+    {
+        var terrain = Terrain.activeTerrain;
+        float Surface(Vector3 at) => terrain.SampleHeight(at) + terrain.transform.position.y;
+        bool swept = body.collisionDetectionMode == CollisionDetectionMode.ContinuousDynamic;
+        float worstClearance = float.PositiveInfinity;
+        foreach (int side in new[] { -1, 1 })
+        {
+            var point = wall.World(side * 1.7f, 0f, 9f);
+            point.y = Surface(point) + .06f;
+            body.position = point;
+            knight.Stun(.35f);
+            body.linearVelocity = wall.transform.right * side * 14f + Vector3.down * 8f;
+            for (int step = 0; step < 14; step++)
+            {
+                yield return new WaitForFixedUpdate();
+                worstClearance = Mathf.Min(worstClearance, body.position.y - Surface(body.position));
+            }
+        }
+        Check(swept && worstClearance >= -.35f, $"a downward and outward shove keeps the knight above both road shoulders ({worstClearance:F2} m, {body.collisionDetectionMode})");
+        yield return Wait(.12f);
+    }
+
+    IEnumerator WalkForegate(ForegateStructure wall, PlayerControlSpeed knight, Rigidbody body)
+    {
+        var terrain = Terrain.activeTerrain;
+        Vector3 Foot(int side)
+        {
+            var point = wall.World(side * 8.43f, 0, 12);
+            point.y = terrain.SampleHeight(point) + terrain.transform.position.y;
+            return point;
+        }
+        var route = new[]
+        {
+            Foot(1), wall.World(8.43f, 6.23f, .6f), wall.World(0, 6.845f, .6f),
+            wall.World(-8.43f, 6.23f, .6f), Foot(-1)
+        };
+        var cameraRig = Camera.main.GetComponent<CameraFollow>();
+        float savedDelta = Time.captureDeltaTime;
+        try
+        {
+            Time.captureDeltaTime = Time.fixedDeltaTime;
+            body.position = route[0] + Vector3.up * .08f;
+            body.linearVelocity = Vector3.zero;
+            Physics.SyncTransforms();
+            for (int i = 0; i < 5; i++) yield return null;
+            foreach (int direction in new[] { 1, -1 })
+            {
+                for (int leg = 1; leg < route.Length; leg++)
+                {
+                    var target = route[direction > 0 ? leg : route.Length - 1 - leg];
+                    var delta = Vector3.ProjectOnPlane(target - body.position, Vector3.up);
+                    float deadline = Time.time + delta.magnitude / knight.walkSpeed + 2f;
+                    float lowestVelocity = 0;
+                    while (delta.magnitude > .16f && Time.time < deadline)
+                    {
+                        var forward = Vector3.ProjectOnPlane(cameraRig.LookDirection, Vector3.up).normalized;
+                        var right = Vector3.Cross(Vector3.up, forward);
+                        knight.DebugMove(new Vector2(Vector3.Dot(delta.normalized, right), Vector3.Dot(delta.normalized, forward)));
+                        yield return null;
+                        delta = Vector3.ProjectOnPlane(target - body.position, Vector3.up);
+                        lowestVelocity = Mathf.Min(lowestVelocity, body.linearVelocity.y);
+                    }
+                    bool walked = delta.magnitude <= .16f && Mathf.Abs(body.position.y - target.y) < .4f && lowestVelocity > -5;
+                    Check(walked, $"knight walks foregate direction {direction}, leg {leg} " +
+                        $"({delta.magnitude:F2} m left, feet at {wall.transform.InverseTransformPoint(body.position):F2}, lowest Y speed {lowestVelocity:F2})");
+                    if (!walked) yield break;
+                }
+            }
+        }
+        finally
+        {
+            knight.DebugMove(null);
+            Time.captureDeltaTime = savedDelta;
+        }
+    }
+
     IEnumerator ReviewOuterGate(GameManager gm, PlayerControlSpeed knight, Rigidbody body)
     {
         var outer = gm.Outer;
         Check(outer != null && outer.Structure != null, "Defend loads the outer gatehouse");
         if (outer == null || outer.Structure == null) yield break;
         var wall = outer.Structure;
+        Check(outer.StonesRemaining == 5, "the central cradle has five stones for the defense");
+        Check(Vector3.Angle(-wall.Outward, Vector3.ProjectOnPlane(gm.Gate.Approach - wall.transform.position, Vector3.up)) < 2f, "breached gate faces the inner sanctuary");
         float Depth(Vector3 point) => Vector3.Dot(wall.World(0, 0, 0) - point, wall.Outward);
         void Place(Vector3 at)
         {
@@ -180,6 +266,8 @@ public partial class SmokeTestDriver
             Physics.SyncTransforms();
         }
         var start = body.position;
+        Check(EnemyController.All.All(e => e == null || Depth(e.transform.position) < -25f),
+            "the first assault starts deep in the exterior field");
         Check(start.y > wall.World(0, 4.8f, 0).y && knight.CurrentWeapon == Weapon.Bow,
             "knight begins on the parapet equipped for ranged defense");
         Capture("outer_gate_parapet");
@@ -187,15 +275,15 @@ public partial class SmokeTestDriver
         CaptureFrom("outer_gate_courtyard", wall.World(-9, 18, 20), wall.World(1, 3.4f, 2));
         foreach (int side in new[] { -1, 1 })
         {
-            var mid = wall.World(0, 2f, 7f);
-            var direction = (wall.World(side * 16, 2f, 7f) - mid).normalized;
+            var mid = wall.World(0, 4.7f, 12f);
+            var direction = (wall.World(side * 16, 4.7f, 12f) - mid).normalized;
             Check(Physics.Raycast(mid, direction, out var hit, 17f, ~0, QueryTriggerInteraction.Ignore) &&
                 hit.distance > 9f, "protected stair yard meets a solid return wall on side " + side);
             float lastHeight = float.PositiveInfinity;
             bool clearFlight = true;
             for (float inward = 2f; inward <= 12f; inward += .5f)
             {
-                var top = wall.World(side * 7.18f, 10f, inward);
+                var top = wall.World(side * 8.43f, 10f, inward);
                 if (!Physics.Raycast(top, Vector3.down, out var step, 16f, ~0, QueryTriggerInteraction.Ignore) ||
                     step.point.y > lastHeight + .2f)
                 {
@@ -207,7 +295,7 @@ public partial class SmokeTestDriver
                     step.point + Vector3.up * 1.6f, .30f, ~0, QueryTriggerInteraction.Ignore))
                     clearFlight = false;
             }
-            Check(clearFlight && lastHeight < wall.World(0, 1.3f, 0).y,
+            Check(clearFlight && Mathf.Abs(lastHeight - (Terrain.activeTerrain.SampleHeight(wall.World(side * 8.43f, 0, 12)) + Terrain.activeTerrain.transform.position.y)) < .4f,
                 "a knight-width stair flight descends into the courtyard on side " + side);
             Place(wall.World(side * 11.3f, 6.35f, 1.1f));
             knight.DebugFireAt(body.position + Vector3.up * 20, .5f);
@@ -220,7 +308,15 @@ public partial class SmokeTestDriver
         Check(outer.Health < outer.MaxHealth && !outer.Breached && gm.Gate.Health == gm.Gate.MaxHealth,
             "live road attackers batter only the outer leaves while the keep is protected");
         var underGallery = EnemyController.All.Where(e => e != null && !e.IsDead &&
-            Vector3.Distance(e.transform.position, wall.World(0f, 0f, -1.3f)) < 3f).ToArray();
+            Vector3.Distance(e.transform.position, wall.World(0f, 0f, -3.55f)) < 3f).ToArray();
+        var shotOrigin = wall.World(1.42f, 8.15f, -2.58f);
+        var shotTarget = wall.World(.45f, 0f, -3.9f);
+        shotTarget.y = outer.GroundHeight(shotTarget) + 1.38f;
+        Check(!Physics.Linecast(shotOrigin, shotTarget, out var block, ~0, QueryTriggerInteraction.Ignore) ||
+            block.collider.GetComponentInParent<EnemyController>() != null,
+            "an arrow has a clear line from the gallery to the front rank" +
+            (block.collider != null ? $" (hit {block.collider.name})" : ""));
+        CaptureFrom("outer_gate_firing_lane", shotOrigin + Vector3.up * 1.6f, shotTarget);
         Place(wall.World(-.75f, 6.95f, .24f));
         Check(outer.StoneReady && outer.Interact() && !outer.StoneReady,
             "releasing the loaded stone consumes the ready shot");
@@ -228,8 +324,26 @@ public partial class SmokeTestDriver
         yield return Wait(1.35f);
         Check(underGallery.Any(e => e == null || e.IsDead || e.Health < e.MaxHealth),
             "the stone strikes the enemies gathered beneath the gallery");
+        yield return Wait(1.4f);
+        Check(outer.StonesRemaining == 4 && outer.StoneReady && wall.ReserveStones == 3,
+            "the cradle automatically loads the next stone from the visible stock");
         Place(start);
-        deadline = Time.realtimeSinceStartup + 65f;
+        var clockField = typeof(OuterSiege).GetField("<HoldSeconds>k__BackingField",
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+        int beforePush = EnemyController.All.Count;
+        clockField.SetValue(outer, OuterSiege.FinalAssaultAt - .05f);
+        deadline = Time.realtimeSinceStartup + 3f;
+        while (EnemyController.All.Count < beforePush + 10 && Time.realtimeSinceStartup < deadline)
+        {
+            if (GameHUD.BoonsOpen) GameHUD.DebugPickBoon(0);
+            yield return null;
+        }
+        Check(outer.FinalAssault && EnemyController.All.Count >= beforePush + 10,
+            "the timer launches a large final assault");
+        // The clock was advanced without the preceding 90 seconds of
+        // structural damage. Stage a weakened gate and let a live hit finish it.
+        outer.TakeDamage(Mathf.Max(0f, outer.Health - 6f));
+        deadline = Time.realtimeSinceStartup + 37f;
         var attackers = new System.Collections.Generic.HashSet<EnemyController>();
         while (Time.realtimeSinceStartup < deadline && !outer.Breached)
         {
@@ -248,6 +362,29 @@ public partial class SmokeTestDriver
         Check(!outer.Cinematic && Time.time - began >= .85f && Time.time - began < 1.5f,
             "the breach shot hands control back after one second");
         Check(knight.enabled && gm.Gate.Health == gm.Gate.MaxHealth, "defense resumes with the knight and keep intact");
+        var terrain = Terrain.activeTerrain;
+        float length = Depth(gm.Gate.Approach);
+        float steepest = 0;
+        for (float depth = 1; depth < Mathf.Min(66, length); depth += .5f)
+        {
+            float a = terrain.SampleHeight(wall.World(0,0,depth));
+            float b = terrain.SampleHeight(wall.World(0,0,depth+.5f));
+            steepest = Mathf.Max(steepest, Mathf.Abs(b-a)/.5f);
+        }
+        Check(steepest < .25f, $"the cobbled road has a continuous walkable grade (maximum {steepest:P0})");
+        Collider obstacle = null;
+        for (float depth = 2; depth < length - 1 && obstacle == null; depth += .4f)
+        {
+            var centre = wall.World(0f, 0f, depth);
+            centre.y = terrain.SampleHeight(centre) + terrain.transform.position.y;
+            obstacle = Physics.OverlapCapsule(centre + Vector3.up * .6f, centre + Vector3.up * 1.6f,
+                .38f, ~0, QueryTriggerInteraction.Ignore).FirstOrDefault(c => !(c is TerrainCollider) &&
+                c.GetComponentInParent<EnemyController>() == null && c.GetComponentInParent<PlayerControlSpeed>() == null);
+        }
+        Check(obstacle == null, "the entire central lane to the sanctuary is physically clear" +
+            (obstacle != null ? $" (blocked by {obstacle.name} at {obstacle.bounds.center})" : ""));
+        CaptureFrom("outer_gate_open_route", wall.World(0, 2.1f, -4f),
+            gm.Gate.transform.position + Vector3.up * 1.8f);
         deadline = Time.realtimeSinceStartup + 12;
         while (Time.realtimeSinceStartup < deadline && !attackers.Any(e => e != null && Depth(e.transform.position) > 2f))
             yield return null;

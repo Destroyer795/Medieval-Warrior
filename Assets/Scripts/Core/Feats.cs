@@ -25,6 +25,7 @@ public static class Feats
         new Def { id = "defender", name = "Defender of the Realm", description = "Win Defend the Castle.", icon = "swords" },
         new Def { id = "dawn", name = "Dawn Breaks", description = "Survive the Last Stand.", icon = "hourglass" },
         new Def { id = "unbroken", name = "Unbroken", description = "Reach wave 10 of the Endless Horde.", icon = "horde" },
+        new Def { id = "last_oath", name = "Last Oath", description = "Clear wave 20 of the Endless Horde.", icon = "crown" },
         new Def { id = "untouchable", name = "Untouchable", description = "Clear an Endless wave without taking damage.", icon = "shield" },
         new Def { id = "blessed", name = "Blessed", description = "Hold 6 boons in a single match.", icon = "potion" },
         new Def { id = "legend", name = "Legend", description = "Win any battle on Warlord difficulty.", icon = "crown" },

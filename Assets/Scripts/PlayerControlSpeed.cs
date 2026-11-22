@@ -131,7 +131,8 @@ public class PlayerControlSpeed : MonoBehaviour
             // Physics-driven movement so the knight collides with walls and follows the terrain
             rb.freezeRotation = true;
             rb.interpolation = RigidbodyInterpolation.Interpolate;
-            rb.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
+            rb.collisionDetectionMode = GameSettings.Mode == GameMode.DefendTheCastle
+                ? CollisionDetectionMode.ContinuousDynamic : CollisionDetectionMode.ContinuousSpeculative;
         }
 
         Stamina = maxStamina;
@@ -729,8 +730,18 @@ public class PlayerControlSpeed : MonoBehaviour
             foreach (var hit in SortedHits(ray, 120f))
             {
                 if (hit.transform.IsChildOf(transform)) continue;
-                if (Vector3.Dot(hit.point - origin, cameraTransform.forward) < 0.5f) continue;   // behind the bow
-                target = hit.point;
+                Vector3 point = hit.point;
+                if (Vector3.Dot(point - origin, ray.direction) <= .01f)
+                {
+                    // At contact range the camera can see the front of an enemy
+                    // behind the bow rest, while its body still extends ahead.
+                    // Use its forward part and never reverse the shot.
+                    if (hit.collider.GetComponentInParent<EnemyController>() is not EnemyController enemy || enemy.IsDead)
+                        continue;
+                    point = hit.collider.bounds.center;
+                    if (Vector3.Dot(point - origin, ray.direction) <= .01f) continue;
+                }
+                target = point;
                 break;
             }
         }

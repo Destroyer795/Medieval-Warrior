@@ -18,17 +18,21 @@ public partial class SmokeTestDriver
         wave.Invoke(gm, new object[] { 14 });
         yield return null;
         var goblet = director.Goblet;
-        Check(goblet != null, "an unclaimed goblet appears at a castle wall during an ordinary wave");
+        Check(goblet != null, "an unclaimed goblet appears in the central village during an ordinary wave");
         if (goblet == null) yield break;
 
         var path = new NavMeshPath();
-        Check(NavMesh.CalculatePath(knight.transform.position, goblet.Approach, NavMesh.AllAreas, path) &&
-            path.status == NavMeshPathStatus.PathComplete, "the goblet has a walkable approach from the knight");
-        var gate = GameObject.Find("Environment/Siege Road Gate");
-        bool wallShelf = Physics.Raycast(goblet.Target, -goblet.transform.forward, out var hit, 1.5f, ~0, QueryTriggerInteraction.Ignore)
-            && hit.collider.name.StartsWith("Wall");
-        Check(wallShelf || (gate != null && Vector3.Distance(gate.transform.position, goblet.Approach) < 17f),
-            "the goblet stands by the physical wall or its road gate");
+        Vector3 spawn = director.OpeningSpawn;
+        Check(NavMesh.SamplePosition(spawn, out var start, 5f, NavMesh.AllAreas) &&
+            NavMesh.CalculatePath(start.position, goblet.Approach, NavMesh.AllAreas, path) &&
+            path.status == NavMeshPathStatus.PathComplete, "the goblet has a walkable approach from the opening spawn");
+        var keep = GameObject.Find("Castle/Castle")?.transform;
+        bool wallShelf = keep != null && Physics.Raycast(goblet.Target, -goblet.transform.forward, out var hit,
+            1.5f, ~0, QueryTriggerInteraction.Ignore) && (hit.transform == keep || hit.transform.IsChildOf(keep));
+        float distance = Vector3.Distance(spawn, goblet.Approach);
+        bool courtyardPlinth = goblet.transform.Find("Courtyard plinth") != null && distance < 13f;
+        Check(distance < 28f && (wallShelf || courtyardPlinth),
+            $"the goblet stands {distance:F1} m from spawn at a keep wall or courtyard plinth");
         var saved = body.position;
         var savedRotation = knight.transform.rotation;
         GameObject fixture = null;

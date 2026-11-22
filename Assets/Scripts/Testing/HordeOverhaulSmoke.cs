@@ -23,7 +23,7 @@ public partial class SmokeTestDriver
     {
         var gm=GameManager.instance;var director=gm.Horde;var flags=BindingFlags.Instance|BindingFlags.NonPublic;
         var fields=new Dictionary<FieldInfo,object>();
-        foreach(string name in new[]{"<Wave>k__BackingField","<State>k__BackingField","<Boss>k__BackingField","<Score>k__BackingField","<RecoveryRemaining>k__BackingField","<Combo>k__BackingField","<BestCombo>k__BackingField","<BoonsOffered>k__BackingField","<IntermissionLeft>k__BackingField","comboExpires","waveToSpawn","waveSpawned","spawnTimer","damageAtWaveStart","lastThreatCue","currentKills"})
+        foreach(string name in new[]{"<Wave>k__BackingField","<State>k__BackingField","<Boss>k__BackingField","<Score>k__BackingField","<RecoveryRemaining>k__BackingField","<Combo>k__BackingField","<BestCombo>k__BackingField","<BoonsOffered>k__BackingField","<IntermissionLeft>k__BackingField","<HordeGrave>k__BackingField","comboExpires","waveToSpawn","waveSpawned","spawnTimer","damageAtWaveStart","lastThreatCue","currentKills","draftPending","graveWasActive","hordeGraveRaised","nextHordeGraveAttempt"})
         {var field=typeof(GameManager).GetField(name,flags|BindingFlags.Public);fields[field]=field.GetValue(gm);}
         bool manager=gm.enabled,control=player.enabled;var body=player.GetComponent<Rigidbody>();bool kinematic=body.isKinematic;
         Vector3 position=player.transform.position;Quaternion rotation=player.transform.rotation;
@@ -68,15 +68,44 @@ public partial class SmokeTestDriver
                 ClearEnemies();director.ClearWave();yield return null;
             }
             Check(seen.Count==3,"the first three chaos waves cover all events without repeats");
+            foreach (int wave in new[] { 1, 5, 10, 15, 20, 25 })
+            {
+                Wave(wave);
+                var walker = Enemy(ZombieType.Walker, position + player.transform.forward * 4f);
+                var tier = HordeDirector.Pressure(wave);
+                var profile = GameSettings.Profile;
+                float damage = (float)typeof(EnemyController).GetField("damage", flags).GetValue(walker);
+                float speed = (float)typeof(EnemyController).GetField("baseSpeed", flags).GetValue(walker);
+                float targetSpeed = walker.Stats.speed * profile.enemySpeed * tier.Speed;
+                Check(Mathf.Approximately(walker.MaxHealth, walker.Stats.health * profile.enemyHealth * tier.Health) &&
+                    Mathf.Approximately(damage, walker.Stats.damage * profile.enemyDamage * tier.Damage) &&
+                    speed >= targetSpeed * .899f && speed <= targetSpeed * 1.121f,
+                    $"wave {wave} applies its tier's health, move speed and damage to a live Walker");
+                yield return null;
+                var label = FindObjectsByType<TextMeshProUGUI>(FindObjectsSortMode.None).FirstOrDefault(t => t.text == tier.Name);
+                Check(label != null && (label.color - tier.Accent).maxColorComponent <= .01f,
+                    $"wave {wave} presents the {tier.Name} tier in the HUD");
+                if (wave == 20 || wave == 25) Capture($"horde_tier_{wave:00}");
+                ClearEnemies(); director.ClearWave(); yield return null;
+            }
+            Check(HordeDirector.Pressure(25).Health > HordeDirector.Pressure(20).Health * 1.4f &&
+                Feats.All.Any(f => f.id == "last_oath"), "wave 25 is a steep escalation past the wave 20 feat");
             for(int wave=1;wave<=3;wave++)
             {
                 Wave(wave);ClearEnemies();yield return null;
                 var spawned=typeof(GameManager).GetField("waveSpawned",flags).GetValue(gm);
                 typeof(GameManager).GetField("waveToSpawn",flags).SetValue(gm,spawned);
                 typeof(GameManager).GetMethod("UpdateMode",flags).Invoke(gm,null);
+                var intermission = typeof(GameManager).GetMethod("UpdateHordeIntermission", flags);
+                intermission.Invoke(gm, new object[] { 1.9f });
+                Check(!gm.ChoosingBoon && gm.State == GameManager.MatchState.Intermission,
+                    $"wave {wave} lets the clear settle before drafting");
+                intermission.Invoke(gm, new object[] { .11f });
                 var hud=FindFirstObjectByType<GameHUD>();
                 var choices=(Boons.Def[])typeof(GameHUD).GetField("boonChoices",flags).GetValue(hud);
                 Check(gm.ChoosingBoon&&choices.Length==3&&choices.Select(d=>d.id).Distinct().Count()==3,$"wave {wave} ends in three distinct boon cards");
+                intermission.Invoke(gm, new object[] { 20f });
+                Check(gm.Wave == wave && gm.ChoosingBoon, "a draft stays open without starting the next wave underneath it");
                 Check(choices.Any(d=>Boons.IsSignature(d.id)),"Horde draft guarantees a signature power");
                 yield return null;
                 Check(!hud.GetComponentsInChildren<TextMeshProUGUI>().Any(t=>t.transform.parent.name.StartsWith("Boon ")&&t.isTextOverflowing),"boon card titles and descriptions fit their panels");
@@ -205,9 +234,42 @@ public partial class SmokeTestDriver
             director.ClearWave();ClearEnemies();yield return null;
             Check(director.Current==HordeEvent.None&&director.Totem==null&&director.FogCount==0,"wave cleanup clears event state, hazard objects and protection");
             yield return ReviewGoblet(player);
+            ClearEnemies();
+            yield return null;
+            Wave(8);
+            var tick = typeof(GameManager).GetMethod("UpdateMode", flags);
+            typeof(GameManager).GetField("waveSpawned", flags).SetValue(gm, typeof(GameManager).GetField("waveToSpawn", flags).GetValue(gm));
+            player.enabled = true;
+            float graveDeadline = Time.realtimeSinceStartup + 9f;
+            tick.Invoke(gm, null);
+            Check(gm.HordeGraveActive && !player.enabled, "a quiet point in wave 8 raises the grave and locks the reveal");
+            bool capturedGrave = false;
+            while (gm.HordeGraveActive && gm.HordeGrave.Revealing && Time.realtimeSinceStartup < graveDeadline)
+            {
+                tick.Invoke(gm, null);
+                if (!capturedGrave && gm.HordeGrave.Age > 4.7f)
+                {
+                    Capture("horde_grave_reveal");
+                    capturedGrave = true;
+                }
+                yield return null;
+            }
+            var duel = gm.HordeGrave != null ? gm.HordeGrave.Duelist : null;
+            Check(duel != null && player.enabled && duel.CanFight && gm.Wave == 8 &&
+                Mathf.Approximately(gm.AmbientSpawnRateMultiplier, .2f),
+                "the live grave duel holds the round open and eases regular reinforcements");
+            if (duel != null)
+            {
+                duel.GetComponent<EnemyController>().TakeDamage(999f, Vector3.forward, 0f);
+                yield return null;
+                tick.Invoke(gm, null);
+                Check(gm.State == GameManager.MatchState.Intermission && gm.RecoveryRemaining > 0f,
+                    "defeating the revenant resumes round completion");
+            }
         }
         finally
         {
+            if (gm.HordeGrave != null) Destroy(gm.HordeGrave.gameObject);
             director.ClearWave();ClearEnemies();foreach(var go in fixtures)if(go!=null)Destroy(go);
             foreach(var pickup in FindObjectsByType<Pickup>(FindObjectsSortMode.None))if(!originalPickups.Contains(pickup))Destroy(pickup.gameObject);
             Boons.Reset();foreach(var item in owned)stacks[item.Key]=item.Value;

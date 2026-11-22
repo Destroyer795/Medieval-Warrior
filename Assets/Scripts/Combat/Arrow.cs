@@ -6,6 +6,8 @@ public class Arrow : MonoBehaviour
     Vector3 velocity;
     float damage, knockback;
     Transform owner;
+    Vector3 bowMuzzle;
+    bool sweepFromMuzzle;
     bool firedByDuelist;
     GraveDuelist duelist;
     bool stuck, falling, stuckInEnemy;
@@ -26,6 +28,8 @@ public class Arrow : MonoBehaviour
     {
         var arrow = Fire(origin + direction * .2f, direction, Mathf.Lerp(24f, 58f, draw), Mathf.Lerp(1f, 3.4f, draw),
             Mathf.Lerp(2f, 9f, draw), owner, pierce, fire);
+        arrow.bowMuzzle = origin;
+        arrow.sweepFromMuzzle = true;
         arrow.duelist = duelist;
         arrow.firedByDuelist = duelist != null;
         return arrow;
@@ -77,57 +81,83 @@ public class Arrow : MonoBehaviour
             return;
         }
         if (age > 14f) { Destroy(gameObject); return; }
+        if (Time.deltaTime <= 0f) return;
 
         velocity += Physics.gravity * 0.45f * Time.deltaTime;
         Vector3 tip = transform.position + transform.forward * Length;
         Vector3 step = velocity * Time.deltaTime;
-
-        var hits = Physics.RaycastAll(tip, step.normalized, step.magnitude + 0.05f, ~0, QueryTriggerInteraction.Collide);
+        Vector3 start = tip;
+        if (sweepFromMuzzle)
+        {
+            // The rendered shaft starts in front of the rest. The first cast
+            // must still cover every point from the rest to the moving tip.
+            start = bowMuzzle;
+            sweepFromMuzzle = false;
+            if (ResolveMuzzleOverlap()) return;
+        }
+        Vector3 sweep = tip + step - start;
+        var hits = Physics.RaycastAll(start, sweep.normalized, sweep.magnitude + 0.05f, ~0, QueryTriggerInteraction.Collide);
         System.Array.Sort(hits, (x, y) => x.distance.CompareTo(y.distance));
         foreach (var hit in hits)
-        {
-            if(hit.collider.isTrigger&&hit.collider.GetComponent<RevenantHitZone>()==null)continue;
-            if (owner != null && hit.transform.IsChildOf(owner)) continue;
-            if (firedByDuelist)
-            {
-                if (hit.collider.GetComponentInParent<PlayerHealth>() == duelist.Knight)
-                {
-                    bool headshot = hit.point.y > duelist.Knight.transform.position.y + 1.45f * duelist.Knight.transform.lossyScale.y;
-                    duelist.Knight.TakeDamage(damage * (headshot ? 2f : 1f), owner, knockback);
-                }
-                else FX.Dust(hit.point, .2f, 3);
-                Destroy(gameObject);
-                return;
-            }
-            var e = hit.collider.GetComponentInParent<EnemyController>();
-            if(e!=null&&e.IsDead)continue;
-            if (e != null && pierced.Contains(e)) continue;
-            if (e != null && !e.IsDead && pierce > 0&&!e.GuardsContact(velocity.normalized,hit.point))
-            {
-                // punch straight through and keep flying
-                pierce--;
-                pierced.Add(e);
-                HitEnemy(e, hit.point);
-                continue;
-            }
-            Impact(hit);
-            return;
-        }
+            if (Contact(hit.collider, hit.point)) return;
         transform.position += step;
         transform.rotation = Quaternion.LookRotation(velocity);
     }
 
-    void Impact(RaycastHit hit)
+    bool Ignore(Collider collider) =>
+        (collider.isTrigger && collider.GetComponent<RevenantHitZone>() == null) ||
+        (owner != null && collider.transform.IsChildOf(owner));
+
+    bool ResolveMuzzleOverlap()
+    {
+        // Rays skip colliders containing their origin. Give solid cover
+        // precedence when it and a character overlap the bow at release.
+        var overlaps = Physics.OverlapSphere(bowMuzzle, .02f, ~0, QueryTriggerInteraction.Collide);
+        foreach (var collider in overlaps)
+            if (collider.GetComponentInParent<EnemyController>() == null &&
+                collider.GetComponentInParent<PlayerHealth>() == null && Contact(collider, bowMuzzle)) return true;
+        foreach (var collider in overlaps)
+            if (Contact(collider, bowMuzzle)) return true;
+        return false;
+    }
+
+    bool Contact(Collider collider, Vector3 point)
+    {
+        if (Ignore(collider)) return false;
+        if (firedByDuelist)
+        {
+            if (collider.GetComponentInParent<PlayerHealth>() == duelist.Knight)
+            {
+                bool headshot = point.y > duelist.Knight.transform.position.y + 1.45f * duelist.Knight.transform.lossyScale.y;
+                duelist.Knight.TakeDamage(damage * (headshot ? 2f : 1f), owner, knockback);
+            }
+            else FX.Dust(point, .2f, 3);
+            Destroy(gameObject);
+            return true;
+        }
+        var enemy = collider.GetComponentInParent<EnemyController>();
+        if (enemy != null && (enemy.IsDead || pierced.Contains(enemy))) return false;
+        if (enemy != null && pierce > 0 && !enemy.GuardsContact(velocity.normalized, point))
+        {
+            pierce--;
+            pierced.Add(enemy);
+            HitEnemy(enemy, point);
+            return false;
+        }
+        Impact(collider, point, enemy);
+        return true;
+    }
+
+    void Impact(Collider collider, Vector3 point, EnemyController enemy)
     {
         stuck = true;
         var trail = GetComponent<TrailRenderer>();
         if (trail != null) trail.emitting = false;
-        transform.position = hit.point - transform.forward * (Length - 0.18f);
+        transform.position = point - transform.forward * (Length - 0.18f);
 
-        var enemy = hit.collider.GetComponentInParent<EnemyController>();
-        if (enemy != null && !enemy.IsDead)
+        if (enemy != null)
         {
-            bool landed=HitEnemy(enemy, hit.point);
+            bool landed=HitEnemy(enemy, point);
             // stick to the nearest bone so the arrow moves with the body, not the upright root collider
             var visual=enemy.GetComponent<RevenantVisual>();
             if(!landed&&visual!=null)
@@ -136,30 +166,30 @@ public class Arrow : MonoBehaviour
                 Vector3 plane=hand.TransformPoint(visual.Form.left.position)+normal*.07f;float dot=Vector3.Dot(velocity.normalized,normal);
                 if(Mathf.Abs(dot)>.1f)
                 {
-                    float along=Vector3.Dot(plane-hit.point,normal)/dot;
-                    if(Mathf.Abs(along)<1)transform.position=hit.point+velocity.normalized*along-transform.forward*(Length-.18f);
+                    float along=Vector3.Dot(plane-point,normal)/dot;
+                    if(Mathf.Abs(along)<1)transform.position=point+velocity.normalized*along-transform.forward*(Length-.18f);
                 }
                 transform.SetParent(hand,true);
             }
-            else transform.SetParent(NearestBone(enemy, hit.point), true);
+            else transform.SetParent(NearestBone(enemy, point), true);
             stuckIn = enemy;
             stuckInEnemy = true;
             if (enemy.IsDead) BeginFall();
         }
         else
         {
-            if (hit.collider.TryGetComponent<ExplosiveBarrel>(out var barrel))
+            if (collider.TryGetComponent<ExplosiveBarrel>(out var barrel))
             {
                 barrel.Detonate();
                 Destroy(gameObject);
                 return;
             }
-            var totem=hit.collider.GetComponentInParent<HordeTotem>();
-            if(totem!=null)totem.ReceiveHit(damage,hit.point);
-            BurstSplinters(hit.point,null);
-            if (isFire) FX.Embers(hit.point, 8);
-            AudioManager.PlayAt("arrow_hit", hit.point, 0.8f);
-            FX.Dust(hit.point, 0.25f, 5);
+            var totem=collider.GetComponentInParent<HordeTotem>();
+            if(totem!=null)totem.ReceiveHit(damage,point);
+            BurstSplinters(point,null);
+            if (isFire) FX.Embers(point, 8);
+            AudioManager.PlayAt("arrow_hit", point, 0.8f);
+            FX.Dust(point, 0.25f, 5);
             BecomePickup();   // walk over it to get it back
         }
     }

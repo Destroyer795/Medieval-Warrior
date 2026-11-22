@@ -42,6 +42,7 @@ public class AutoPlayTest : MonoBehaviour
     {
         yield return new WaitForSecondsRealtime(3f);
         Expect(FindFirstObjectByType<MainMenuUI>() != null, "menu built");
+        Expect(Application.version == "1.2", "Windows player reports version 1.2");
 
         GameSettings.Mode = GameMode.DefendTheCastle;
         SceneManager.LoadScene("Semi-Final");
@@ -61,6 +62,18 @@ public class AutoPlayTest : MonoBehaviour
                 pc.CurrentWeapon == Weapon.Bow, "Defend opens on the fortified wall with the bow");
             if (outer != null)
             {
+                var gateLabel = FindObjectsByType<TMPro.TextMeshProUGUI>(FindObjectsSortMode.None)
+                    .FirstOrDefault(t => t.text.StartsWith("OUTER GATE"));
+                var objective = FindObjectsByType<TMPro.TextMeshProUGUI>(FindObjectsSortMode.None)
+                    .FirstOrDefault(t => t.text == gm.Objective);
+                bool Centered(TMPro.TextMeshProUGUI label)
+                {
+                    if (label == null) return false;
+                    var rect = label.rectTransform;
+                    var screen = RectTransformUtility.WorldToScreenPoint(null, rect.TransformPoint(rect.rect.center));
+                    return Mathf.Abs(screen.x - Screen.width * .5f) < 2f && !label.isTextOverflowing;
+                }
+                Expect(Centered(objective) && Centered(gateLabel), "siege title and integrity label share the screen centre without clipping");
                 var gallery = outer.Structure.World(9f, 6.25f, -.1f);
                 Expect(Mathf.Abs(pc.transform.position.y - gallery.y) < 1f &&
                     Physics.Raycast(gallery + Vector3.up * 1.2f, Vector3.down, 2f,
@@ -105,9 +118,32 @@ public class AutoPlayTest : MonoBehaviour
         Expect(gm != null && gm.Wave >= 1, "endless wave started");
         Expect(gm != null && gm.Outer == null && FindFirstObjectByType<ForegateStructure>() == null,
             "switching to Horde removes the siege frontage");
+        Expect(GameObject.Find("Wall (7)") != null && GameObject.Find("House (3)") != null &&
+            GameObject.Find("House (20)") != null && Terrain.activeTerrain != null &&
+            !Terrain.activeTerrain.terrainData.name.EndsWith("(Clone)"),
+            "switching modes restores the original curtain, village houses and terrain");
         Expect(gm != null && gm.Horde.Goblet != null, "wall goblet is present in the built Horde arena");
         Expect(gm != null && gm.GobletScoreMultiplier == 1, "Horde begins at ordinary kill score");
-        GameObject.FindWithTag("Player").GetComponent<PlayerHealth>().TakeDamage(9999f, null, 0f, true);
+        var defender = GameObject.FindWithTag("Player").GetComponent<PlayerHealth>();
+        defender.InvulnerableUntil = Time.time + 30f;
+        float waveDeadline = Time.realtimeSinceStartup + 25f;
+        while (gm.State == GameManager.MatchState.Playing && Time.realtimeSinceStartup < waveDeadline)
+        {
+            foreach (var enemy in EnemyController.All.ToArray())
+                if (enemy != null && !enemy.IsDead) enemy.TakeDamage(999f, Vector3.forward, 0f);
+            yield return null;
+        }
+        Expect(gm.State == GameManager.MatchState.Intermission && !gm.ChoosingBoon,
+            "the last kill leaves the player in the arena before the draft");
+        float clearedAt = Time.time;
+        yield return new WaitForSecondsRealtime(1.2f);
+        Expect(!gm.ChoosingBoon && gm.Wave == 1 && Time.timeScale > 0f, "the boon draft does not open early");
+        yield return new WaitForSecondsRealtime(1.25f);
+        Expect(gm.ChoosingBoon && gm.Wave == 1 && Time.time - clearedAt >= 1.9f,
+            "the boon draft opens after two seconds and holds the wave");
+        if (gm.ChoosingBoon) GameHUD.DebugPickBoon(0);
+        defender.InvulnerableUntil = 0f;
+        defender.TakeDamage(9999f, null, 0f, true);
         yield return new WaitForSecondsRealtime(4f);
         Expect(gm.State == GameManager.MatchState.Lost, "run ends on death");
         gm.QuitGame();

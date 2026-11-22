@@ -161,17 +161,17 @@ Defend starts at a match-owned outer gatehouse joined to the front curtain. The 
 
 The inner `KeepGate` follows the Keep prefab’s `Double Door Frame` in `Background`. Its melee approach, village deployments and artillery stations share a complete NavMesh path with the original village start. The exterior approach must cross the physical outer threshold and enter that connected area. A sample at the old siege road marker alone cannot validate that route.
 
-| Difficulty | Inner gate HP | Kill quota | Final assault begins |
-| --- | ---: | ---: | ---: |
-| Squire | 1,250 | 20 | 15 kills |
-| Knight | 1,000 | 30 | 23 kills |
-| Warlord | 850 | 45 | 34 kills |
+| Difficulty | Outer gate HP | Inner gate HP |
+| --- | ---: | ---: |
+| Squire | 580 | 1,250 |
+| Knight | 540 | 1,000 |
+| Warlord | 480 | 850 |
 
-Walkers and Brutes approach the doorway and deal structural damage on the contact frame of their attack. A weapon hit or a shield across their approach within three metres draws them onto the knight for 3.5 seconds. Runners seek the rear flank. Ordinary Swordsmen take a side approach. Spitters occupy open firing positions and lob bile onto the steps. The existing projectile leaves a damaging acid pool for 4.5 seconds. At 75% of the quota the Warlord, two Bulwarks and two Swordsmen enter together at the road. The guard shares the breachers’ orders.
+The outer assault starts in the field and grows over 125 seconds. A reinforcement column arrives at 90 seconds. If the outer gate breaks, the 100-second inner clock starts after the cinematic. Regular inner reinforcements use connected ground on the front of the Keep and the open frontage. At 68 seconds the Warlord joins with two Bulwarks and two Swordsmen. A reachable knight can draw the attack away from the gates. Spitters can still bombard the steps from their firing positions.
 
 `ExplosiveBarrel` positions come from the village lane survey in `Resources/Horde/Arena.json`. The search leaves clearance along intersecting routes. A sword stroke or arrow consumes the barrel once. Enemies within 5.5 metres and in line of sight take damage with distance falloff. Survivors stagger and move back along the NavMesh. Two `FireBrazier` components flank the approach. Within three metres, a draw picks up fire and keeps it through release. Each new draw checks its own position. A frontal shield stops the advance at contact, and the bash can displace several enemies in its forward cone.
 
-`GameHUD` shows gate integrity, flashes on impact, and marks the Keep from across the village. The warning clang and banner repeat at most once every six seconds during sustained damage. `AudioManager.GateImpact` plays the positional timber thud and hinge strain. The siege ends in defeat if the knight dies or the gate breaks. Victory requires the quota and a confirmed kill of this assault’s Warlord. The match adds `round(3000 × remaining HP / maximum HP)` before submitting the score and displaying the result.
+The HUD displays the current phase clock and gate integrity. The siege ends in defeat when the knight dies or the sanctuary gate breaks. Holding the outer gate through the final assault wins. After a breach, victory requires surviving the inner timer with the sanctuary intact. The match adds `round(3000 × remaining HP / maximum HP)` before submitting the score and displaying the result.
 
 `SiegeSmoke` exercises both loss conditions, connected routes, structural strikes, artillery, shield bracing and weapon interactions in Play Mode. The full smoke run also checks the final formation, the victory bonus and cleanup when switching modes. To run only the siege scenarios, create `Artifacts/SiegeReviewOnly.txt` in the test project before launching `SmokeTest.RunBatch`. Remove that marker to restore the full suite.
 

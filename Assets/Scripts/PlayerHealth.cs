@@ -130,7 +130,7 @@ public class PlayerHealth : MonoBehaviour
 
         Apply(amount);
 
-        if (knockback > 0f && body != null && attacker != null)
+        if (!isDead && knockback > 0f && body != null && attacker != null)
         {
             Vector3 push = transform.position - attacker.position; push.y = 0;
             body.AddForce(push.normalized * knockback + Vector3.up * knockback * 0.35f, ForceMode.VelocityChange);
@@ -199,20 +199,73 @@ public class PlayerHealth : MonoBehaviour
         if (controller != null) controller.enabled = false;
         if (body != null) { body.linearVelocity = Vector3.zero; body.isKinematic = true; }
         var anim = GetComponent<Animator>();
-        if (anim != null) { anim.SetBool("isMoving", false); anim.SetBool("isRunning", false); }
+        if (anim != null) anim.enabled = false;
         StartCoroutine(Fall());
     }
 
     IEnumerator Fall()
     {
-        // topple sideways, then hand over to the game-over screen
-        Quaternion start = transform.rotation, end = start * Quaternion.Euler(0, 0, 85f);
-        for (float t = 0; t < 1f; t += Time.deltaTime / 0.7f)
+        Vector3 start = transform.position;
+        Quaternion facing = transform.rotation;
+        Vector3 right = facing * Vector3.right;
+        Vector3 forward = facing * Vector3.forward;
+        var figure = GetComponent<MarchwardenVisual>();
+        var pose = new (Transform bone, Quaternion rest, Vector3 hinge, float bend, float finish)[]
         {
-            transform.rotation = Quaternion.Slerp(start, end, t * t);
+            Joint("Spine", right, 26f, 8f),
+            Joint("Head", right, 19f, -8f),
+            Joint("L Thigh", right, -42f, -10f),
+            Joint("R Thigh", right, -28f, 8f),
+            Joint("L Calf", right, 60f, 25f),
+            Joint("R Calf", right, 49f, 15f),
+            Joint("L UpperArm", forward, 24f, 31f),
+            Joint("R UpperArm", forward, -21f, -28f)
+        };
+        (Transform, Quaternion, Vector3, float, float) Joint(string name, Vector3 axis, float bend, float finish)
+        {
+            var joint = figure != null && figure.Body != null
+                ? Array.Find(figure.Body.bones, b => b != null && b.name == "Bip001 " + name) : null;
+            return joint == null ? default : (joint, joint.localRotation, joint.InverseTransformDirection(axis), bend, finish);
+        }
+
+        // Commit the knees before pitching forward. Keep the spine above the
+        // actual surface during the last part of the fall, including on ramps.
+        const float length = 1.05f;
+        bool landed = false;
+        for (float time = 0f; ; time = Mathf.Min(length, time + Time.deltaTime))
+        {
+            float buckle = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(.06f, .41f, time));
+            float fall = Mathf.InverseLerp(.34f, .87f, time);
+            fall *= fall;
+            float settle = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(.72f, length, time));
+            transform.rotation = facing * Quaternion.Euler(82f * fall, -8f * fall, -11f * buckle);
+            Vector3 point = start + forward * (.36f * fall) - Vector3.up * (.27f * buckle * (1f - fall));
+            if (fall > .25f)
+            {
+                Vector3 upperBody = point + forward * .68f;
+                foreach (var hit in Physics.RaycastAll(upperBody + Vector3.up * .85f, Vector3.down, 2.2f,
+                    ~0, QueryTriggerInteraction.Ignore))
+                {
+                    if (hit.transform.IsChildOf(transform) || hit.collider.GetComponentInParent<EnemyController>() != null ||
+                        hit.normal.y < .5f) continue;
+                    point.y = Mathf.Max(point.y, hit.point.y + .16f * fall);
+                }
+            }
+            transform.position = point;
+            foreach (var part in pose)
+                if (part.bone != null)
+                    part.bone.localRotation = part.rest * Quaternion.AngleAxis(
+                        Mathf.Lerp(part.bend * buckle, part.finish, settle), part.hinge);
+            if (!landed && time >= .84f)
+            {
+                landed = true;
+                FX.Dust(transform.position, .52f, 8);
+                FX.Shake(.24f);
+            }
+            if (time >= length) break;
             yield return null;
         }
-        yield return new WaitForSeconds(1.2f);
+        yield return new WaitForSeconds(.8f);
         if (GameManager.instance != null)
             GameManager.instance.GameOver();
     }

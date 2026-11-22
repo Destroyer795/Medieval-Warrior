@@ -50,13 +50,24 @@ public partial class SmokeTestDriver
         }
         try
         {
+            // The encounter may have brought a few ambient zombies into
+            // range before the first isolated hit. Measure only the duel.
+            foreach (var bystander in EnemyController.All.ToArray())
+                if (bystander != null && bystander != enemy)
+                {
+                    bystander.gameObject.SetActive(false);
+                    Destroy(bystander.gameObject);
+                }
+            var privateInstance = System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
+            typeof(GraveDuelist).GetMethod("InterruptAttack", privateInstance).Invoke(duelist, new object[] { .2f });
+            typeof(GraveDuelist).GetField("step", privateInstance).SetValue(duelist, 0);
             knight.InvulnerableUntil = 0;
             control.Equip(Weapon.Sword);
             AtRange(1.45f);
             float hp = knight.currentHealth;
             yield return Observe(() => knight.currentHealth < hp, 5f);
             Check(Mathf.Abs(hp - knight.currentHealth - Boons.SwordDamage) < .02f,
-                "an unguarded grave sword cut deals the knight's light sword damage");
+                $"an unguarded grave sword cut deals the knight's light sword damage ({hp - knight.currentHealth:F2})");
 
             control.DebugBlock(true);
             hp = knight.currentHealth;

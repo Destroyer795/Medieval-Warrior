@@ -85,6 +85,7 @@ public class KnightGear : MonoBehaviour
         }
         swordProp = Make("Sheathed Sword", asset.sword);
         shieldProp = Make("Slung Shield", asset.shield);
+        ShieldHeraldry.Attach(shieldProp, asset.shield);
         float scale=Mathf.Abs(transform.lossyScale.x);
         swordLength = asset.sword.bounds.size.x*scale;
         shieldHeight = asset.shield.bounds.size.x*scale;

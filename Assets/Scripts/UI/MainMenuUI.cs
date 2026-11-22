@@ -77,7 +77,7 @@ public class MainMenuUI : MonoBehaviour
 
         var records = UIKit.Text(rt, RecordsLine(), 24, new Color(1, 1, 1, 0.75f), TextAlignmentOptions.BottomLeft);
         records.rectTransform.Place(new Vector2(0, 0), new Vector2(0, 0), new Vector2(130, 40), new Vector2(1400, 40));
-        var credit = UIKit.Text(rt, "v1.0", 20, new Color(1, 1, 1, 0.5f), TextAlignmentOptions.BottomRight);
+        var credit = UIKit.Text(rt, $"v{Application.version}", 20, new Color(1, 1, 1, 0.5f), TextAlignmentOptions.BottomRight);
         credit.rectTransform.Place(new Vector2(1, 0), new Vector2(1, 0), new Vector2(-30, 24), new Vector2(400, 30));
     }
 
@@ -170,7 +170,7 @@ public class MainMenuUI : MonoBehaviour
         UIKit.InputField(list.transform, "Hero name", GameSettings.HeroName, v => GameSettings.HeroName = v);
         SharedPanels.Section(list.transform, "Heraldry");
         var tabard = UIKit.Selector(list.transform, "Tabard & shield", Names(GameSettings.TabardColors), GameSettings.Tabard, i => { GameSettings.Tabard = i; Refresh(); }, i => GameSettings.TabardColors[i].color);
-        var crest = UIKit.Selector(list.transform, "Crest", GameSettings.Crests, GameSettings.Crest, i => GameSettings.Crest = i);
+        var crest = UIKit.Selector(list.transform, "Crest", GameSettings.Crests, GameSettings.Crest, i => { GameSettings.Crest = i; Refresh(); });
         SharedPanels.Section(list.transform, "Armour");
         var metal = UIKit.Selector(list.transform, "Metal", Names(GameSettings.MetalTints), GameSettings.Metal, i => { GameSettings.Metal = i; Refresh(); }, i => GameSettings.MetalTints[i].tint * 0.7f);
         var leather = UIKit.Selector(list.transform, "Leather", Names(GameSettings.LeatherTints), GameSettings.Leather, i => { GameSettings.Leather = i; Refresh(); }, i => GameSettings.LeatherTints[i].tint * new Color(0.45f, 0.3f, 0.2f));
@@ -277,7 +277,7 @@ public class MainMenuUI : MonoBehaviour
         creditsPage = SharedPanels.Page(root, "Credits Page", new Vector2(1100, 860), "Credits");
         var t = UIKit.Text(creditsPage.transform,
             "<color=#F5CB73>MEDIEVAL WARRIOR</color>\n" +
-            "A game by the Medieval Warrior team\n\n" +
+            "Developed by S Sanjeev Srinivas and Pranav Kishan T Y\n\n" +
             "<color=#F5CB73>Art</color>\n" +
             "Medieval Castle - Advance Studios\n" +
             "Marchwarden warrior & equipment - original project art\n" +

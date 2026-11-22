@@ -9,48 +9,76 @@ public sealed class HordeGoblet : MonoBehaviour
     public Vector3 Approach { get; private set; }
     public bool InReach(Vector3 point) => Vector3.Distance(point, Approach) < 2.2f && Vector3.Distance(point + Vector3.up, Target) < 3f;
 
-    internal static bool TryFindSite(Vector3 player, out Site site)
+    internal static bool TryFindSite(Vector3 openingSpawn, out Site site)
     {
         site = default;
-        if (!NavMesh.SamplePosition(player, out var start, 5f, NavMesh.AllAreas)) return false;
+        if (!NavMesh.SamplePosition(openingSpawn, out var start, 5f, NavMesh.AllAreas)) return false;
+        var keep = GameObject.Find("Castle/Castle")?.transform;
         var path = new NavMeshPath();
         float nearest = float.PositiveInfinity;
-        foreach (var wall in FindObjectsByType<MeshCollider>(FindObjectsSortMode.None))
+        Vector3 towardKeep = keep != null
+            ? Vector3.ProjectOnPlane(keep.position - start.position, Vector3.up).normalized
+            : Vector3.forward;
+        if (towardKeep == Vector3.zero) towardKeep = Vector3.forward;
+
+        // Sample the walkable village around the opening spawn. The closest
+        // usable vertical stone face must belong to the keep itself.
+        if (keep != null)
         {
-            if (!wall.name.StartsWith("Wall", System.StringComparison.OrdinalIgnoreCase)) continue;
-            var center = wall.bounds.center;
-            center.y = Mathf.Clamp(player.y + 1.4f, wall.bounds.min.y + .1f, wall.bounds.max.y);
-            for (int i = 0; i < 8; i++)
+            for (float radius = 3.5f; radius <= 24f; radius += 1.25f)
+            for (int angle = -180; angle < 180; angle += 12)
             {
-                var outward = Quaternion.Euler(0, 45 * i, 0) * Vector3.forward;
-                var probe = center + outward * (wall.bounds.extents.magnitude + 3);
-                if (!wall.Raycast(new Ray(probe, -outward), out var face, Vector3.Distance(probe, center) + 1)) continue;
-                if (Mathf.Abs(face.normal.y) > .25f) continue;
-                var normal = Vector3.ProjectOnPlane(face.normal, Vector3.up).normalized;
-                if (!NavMesh.SamplePosition(face.point + normal * 1.8f, out var floor, 6, NavMesh.AllAreas)) continue;
+                var offset = Quaternion.Euler(0, angle, 0) * towardKeep * radius;
+                if (!NavMesh.SamplePosition(start.position + offset, out var floor, 2f, NavMesh.AllAreas)) continue;
+                if (Mathf.Abs(floor.position.y - start.position.y) > 2f) continue;
                 var front = floor.position + Vector3.up * 1.25f;
-                if (!Physics.Raycast(front, -normal, out var surface, 2.65f, ~0, QueryTriggerInteraction.Ignore) || surface.collider != wall) continue;
-                if (Vector3.Distance(player, floor.position) >= nearest) continue;
-                if (!NavMesh.CalculatePath(start.position, floor.position, NavMesh.AllAreas, path) || path.status != NavMeshPathStatus.PathComplete) continue;
-                nearest = Vector3.Distance(player, floor.position);
-                site = new Site { wall = wall, back = surface.point, approach = floor.position, normal = normal };
+                var inward = Vector3.ProjectOnPlane(keep.position - front, Vector3.up).normalized;
+                if (!Physics.Raycast(front, inward, out var surface, 2.6f, ~0, QueryTriggerInteraction.Ignore) ||
+                    (surface.transform != keep && !surface.transform.IsChildOf(keep)) ||
+                    surface.distance < 1f || Mathf.Abs(surface.normal.y) > .25f) continue;
+                float distance = WalkDistance(start.position, floor.position, path);
+                if (distance > 28f || distance >= nearest) continue;
+                nearest = distance;
+                site = new Site
+                {
+                    wall = surface.collider,
+                    back = surface.point,
+                    approach = floor.position,
+                    normal = Vector3.ProjectOnPlane(surface.normal, Vector3.up).normalized
+                };
             }
+            if (site.wall != null) return true;
         }
-        if (site.wall != null) return true;
-        // On a bake that leaves a gap at the masonry, use a freestanding plinth
-        // on the village side of the outer road gate.
-        var gate = GameObject.Find("Environment/Siege Road Gate");
-        if (gate == null) return false;
-        for (int radius = 2; radius <= 12; radius += 2)
-        for (int angle = 0; angle < 360; angle += 30)
+
+        // A bake without ground tight to the keep gets a freestanding plinth
+        // in the opening courtyard, within a short walk of the same spawn.
+        for (int radius = 5; radius <= 11; radius += 2)
+        for (int angle = 0; angle <= 180; angle += 30)
+        for (int side = -1; side <= 1; side += 2)
         {
-            var direction = Quaternion.Euler(0, angle, 0) * Vector3.forward;
-            if (!NavMesh.SamplePosition(gate.transform.position + direction * radius, out var position, 4, NavMesh.AllAreas)) continue;
-            if (!NavMesh.CalculatePath(start.position, position.position, NavMesh.AllAreas, path) || path.status != NavMeshPathStatus.PathComplete) continue;
-            site = new Site { approach = position.position, normal = direction, back = position.position + Vector3.up * 1.25f };
+            var direction = Quaternion.Euler(0, angle * side, 0) * towardKeep;
+            if (!NavMesh.SamplePosition(start.position + direction * radius, out var floor, 1.6f, NavMesh.AllAreas) ||
+                Mathf.Abs(floor.position.y - start.position.y) > 2f ||
+                WalkDistance(start.position, floor.position, path) > 14f) continue;
+            var back = floor.position + Vector3.up * 1.25f;
+            if (Physics.CheckSphere(back, .65f, ~0, QueryTriggerInteraction.Ignore)) continue;
+            site = new Site { approach = floor.position, normal = -direction, back = back };
             return true;
         }
         return false;
+    }
+
+    static float WalkDistance(Vector3 start, Vector3 end, NavMeshPath path)
+    {
+        if (!NavMesh.CalculatePath(start, end, NavMesh.AllAreas, path) ||
+            path.status != NavMeshPathStatus.PathComplete) return float.PositiveInfinity;
+        float distance = 0f;
+        foreach (var corner in path.corners)
+        {
+            distance += Vector3.Distance(start, corner);
+            start = corner;
+        }
+        return distance;
     }
 
     internal static HordeGoblet Create(Site site, Transform parent)
@@ -76,7 +104,7 @@ public sealed class HordeGoblet : MonoBehaviour
         }
         Part(PrimitiveType.Cube, "Stone corbel", new Vector3(0,-.40f,-.22f), new Vector3(.74f,.18f,.85f),stone);
         if (site.wall == null)
-            Part(PrimitiveType.Cylinder, "Gate plinth", new Vector3(0,-.85f,-.22f), new Vector3(.53f,.45f,.53f),stone);
+            Part(PrimitiveType.Cylinder, "Courtyard plinth", new Vector3(0,-.85f,-.22f), new Vector3(.53f,.45f,.53f),stone);
         Part(PrimitiveType.Cylinder, "Foot", Vector3.down*.28f,new Vector3(.33f,.035f,.33f),gold);
         Part(PrimitiveType.Cylinder, "Stem", Vector3.down*.16f,new Vector3(.11f,.11f,.11f),gold);
         Part(PrimitiveType.Sphere, "Green chalice", Vector3.zero,new Vector3(.42f,.32f,.42f),enamel);

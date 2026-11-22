@@ -124,8 +124,12 @@ public class CameraFollow : MonoBehaviour
             Vector2 look = GameInput.Look;
             currentYaw += look.x * sens;
             currentPitch -= look.y * sens * (GameSettings.InvertY ? -1f : 1f);
-            currentPitch = Mathf.Clamp(currentPitch, minPitch, maxPitch);
+
         }
+
+        var frontage = GameManager.instance?.Outer?.Structure;
+        float pitchLimit = frontage != null && frontage.IsOnParapet(target.position) ? 86f : maxPitch;
+        currentPitch = Mathf.Clamp(currentPitch, minPitch, pitchLimit);
 
         // ZOOM INPUT (Mouse Scroll)
         float scrollInput = paused ? 0f : GameInput.Zoom;

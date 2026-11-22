@@ -22,8 +22,9 @@ public class GameHUD : MonoBehaviour
     TextMeshProUGUI objectiveText, scoreText, comboText, lastStandStatus;
     RectTransform eventRoot,eventMarker;
     TextMeshProUGUI eventTitle,eventDetail,eventTarget;
-    Image objectiveIcon, comboBar, gateFill;
-    RectTransform gateRow;
+    Image objectiveIcon, objectiveFrame, comboBar, gateFill;
+    TextMeshProUGUI hordeTierLabel;
+    RectTransform gateRow, objectivePlaque;
     TextMeshProUGUI gateLabel;
     float gateWarningUntil;
     RectTransform bossRoot;
@@ -63,6 +64,8 @@ public class GameHUD : MonoBehaviour
             Time.time < instance.gateWarningUntil)) return;
         instance.bannerTitle.text = title;
         instance.bannerSub.text = subtitle;
+        instance.bannerTitle.color = instance.gm != null && instance.gm.Mode == GameMode.EndlessHorde
+            ? HordeDirector.Pressure(instance.gm.Wave).Accent : UIKit.Gold;
         instance.bannerSub.gameObject.SetActive(!string.IsNullOrEmpty(subtitle));
         instance.bannerDuration = instance.bannerTimer = duration;
         instance.bannerRoot.gameObject.SetActive(true);
@@ -253,6 +256,12 @@ public class GameHUD : MonoBehaviour
         if (playerHealth != null) playerHealth.Damaged += OnPlayerDamaged;
         EnemyController.Damaged += OnEnemyDamaged;
         if (gm != null) objectiveIcon.sprite = UIKit.Sprite("icon_" + (gm.Mode == GameMode.DefendTheCastle ? "swords" : gm.Mode == GameMode.EndlessHorde ? "horde" : "hourglass"));
+        if (gm != null && gm.Mode == GameMode.DefendTheCastle)
+        {
+            objectiveIcon.gameObject.SetActive(false);
+            objectiveText.rectTransform.Fill(8);
+            AlignSiegeObjective();
+        }
         if (gm != null && gm.Mode == GameMode.LastStand) bossRoot.anchoredPosition = new Vector2(0f, -144f);
     }
 
@@ -312,7 +321,8 @@ public class GameHUD : MonoBehaviour
 
     void BuildObjective()
     {
-        var plaque = UIKit.Img(combatRoot, "panel_iron", new Color(1, 1, 1, 0.95f), "Objective");
+        var plaque = objectiveFrame = UIKit.Img(combatRoot, "panel_iron", new Color(1, 1, 1, 0.95f), "Objective");
+        objectivePlaque = plaque.rectTransform;
         plaque.rectTransform.Place(new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(40, -20), new Vector2(560, 74));
         objectiveIcon = UIKit.Icon(plaque.transform, "swords", 50);
         objectiveIcon.rectTransform.Place(new Vector2(0, 0.5f), new Vector2(0, 0.5f), new Vector2(22, 0), new Vector2(50, 50));
@@ -321,6 +331,10 @@ public class GameHUD : MonoBehaviour
         lastStandStatus = UIKit.Text(plaque.transform, "", 21, UIKit.Parchment, TextAlignmentOptions.Center, true);
         lastStandStatus.rectTransform.Place(new Vector2(.5f, 0f), new Vector2(.5f, 1f), new Vector2(0f, 1f), new Vector2(720, 28));
         lastStandStatus.gameObject.SetActive(false);
+        hordeTierLabel = UIKit.Text(plaque.transform, "", 20, UIKit.Parchment, TextAlignmentOptions.Center, true);
+        hordeTierLabel.rectTransform.Place(new Vector2(.5f, 0f), new Vector2(.5f, 1f), new Vector2(0f, -1f), new Vector2(510, 30));
+        hordeTierLabel.outlineWidth = .16f;
+        hordeTierLabel.gameObject.SetActive(false);
         gateRow = UIKit.Img(plaque.transform, "bar_bg", Color.white, "Gate Integrity").rectTransform;
         gateRow.Place(new Vector2(.5f, 0), new Vector2(.5f, 1), Vector2.zero, new Vector2(500, 36));
         gateFill = BarFill(gateRow, Color.green);
@@ -471,8 +485,16 @@ public class GameHUD : MonoBehaviour
         var sub = UIKit.Text(endPage.transform, GameSettings.ModeName(gm.Mode) + "  ·  " + GameSettings.Difficulty, 28, UIKit.Parchment);
         sub.rectTransform.Place(new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0, -140), new Vector2(900, 40));
         if (gm.Gate != null)
-            sub.text = victory ? $"Keep held at {gm.Gate.Integrity:P0}   +{gm.GateBonus:N0} defense bonus" :
-                gm.Gate.Health <= 0 ? "The sanctuary gate was breached" : "The knight fell defending the Keep";
+        {
+            bool outerHeld = gm.Outer != null && !gm.Outer.Breached;
+            if (victory)
+            {
+                string defense = outerHeld ? $"Outer wall held at {gm.Outer.Integrity:P0}" : $"Keep held at {gm.Gate.Integrity:P0}";
+                sub.text = $"{defense}   +{gm.GateBonus:N0} defense bonus";
+            }
+            else sub.text = gm.Gate.Health <= 0 ? "The sanctuary gate was breached" :
+                outerHeld ? "The knight fell defending the outer wall" : "The knight fell defending the Keep";
+        }
         var score = UIKit.Text(endPage.transform, gm.Score.ToString("N0"), 76, UIKit.Gold, TextAlignmentOptions.Center, true);
         score.rectTransform.Place(new Vector2(0.5f, 1), new Vector2(0.5f, 1), new Vector2(0, -188), new Vector2(900, 90));
         var best = UIKit.Text(endPage.transform, gm.NewRecord ? "New record!" : "Best: " + GameSettings.HighScore(gm.Mode).ToString("N0"), 28, gm.NewRecord ? new Color(1f, 0.6f, 0.3f) : UIKit.GoldDim);
@@ -556,6 +578,12 @@ public class GameHUD : MonoBehaviour
         {
             combatGroup.alpha = gm.Outer.Cinematic ? 0f : 1f;
         }
+        else if (gm != null && gm.Mode == GameMode.EndlessHorde)
+        {
+            bool reveal = gm.HordeGrave != null && gm.HordeGrave.Revealing;
+            combatGroup.alpha = Mathf.MoveTowards(combatGroup.alpha,
+                reveal || gm.ChoosingBoon ? 0f : 1f, dt / .22f);
+        }
 
         if (playerHealth != null)
         {
@@ -599,6 +627,15 @@ public class GameHUD : MonoBehaviour
         if (gm != null)
         {
             objectiveText.text = gm.Objective;
+            if (gm.Mode == GameMode.EndlessHorde)
+            {
+                var tier = HordeDirector.Pressure(gm.Wave);
+                hordeTierLabel.gameObject.SetActive(true);
+                hordeTierLabel.text = tier.Name;
+                hordeTierLabel.color = tier.Accent;
+                objectiveFrame.color = Color.Lerp(Color.white, tier.Accent, .58f);
+                bossRoot.anchoredPosition = new Vector2(40f, -136f);
+            }
             var gate = gm.Gate;
             gateRow.gameObject.SetActive(gate != null);
             if (gate != null)
@@ -611,18 +648,30 @@ public class GameHUD : MonoBehaviour
                 gateFill.fillAmount = hp;
                 gateFill.color = Color.Lerp(condition, Color.white, Mathf.Clamp01(1 - (Time.time - gate.LastImpact) * 3));
                 gateLabel.text = $"{(defendingWall ? "OUTER GATE" : "KEEP GATE")}   {Mathf.CeilToInt(hp * 100)}%";
-                bossRoot.anchoredPosition = new Vector2(0, -143);
+                AlignSiegeObjective();
             }
             scoreText.text = gm.Score.ToString("N0");
             scoreText.transform.localScale = Vector3.Lerp(scoreText.transform.localScale, Vector3.one, 1f - Mathf.Exp(-8f * dt));
             comboText.text = gm.Combo >= 2 ? $"{gm.Combo} kill streak  x{gm.ComboMultiplier}" : "";
             comboBar.fillAmount = gm.Combo >= 2 ? gm.ComboTimeLeft / Boons.ComboWindow : 0f;
             var boss = gm.Boss;
+            var revenant = gm.HordeGraveActive ? gm.HordeGrave.Duelist : null;
+            if (revenant != null) boss = revenant.GetComponent<EnemyController>();
+            else if (gm.Mode == GameMode.EndlessHorde && (boss == null || boss.IsDead))
+            {
+                foreach (var contender in EnemyController.All)
+                {
+                    if (contender == null || contender.IsDead || !contender.isBoss) continue;
+                    boss = contender;
+                    break;
+                }
+            }
             bool showBoss = boss != null && !boss.IsDead;
             bossRoot.gameObject.SetActive(showBoss);
             if (showBoss)
             {
-                bossName.text = boss.Stats.name == "Warlord" ? "The Warlord" : boss.Stats.name + " Champion";
+                bossName.text = revenant != null ? "Your Revenant" :
+                    boss.Stats.name == "Warlord" ? "The Warlord" : boss.Stats.name + " Champion";
                 bossFill.fillAmount = Mathf.Lerp(bossFill.fillAmount, boss.HealthFraction, 1f - Mathf.Exp(-8f * dt));
             }
         }
@@ -655,13 +704,17 @@ public class GameHUD : MonoBehaviour
         if (gm != null && gm.Mode == GameMode.EndlessHorde && gm.State == GameManager.MatchState.Playing && !gm.ChoosingBoon)
         {
             var horde = gm.Horde;
-            if (horde.GobletActive || horde.Goblet != null)
+            if (horde.GobletActive)
             {
-                hintText.alpha = 1;
-                if (horde.GobletActive) hintText.text = "Goblet active   ·   Double spawn rate, movement and kill score";
-                else if (horde.CanClaimGoblet) hintText.text = "<size=125%><b>" + (GameInput.UsingGamepad ? "X / Square" : "F") + "   Drink from the goblet</b></size>   ·   2× spawns, speed and kill score this wave";
-                else if (!gm.ReinforcementsPending) hintText.text = "Goblet seals until the next wave";
-                else hintText.text = "Castle wall goblet   ·   Double danger for double kill score";
+                hintText.alpha = 1f;
+                hintText.text = "Goblet active   ·   Double spawn rate, movement and kill score";
+            }
+            else if (horde.Goblet != null && player != null && horde.Goblet.InReach(player.transform.position))
+            {
+                hintText.alpha = 1f;
+                hintText.text = horde.CanClaimGoblet ?
+                    $"<size=125%><b>{(GameInput.UsingGamepad ? "X / Square" : "F")}   Drink from the goblet</b></size>   ·   2× spawns, speed and kill score this wave" :
+                    "The goblet reopens next wave";
             }
         }
 
@@ -710,7 +763,7 @@ public class GameHUD : MonoBehaviour
         {
             if (director != null && director.Goblet != null && gm.ReinforcementsPending &&
                 gm.State == GameManager.MatchState.Playing && !gm.IsPaused && !gm.ChoosingBoon && !director.CanClaimGoblet)
-                ShowObjectiveMarker(director.Goblet.Target, "WALL GOBLET", HordeGoblet.Tint);
+                ShowObjectiveMarker(director.Goblet.Target, "VERDANT GOBLET", HordeGoblet.Tint);
             return;
         }
         eventTitle.text=director.Title;eventTitle.color=director.EventColor;eventDetail.text=director.Objective;
@@ -721,6 +774,16 @@ public class GameHUD : MonoBehaviour
         ShowObjectiveMarker(target, label, director.EventColor);
     }
 
+    void AlignSiegeObjective()
+    {
+        // The health frame ends 642 reference pixels from the left. Stack
+        // the objective below it when the centred plaque would intersect it.
+        float leftEdge = (combatRoot.rect.width - objectivePlaque.rect.width) * .5f;
+        float top = leftEdge < 654f ? -166f : -20f;
+        objectivePlaque.anchoredPosition = new Vector2(0f, top);
+        bossRoot.anchoredPosition = new Vector2(0f, top - objectivePlaque.rect.height - gateRow.rect.height - 12f);
+    }
+
     void ShowObjectiveMarker(Vector3 target, string label, Color color)
     {
         if(cam==null||player==null)return;
@@ -728,7 +791,8 @@ public class GameHUD : MonoBehaviour
         if(viewport.z<0){viewport.x=1-viewport.x;viewport.y=1-viewport.y;}
         Vector2 point=new Vector2((viewport.x-.5f)*root.rect.width,(viewport.y-.5f)*root.rect.height);
         point.x=Mathf.Clamp(point.x,-root.rect.width*.5f+150,root.rect.width*.5f-150);
-        point.y=Mathf.Clamp(point.y,-root.rect.height*.5f+130,root.rect.height*.5f-225);
+        float upperMargin = gm != null && gm.Mode == GameMode.EndlessHorde && bossRoot.gameObject.activeSelf ? 290f : 225f;
+        point.y=Mathf.Clamp(point.y,-root.rect.height*.5f+130,root.rect.height*.5f-upperMargin);
         eventMarker.anchorMin=eventMarker.anchorMax=eventMarker.pivot=new Vector2(.5f,.5f);eventMarker.anchoredPosition=point;
         eventTarget.text=$"◆ {label}\n{Mathf.RoundToInt(Vector3.Distance(player.transform.position,target))} m";
         eventTarget.color=color;eventMarker.gameObject.SetActive(true);

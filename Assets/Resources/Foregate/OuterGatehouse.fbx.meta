@@ -7,6 +7,11 @@ ModelImporter:
   - first:
       type: UnityEngine:Material
       assembly: UnityEngine.CoreModule
+      name: Foregate dressed stone and timber
+    second: {fileID: 2100000, guid: e57f9ca0006c4d4eb8a1118acdc9232a, type: 2}
+  - first:
+      type: UnityEngine:Material
+      assembly: UnityEngine.CoreModule
       name: Castle fabric
     second: {fileID: 2100000, guid: e7f84bc2b51379647b1038a08eff51b2, type: 2}
   - first:

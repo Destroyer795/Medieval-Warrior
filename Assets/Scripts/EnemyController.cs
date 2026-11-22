@@ -81,6 +81,10 @@ public class EnemyController : MonoBehaviour
     float runnerBurst=1.5f,runnerWithdrawUntil;
     int runnerEvadedSwing=-1;
     NavMeshPath runnerPath;
+    OuterSiege outerOrder;
+    int outerLane;
+    float marchSpeed;
+    int outerStage;
     internal bool SiegeEscort { get; set; }
     float divertedUntil;
     Vector3 repelVelocity;
@@ -257,6 +261,7 @@ public class EnemyController : MonoBehaviour
 
         if (state == State.Emerging) { UpdateEmerging(); return; }
         UpdateVoice();
+        if (outerOrder != null) { MarchOuter(); return; }
         if (player == null || navAgent == null || !navAgent.enabled || !navAgent.isOnNavMesh) return;
         if (playerHealth != null && playerHealth.IsDead) { Idle(); return; }
 
@@ -294,6 +299,67 @@ public class EnemyController : MonoBehaviour
             case State.Kite: UpdateKite(); break;
             case State.Fuse: UpdateFuse(); break;
             case State.Charge: UpdateCharge(); break;
+        }
+    }
+
+    internal void SetOuterOrder(OuterSiege outer, Vector3 start, int lane)
+    {
+        navAgent.enabled = false;
+        transform.SetPositionAndRotation(start, Quaternion.LookRotation(-outer.Structure.Outward));
+        outerOrder = outer;
+        outerLane = lane;
+    }
+
+    // The approach crosses terrain outside the baked town navigation island.
+    // Walk every metre to a connected interior point before handing back to the agent.
+    void MarchOuter()
+    {
+        marchSpeed = 0;
+        if (Time.deltaTime <= 0 || GameManager.instance.State != GameManager.MatchState.Playing || Health <= 0) return;
+        if (IsStaggered) return;
+        if (state == State.Staggered) SetState(State.Hunt);
+        if (state == State.Attack && !outerOrder.Breached)
+        {
+            stateTimer += Time.deltaTime * AttackSpeed;
+            if (!hitDealt && stateTimer >= Stats.windup)
+            {
+                hitDealt = true;
+                outerOrder.TakeDamage(damage);
+            }
+            if (stateTimer >= Stats.windup + .45f)
+            {
+                attackTimer = Time.time + Mathf.Min(2, timeBetweenAttacks);
+                SetState(State.Hunt);
+            }
+            return;
+        }
+        if (state == State.Attack) SetState(State.Hunt);
+        bool rush = outerOrder.Breached;
+        if (rush && !outerOrder.PassageClear) return;
+        Vector3 station = outerOrder.MarchPoint(this, outerLane, rush ? outerStage : -1);
+        Vector3 delta = Flat(station - transform.position);
+        if (delta.sqrMagnitude > .025f)
+        {
+            FaceTowards(station, 11);
+            marchSpeed = rush ? Mathf.Max(5.8f, baseSpeed) : baseSpeed;
+            Vector3 next = transform.position + Vector3.ClampMagnitude(delta, marchSpeed * Time.deltaTime);
+            next.y = outerOrder.GroundHeight(next);
+            transform.position = next;
+            return;
+        }
+        if (!rush)
+        {
+            FaceTowards(transform.position - outerOrder.Structure.Outward, 10);
+            if (Time.time >= attackTimer && outerOrder.AtFront(this, outerLane)) BeginAttackMotion(State.Attack);
+        }
+        else if (outerStage < 2) outerStage++;
+        else
+        {
+            transform.position = station;
+            navAgent.enabled = true;
+            if (!navAgent.Warp(station)) { navAgent.enabled = false; return; }
+            outerOrder = null;
+            SetState(type == ZombieType.Spitter ? State.Kite : State.Hunt);
         }
     }
 
@@ -752,7 +818,7 @@ public class EnemyController : MonoBehaviour
     void UpdateAnimator()
     {
         if (animator == null) return;
-        float v = navAgent != null && navAgent.enabled ? navAgent.velocity.magnitude : 0f;
+        float v = outerOrder != null ? marchSpeed : navAgent != null && navAgent.enabled ? navAgent.velocity.magnitude : 0f;
         if (state == State.Attack || state == State.Fuse) v = 0f;
         if (state == State.Charge) v = stateTimer >= chargeWindup ? ChargeSpeed : 0f;
         float localSpeed=v/Mathf.Max(.5f,transform.localScale.y);

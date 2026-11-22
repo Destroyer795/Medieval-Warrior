@@ -67,6 +67,7 @@ public class KnightGear : MonoBehaviour
         replacement = GetComponent<MarchwardenVisual>();
         try { if (replacement != null) SetupReplacement(); else Analyse(); }
         catch (System.Exception e) { Report = "analysis failed: " + e.Message; Ready = false; }
+        if (owner != null) SetStowed(owner.CurrentWeapon == Weapon.Bow);
         Debug.Log("[KnightGear] " + Report);
     }
 

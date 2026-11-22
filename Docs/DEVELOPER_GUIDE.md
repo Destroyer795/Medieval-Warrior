@@ -157,9 +157,11 @@ settings without overwriting the next scene's menu lighting.
 
 ### Defend the Castle
 
-The match owns a `KeepGate` and its defenses from the beginning of play until scene unload. The physical doors follow the Keep prefab’s `Double Door Frame` in `Background`. `EnvironmentBuilder` places the `Environment/Siege Road Gate` marker at the outer wall opening used by the first road. The gate samples the connected side of that passage for the assault formation. Its melee approach, village deployments and artillery stations must all share a complete NavMesh path with the knight’s starting position.
+Defend starts at a match-owned outer gatehouse joined to the front curtain. The wall walk has a resupply station at each end and a stone cradle at the central opening. Both staircases descend behind the doors. The outer structure owns its swinging leaves and stays in place after the breach. A one-second shot frames the entering horde and returns the player to their current position.
 
-| Difficulty | Gate HP | Kill quota | Final assault begins |
+The inner `KeepGate` follows the Keep prefab’s `Double Door Frame` in `Background`. Its melee approach, village deployments and artillery stations share a complete NavMesh path with the original village start. The exterior approach must cross the physical outer threshold and enter that connected area. A sample at the old siege road marker alone cannot validate that route.
+
+| Difficulty | Inner gate HP | Kill quota | Final assault begins |
 | --- | ---: | ---: | ---: |
 | Squire | 1,250 | 20 | 15 kills |
 | Knight | 1,000 | 30 | 23 kills |

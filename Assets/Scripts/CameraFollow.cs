@@ -49,6 +49,21 @@ public class CameraFollow : MonoBehaviour
     Vector3 graveFocus, graveEye;
     float graveBlend, graveFov;
 
+    bool siegeShot;
+    Vector3 siegeFocus, siegeEye;
+    internal void FrameSiege(Vector3 focus, Vector3 eye)
+    {
+        siegeShot = true;
+        siegeFocus = focus;
+        siegeEye = eye;
+    }
+
+    internal void EndSiegeShot()
+    {
+        siegeShot = false;
+        if (cam != null) cam.fieldOfView = GameSettings.FieldOfView;
+    }
+
     internal void FrameGrave(Vector3 focus, Vector3 eye, float blend, float fieldOfView)
     {
         FramingGrave = true;
@@ -97,7 +112,7 @@ public class CameraFollow : MonoBehaviour
 
     void Update()
     {
-        if (target == null || FramingGrave) return;
+        if (target == null || FramingGrave || siegeShot) return;
         bool paused = Time.timeScale < 0.01f&&!CombatTime.IsHitStopped;
         if (paused) return;
         float dt = Mathf.Min(Time.unscaledDeltaTime, 0.05f);
@@ -133,6 +148,12 @@ public class CameraFollow : MonoBehaviour
 
     void LateUpdate()
     {
+        if (siegeShot)
+        {
+            transform.SetPositionAndRotation(siegeEye, Quaternion.LookRotation(siegeFocus - siegeEye));
+            if (cam != null) cam.fieldOfView = 64;
+            return;
+        }
         if(target==null||Time.timeScale<.01f&&!CombatTime.IsHitStopped)return;
         float dt=Mathf.Min(Time.unscaledDeltaTime,.05f),e=aimBlend*aimBlend*(3-2*aimBlend);
         float pitch = Mathf.Lerp(orbitPitch, 6f, DawnView * .8f);

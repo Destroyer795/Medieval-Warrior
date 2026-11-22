@@ -76,6 +76,11 @@ public static class GameInput
     public static bool SwapDown => Key(Input.GetKeyDown(KeyCode.Q)) || PadPressed(p => p.buttonNorth);
     public static bool SwordDown => Key(Input.GetKeyDown(KeyCode.Alpha1)) || PadPressed(p => p.dpad.left);
     public static bool BowDown => Key(Input.GetKeyDown(KeyCode.Alpha2)) || PadPressed(p => p.dpad.right);
+    public static bool SiegeUseDown => Key(Input.GetKeyDown(KeyCode.R))
+#if ENABLE_INPUT_SYSTEM
+        || PadPressed(p => p.buttonEast)
+#endif
+        ;
     public static bool DrinkDown => Key(Input.GetKeyDown(KeyCode.F)) || PadPressed(p => p.buttonWest);
     public static bool PauseDown => Key(Input.GetKeyDown(KeyCode.Escape) || Input.GetKeyDown(KeyCode.P)) || PadPressed(p => p.startButton);
     public static int BoonChoiceDown=>Input.GetKeyDown(KeyCode.Alpha1)?0:Input.GetKeyDown(KeyCode.Alpha2)?1:Input.GetKeyDown(KeyCode.Alpha3)?2:-1;

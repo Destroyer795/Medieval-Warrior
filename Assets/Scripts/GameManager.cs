@@ -54,6 +54,7 @@ public class GameManager : MonoBehaviour
     public float IntermissionLeft { get; private set; }
     public float MatchTime { get; private set; }
     public EnemyController Boss { get; private set; }
+    public OuterSiege Outer { get; private set; }
     public KeepGate Gate { get; private set; }
     public int GateBonus { get; private set; }
     bool warlordSlain;
@@ -202,20 +203,6 @@ public class GameManager : MonoBehaviour
         LockCursor(true);
         CombatTime.SetScale(1f);
         State = MatchState.Intro;
-        introTimer = 3.5f;
-        GameHUD.Banner(GameSettings.ModeName(Mode), IntroLine(), 3.2f);
-        AudioManager.Play2D("wave_horn", 0.8f);
-    }
-
-    string IntroLine() => Mode switch
-    {
-        GameMode.DefendTheCastle => "Hold the sanctuary gate. Break the assault and slay its Warlord.",
-        GameMode.EndlessHorde => "Survive as many waves as you can",
-        _ => "The gates have fallen. Fall back to the courtyard as corruption closes in.",
-    };
-
-    void BeginPlay()
-    {
         if (Mode == GameMode.DefendTheCastle)
         {
             Gate = playerHealth != null ? KeepGate.Create(this, playerHealth.transform.position) : null;
@@ -225,12 +212,33 @@ public class GameManager : MonoBehaviour
                 GameOver();
                 return;
             }
+            Outer = OuterSiege.Create(this, playerHealth);
+            if (Outer == null)
+            {
+                Debug.LogError("Siege setup failed: missing Foregate/OuterGatehouse resource.");
+                GameOver();
+                return;
+            }
         }
+        introTimer = 3.5f;
+        GameHUD.Banner(GameSettings.ModeName(Mode), IntroLine(), 3.2f);
+        AudioManager.Play2D("wave_horn", 0.8f);
+    }
+
+    string IntroLine() => Mode switch
+    {
+        GameMode.DefendTheCastle => "Hold the outer wall with bow and falling stone. Protect the Keep.",
+        GameMode.EndlessHorde => "Survive as many waves as you can",
+        _ => "The gates have fallen. Fall back to the courtyard as corruption closes in.",
+    };
+
+    void BeginPlay()
+    {
         if (Mode == GameMode.EndlessHorde) StartWave(1);
         else
         {
             State = MatchState.Playing;
-            for (int i = 0; i < 3; i++) Spawn(ZombieType.Walker);   // the first few are already shambling in
+            for (int i = 0; i < (Outer != null ? 5 : 3); i++) Spawn(ZombieType.Walker);   // the first few are already shambling in
         }
         spawnTimer = 1f;
         nextBruteTime = 70f;
@@ -248,7 +256,8 @@ public class GameManager : MonoBehaviour
             case GameMode.DefendTheCastle:
             {
                 float progress = Mathf.Clamp01(currentKills / (float)targetKills);
-                int cap = Mathf.RoundToInt(Mathf.Lerp(4, p.maxAlive, progress));
+                if (Outer != null && Outer.Cinematic) return;
+                int cap = Mathf.RoundToInt(Mathf.Lerp(Outer != null && !Outer.Breached ? 8 : 4, p.maxAlive, progress));
                 if (!warlordSpawned && progress >= 0.75f)
                 {
                     LaunchFinalAssault();
@@ -384,7 +393,7 @@ public class GameManager : MonoBehaviour
 
     void CheckBoonMilestones()
     {
-        if (ChoosingBoon || gameEnded || (LastStand != null && LastStand.GraveActive) ||
+        if (ChoosingBoon || gameEnded || (Outer != null && Outer.Cinematic) || (LastStand != null && LastStand.GraveActive) ||
             (playerHealth != null && playerHealth.IsDead)) return;
         if (Mode == GameMode.DefendTheCastle)
         {
@@ -502,17 +511,14 @@ public class GameManager : MonoBehaviour
     {
         var spawner = ZombieSpawner.Instance;
         if (spawner == null) return;
-        Boss = spawner.SpawnAt(ZombieType.Warlord, true, Gate.Road, Gate.Approach);
+        Boss = Outer.Deploy(spawner, ZombieType.Warlord, true);
         if (Boss == null) return;
         warlordSpawned = true;
         Boss.SiegeEscort = true;
-        Vector3 march = Vector3.ProjectOnPlane(Gate.Approach - Gate.Road, Vector3.up).normalized;
-        Vector3 side = Vector3.Cross(Vector3.up, march);
         for (int i = 0; i < 4; i++)
         {
-            Vector3 slot = Gate.Road + side * (i % 2 == 0 ? -1.25f : 1.25f) + march * (i < 2 ? 1.8f : -1.8f);
-            if (!Gate.TryReach(Gate.Road, slot, 2f, out var station)) station = Gate.Road;
-            var guard = spawner.SpawnAt(i < 2 ? ZombieType.Bulwark : ZombieType.Swordsman, false, station, Gate.Approach);
+            var type = i < 2 ? ZombieType.Bulwark : ZombieType.Swordsman;
+            var guard = Outer.Deploy(spawner, type, false);
             if (guard != null) guard.SiegeEscort = true;
         }
         ThreatStinger(ZombieType.Warlord);
@@ -637,7 +643,8 @@ public class GameManager : MonoBehaviour
 
     public string Objective => Mode switch
     {
-        GameMode.DefendTheCastle => $"Defend the Castle   {Mathf.Min(currentKills, targetKills)} / {targetKills}",
+        GameMode.DefendTheCastle when Outer != null && !Outer.Breached => $"Hold the Outer Wall   {Mathf.Min(currentKills, targetKills)} / {targetKills}",
+        GameMode.DefendTheCastle => $"Defend the Keep   {Mathf.Min(currentKills, targetKills)} / {targetKills}",
         GameMode.EndlessHorde => State == MatchState.Intermission ? $"Next wave in {Mathf.CeilToInt(IntermissionLeft)}" : $"Wave {Wave}  -  {WaveRemaining} remain",
         _ => $"Dawn in {Mathf.CeilToInt(TimeLeft) / 60}:{Mathf.CeilToInt(TimeLeft) % 60:00}",
     };
@@ -656,6 +663,7 @@ public class GameManager : MonoBehaviour
         if (gameEnded) return;
         bool dawnVictory = State == MatchState.Dawn;
         gameEnded = true;
+        if (Outer != null) Outer.EndCinematic();
         if(Horde!=null)Horde.ClearWave();
         State = victory ? MatchState.Won : MatchState.Lost;
         if (victory) Score += Mathf.RoundToInt(playerHealth != null ? playerHealth.currentHealth * 10f : 0f);

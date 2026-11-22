@@ -552,6 +552,10 @@ public class GameHUD : MonoBehaviour
             bool cinematic = gm.LastStand.RevealingGrave || gm.State == GameManager.MatchState.Dawn || gm.State == GameManager.MatchState.Won;
             combatGroup.alpha = Mathf.MoveTowards(combatGroup.alpha, cinematic ? 0f : 1f, dt / .4f);
         }
+        else if (gm != null && gm.Outer != null)
+        {
+            combatGroup.alpha = gm.Outer.Cinematic ? 0f : 1f;
+        }
 
         if (playerHealth != null)
         {
@@ -599,12 +603,14 @@ public class GameHUD : MonoBehaviour
             gateRow.gameObject.SetActive(gate != null);
             if (gate != null)
             {
-                float hp = gate.Integrity;
+                var outer = gm.Outer;
+                bool defendingWall = outer != null && !outer.Breached;
+                float hp = defendingWall ? outer.Integrity : gate.Integrity;
                 Color condition = hp > .5f ? Color.Lerp(UIKit.Gold, new Color(.16f,.51f,.27f), hp * 2 - 1)
                     : Color.Lerp(new Color(.78f,.09f,.06f), UIKit.Gold, hp * 2);
                 gateFill.fillAmount = hp;
                 gateFill.color = Color.Lerp(condition, Color.white, Mathf.Clamp01(1 - (Time.time - gate.LastImpact) * 3));
-                gateLabel.text = $"KEEP GATE   {Mathf.CeilToInt(hp * 100)}%";
+                gateLabel.text = $"{(defendingWall ? "OUTER GATE" : "KEEP GATE")}   {Mathf.CeilToInt(hp * 100)}%";
                 bossRoot.anchoredPosition = new Vector2(0, -143);
             }
             scoreText.text = gm.Score.ToString("N0");
@@ -636,6 +642,16 @@ public class GameHUD : MonoBehaviour
         hintTimer -= dt;
         if (hintTimer > 0f) hintText.text = GameInput.ControlsHint;
         hintText.alpha = Mathf.Clamp01(hintTimer / 2f) * 0.85f;
+        if (gm != null && gm.Outer != null && gm.State == GameManager.MatchState.Playing &&
+            !gm.IsPaused && !gm.ChoosingBoon && !gm.Outer.Cinematic)
+        {
+            string prompt = gm.Outer.InteractionPrompt;
+            if (!string.IsNullOrEmpty(prompt))
+            {
+                hintText.text = $"<size=120%><b>{prompt}</b></size>";
+                hintText.alpha = 1f;
+            }
+        }
         if (gm != null && gm.Mode == GameMode.EndlessHorde && gm.State == GameManager.MatchState.Playing && !gm.ChoosingBoon)
         {
             var horde = gm.Horde;
@@ -679,7 +695,14 @@ public class GameHUD : MonoBehaviour
         eventRoot.gameObject.SetActive(visible);eventMarker.gameObject.SetActive(false);
         if (gm != null && gm.Gate != null && gm.State == GameManager.MatchState.Playing && !gm.IsPaused && !gm.ChoosingBoon)
         {
-            if (player != null && (player.transform.position - gm.Gate.Approach).sqrMagnitude > 9 * 9)
+            if (gm.Outer != null && gm.Outer.Cinematic) return;
+            if (gm.Outer != null && !gm.Outer.Breached)
+            {
+                Vector3 wall = gm.Outer.Structure.World(0f, 6.8f, 0f);
+                if (player != null && (player.transform.position - wall).sqrMagnitude > 12 * 12)
+                    ShowObjectiveMarker(wall, "OUTER GATE", UIKit.Gold);
+            }
+            else if (player != null && (player.transform.position - gm.Gate.Approach).sqrMagnitude > 9 * 9)
                 ShowObjectiveMarker(gm.Gate.transform.position + Vector3.up * 3, "KEEP GATE", UIKit.Gold);
             return;
         }

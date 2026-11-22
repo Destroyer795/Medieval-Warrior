@@ -56,6 +56,21 @@ public class AutoPlayTest : MonoBehaviour
         if (pc != null && ph != null)
         {
             ph.InvulnerableUntil = Time.time + 60f;
+            var outer = gm.Outer;
+            Expect(outer != null && outer.Structure != null && !outer.Breached &&
+                pc.CurrentWeapon == Weapon.Bow, "Defend opens on the fortified wall with the bow");
+            if (outer != null)
+            {
+                var gallery = outer.Structure.World(9f, 6.25f, -.1f);
+                Expect(Mathf.Abs(pc.transform.position.y - gallery.y) < 1f &&
+                    Physics.Raycast(gallery + Vector3.up * 1.2f, Vector3.down, 2f,
+                        ~0, QueryTriggerInteraction.Ignore), "the built player's parapet supports the knight");
+                outer.TakeDamage(outer.MaxHealth);
+                Expect(outer.Cinematic, "outer gate opens into the breach cinematic");
+                yield return new WaitForSecondsRealtime(1.6f);
+                Expect(outer.Breached && !outer.Cinematic && gm.Gate.Integrity == 1f &&
+                    gm.State == GameManager.MatchState.Playing, "control returns for the inner keep defense");
+            }
             pc.Equip(Weapon.Bow);
             foreach (var z in EnemyController.All.Take(3).ToArray())
             {
@@ -88,6 +103,8 @@ public class AutoPlayTest : MonoBehaviour
         yield return new WaitForSecondsRealtime(12f);
         gm = GameManager.instance;
         Expect(gm != null && gm.Wave >= 1, "endless wave started");
+        Expect(gm != null && gm.Outer == null && FindFirstObjectByType<ForegateStructure>() == null,
+            "switching to Horde removes the siege frontage");
         Expect(gm != null && gm.Horde.Goblet != null, "wall goblet is present in the built Horde arena");
         Expect(gm != null && gm.GobletScoreMultiplier == 1, "Horde begins at ordinary kill score");
         GameObject.FindWithTag("Player").GetComponent<PlayerHealth>().TakeDamage(9999f, null, 0f, true);

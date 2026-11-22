@@ -149,6 +149,26 @@ public partial class SmokeTestDriver : MonoBehaviour
         var health = playerGo != null ? playerGo.GetComponent<PlayerHealth>() : null;
         Check(player != null && health != null, "player components");
         if (player == null || gm == null) { Finish(savedMode, savedDiff); yield break; }
+        // The roster, movement and weapon fixtures below need open, navigable ground.
+        // ReviewSiege separately exercises the wall and actual breach handoff.
+        if (gm.Outer != null)
+        {
+            if (!gm.Outer.Breached) gm.Outer.TakeDamage(gm.Outer.MaxHealth);
+            yield return Wait(1.3f);
+            // Open village training ground in Semi-Final, clear of both gate structures.
+            var courtyardStart = new Vector3(-12.79f, -.28f, -1.82f);
+            var courtyardHeading = Quaternion.Euler(0f, -27.18f, 0f);
+            var fixtureBody = player.GetComponent<Rigidbody>();
+            fixtureBody.position = courtyardStart;
+            fixtureBody.rotation = courtyardHeading;
+            fixtureBody.linearVelocity = Vector3.zero;
+            player.transform.SetPositionAndRotation(courtyardStart, courtyardHeading);
+            player.Equip(Weapon.Sword);
+            Physics.SyncTransforms();
+            // The opening uses the bow. Allow its arm pose to blend fully back
+            // to the neutral sword guard before measuring palm placement.
+            yield return Wait(1f);
+        }
         var marchwarden = player.GetComponent<MarchwardenVisual>();
         Check(marchwarden != null && marchwarden.Body.sharedMesh == MarchwardenVisual.Asset.body,
             "Marchwarden replaces the demo mesh in gameplay");

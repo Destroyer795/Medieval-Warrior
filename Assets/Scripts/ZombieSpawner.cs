@@ -51,6 +51,8 @@ public class ZombieSpawner : MonoBehaviour
         var gate = GameManager.instance != null ? GameManager.instance.Gate : null;
         if (gate != null)
         {
+            var outer = GameManager.instance.Outer;
+            if (outer != null) return outer.Deploy(this, type, boss);
             position = gate.Road;
             for (int i = 0; i < 8; i++)
             {
@@ -71,14 +73,14 @@ public class ZombieSpawner : MonoBehaviour
         return SpawnAt(type, boss, position, center);
     }
 
-    internal EnemyController SpawnAt(ZombieType type, bool boss, Vector3 position, Vector3 center)
+    internal EnemyController SpawnAt(ZombieType type, bool boss, Vector3 position, Vector3 center, bool emerge = true)
     {
         if (zombiePrefab == null) return null;
         Quaternion facing = Quaternion.LookRotation(Flat(center - position).sqrMagnitude > 0.01f ? Flat(center - position) : Vector3.forward);
         var go = Instantiate(zombiePrefab, position, facing);
         go.name = (boss ? "Boss " : "") + type;
         var enemy = go.GetComponent<EnemyController>();
-        if (enemy != null) enemy.Init(type, boss, true);
+        if (enemy != null) enemy.Init(type, boss, emerge);
         return enemy;
     }
 

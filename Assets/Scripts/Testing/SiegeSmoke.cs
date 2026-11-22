@@ -27,6 +27,10 @@ public partial class SmokeTestDriver
         var health = player.GetComponent<PlayerHealth>();
         health.InvulnerableUntil = float.PositiveInfinity;
         var body = player.GetComponent<Rigidbody>();
+        yield return ReviewOuterGate(gm, player, body);
+        body.position = gate.Road;
+        player.transform.position = gate.Road;
+        Physics.SyncTransforms();
         body.isKinematic = true;
         gm.enabled = false;
         foreach (var enemy in EnemyController.All.ToArray()) Destroy(enemy.gameObject);
@@ -159,6 +163,101 @@ public partial class SmokeTestDriver
             "the knight's death loses the siege with the sanctuary intact");
         gm.QuitGame();
         yield return Wait(2);
+    }
+
+    IEnumerator ReviewOuterGate(GameManager gm, PlayerControlSpeed knight, Rigidbody body)
+    {
+        var outer = gm.Outer;
+        Check(outer != null && outer.Structure != null, "Defend loads the outer gatehouse");
+        if (outer == null || outer.Structure == null) yield break;
+        var wall = outer.Structure;
+        float Depth(Vector3 point) => Vector3.Dot(wall.World(0, 0, 0) - point, wall.Outward);
+        void Place(Vector3 at)
+        {
+            body.position = at;
+            body.linearVelocity = Vector3.zero;
+            knight.transform.position = at;
+            Physics.SyncTransforms();
+        }
+        var start = body.position;
+        Check(start.y > wall.World(0, 4.8f, 0).y && knight.CurrentWeapon == Weapon.Bow,
+            "knight begins on the parapet equipped for ranged defense");
+        Capture("outer_gate_parapet");
+        CaptureFrom("outer_gate_front", wall.World(18, 14, -32), wall.World(0, 3.7f, 1));
+        CaptureFrom("outer_gate_courtyard", wall.World(-9, 18, 20), wall.World(1, 3.4f, 2));
+        foreach (int side in new[] { -1, 1 })
+        {
+            var mid = wall.World(0, 2f, 7f);
+            var direction = (wall.World(side * 16, 2f, 7f) - mid).normalized;
+            Check(Physics.Raycast(mid, direction, out var hit, 17f, ~0, QueryTriggerInteraction.Ignore) &&
+                hit.distance > 9f, "protected stair yard meets a solid return wall on side " + side);
+            float lastHeight = float.PositiveInfinity;
+            bool clearFlight = true;
+            for (float inward = 2f; inward <= 12f; inward += .5f)
+            {
+                var top = wall.World(side * 7.18f, 10f, inward);
+                if (!Physics.Raycast(top, Vector3.down, out var step, 16f, ~0, QueryTriggerInteraction.Ignore) ||
+                    step.point.y > lastHeight + .2f)
+                {
+                    clearFlight = false;
+                    break;
+                }
+                lastHeight = step.point.y;
+                if (Physics.CheckCapsule(step.point + Vector3.up * .49f,
+                    step.point + Vector3.up * 1.6f, .30f, ~0, QueryTriggerInteraction.Ignore))
+                    clearFlight = false;
+            }
+            Check(clearFlight && lastHeight < wall.World(0, 1.3f, 0).y,
+                "a knight-width stair flight descends into the courtyard on side " + side);
+            Place(wall.World(side * 11.3f, 6.35f, 1.1f));
+            knight.DebugFireAt(body.position + Vector3.up * 20, .5f);
+            Check(knight.Arrows < knight.maxArrows && outer.Interact() && knight.Arrows == knight.maxArrows,
+                "wall armory refills the quiver on side " + side);
+        }
+        Place(start);
+        float deadline = Time.realtimeSinceStartup + 35f;
+        while (outer.Health == outer.MaxHealth && Time.realtimeSinceStartup < deadline) yield return null;
+        Check(outer.Health < outer.MaxHealth && !outer.Breached && gm.Gate.Health == gm.Gate.MaxHealth,
+            "live road attackers batter only the outer leaves while the keep is protected");
+        var underGallery = EnemyController.All.Where(e => e != null && !e.IsDead &&
+            Vector3.Distance(e.transform.position, wall.World(0f, 0f, -1.3f)) < 3f).ToArray();
+        Place(wall.World(-.75f, 6.95f, .24f));
+        Check(outer.StoneReady && outer.Interact() && !outer.StoneReady,
+            "releasing the loaded stone consumes the ready shot");
+        Check(!outer.Interact(), "the cradle cannot drop a second stone while reloading");
+        yield return Wait(1.35f);
+        Check(underGallery.Any(e => e == null || e.IsDead || e.Health < e.MaxHealth),
+            "the stone strikes the enemies gathered beneath the gallery");
+        Place(start);
+        deadline = Time.realtimeSinceStartup + 65f;
+        var attackers = new System.Collections.Generic.HashSet<EnemyController>();
+        while (Time.realtimeSinceStartup < deadline && !outer.Breached)
+        {
+            foreach (var enemy in EnemyController.All)
+                if (enemy != null && !enemy.IsDead && Depth(enemy.transform.position) < 0f) attackers.Add(enemy);
+            if (GameHUD.BoonsOpen) GameHUD.DebugPickBoon(0);
+            yield return null;
+        }
+        Check(outer.Breached && outer.Cinematic && gm.State == GameManager.MatchState.Playing,
+            "breaking the outer gate starts a shot and keeps the siege live");
+        float began = Time.time;
+        while (outer.Cinematic && Time.time - began < .62f) yield return null;
+        if (outer.Cinematic) Capture("outer_gate_breach");
+        deadline = Time.realtimeSinceStartup + 4;
+        while (outer.Cinematic && Time.realtimeSinceStartup < deadline) yield return null;
+        Check(!outer.Cinematic && Time.time - began >= .85f && Time.time - began < 1.5f,
+            "the breach shot hands control back after one second");
+        Check(knight.enabled && gm.Gate.Health == gm.Gate.MaxHealth, "defense resumes with the knight and keep intact");
+        deadline = Time.realtimeSinceStartup + 12;
+        while (Time.realtimeSinceStartup < deadline && !attackers.Any(e => e != null && Depth(e.transform.position) > 2f))
+            yield return null;
+        Check(attackers.Any(e => e != null && Depth(e.transform.position) > 2f),
+            "a surviving exterior attacker crosses the doorway into the protected yard");
+        deadline = Time.realtimeSinceStartup + 14;
+        bool Rejoined(EnemyController e) => e != null && !e.IsDead && e.TryGetComponent<NavMeshAgent>(out var agent) &&
+            agent.enabled && agent.isOnNavMesh && Depth(e.transform.position) > 14;
+        while (Time.realtimeSinceStartup < deadline && !attackers.Any(Rejoined)) yield return null;
+        Check(attackers.Any(Rejoined), "the same assault reaches the connected village NavMesh after the breach");
     }
 }
 #endif

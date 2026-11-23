@@ -127,6 +127,6 @@ public static class GameInput
 #endif
 
     public static string ControlsHint => UsingGamepad
-        ? "LS move  ·  RS look  ·  L-click sprint  ·  A dodge  ·  RT attack  ·  LT block / aim  ·  Y swap weapon  ·  Start pause"
-        : "WASD move  ·  Shift sprint  ·  Space dodge  ·  LMB attack  ·  RMB block / aim  ·  Q swap weapon  ·  Esc pause";
+        ? "LS move  |  RS look  |  L-click sprint  |  A dodge\nRT attack  |  LT block / aim  |  Y swap weapon  |  Start pause"
+        : "WASD move  |  Shift sprint  |  Space dodge\nLMB attack  |  RMB block / aim  |  Q swap weapon  |  Esc pause";
 }

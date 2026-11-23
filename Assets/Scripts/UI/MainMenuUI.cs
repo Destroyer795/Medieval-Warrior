@@ -1,9 +1,7 @@
-using System.Collections;
 using System.Linq;
 using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
-using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 // Title screen, mode select, knight customisation, settings and help - built in code.
@@ -11,7 +9,6 @@ public class MainMenuUI : MonoBehaviour
 {
     RectTransform root;
     UIPage titlePage, playPage, customisePage, settingsPage, helpPage, featsPage, creditsPage;
-    CanvasGroup loading;
     MenuPreview preview;
     UIKit.SelectorHandle swordSelector;
     TextMeshProUGUI swordStatus;
@@ -39,7 +36,6 @@ public class MainMenuUI : MonoBehaviour
         helpPage = SharedPanels.HowToPlay(root, () => Show(titlePage));
         BuildFeats();
         BuildCredits();
-        BuildLoading();
         Show(titlePage);
         AudioManager.SetBattleIntensity(0f, true);
         AudioManager.PlayMusic("music_menu", 0.8f);
@@ -164,14 +160,26 @@ public class MainMenuUI : MonoBehaviour
         customisePage = SharedPanels.Page(root, "Customise Page", new Vector2(1600, 940), "Your Knight");
 
         var view = UIKit.Img(customisePage.transform, "panel_iron", Color.white, "Preview Frame");
-        view.rectTransform.Place(new Vector2(0, 0.5f), new Vector2(0, 0.5f), new Vector2(70, -10), new Vector2(560, 720));
-        var raw = UIKit.Rect("Preview", view.transform).Fill(18).gameObject.AddComponent<RawImage>();
+        view.rectTransform.Place(new Vector2(0, 0.5f), new Vector2(0, 0.5f), new Vector2(70, 47), new Vector2(560, 624));
+        var viewport = UIKit.Rect("Preview inset", view.transform).Fill(18);
+        var raw = UIKit.Rect("Preview", viewport).gameObject.AddComponent<RawImage>();
+        var aspect = raw.gameObject.AddComponent<AspectRatioFitter>();
+        aspect.aspectMode = AspectRatioFitter.AspectMode.FitInParent;
+        aspect.aspectRatio = .75f;
         raw.raycastTarget = true;
         if (preview != null) raw.texture = preview.Texture;
         else UIKit.Text(view.transform, "Preview unavailable", 26).rectTransform.Fill();
         raw.gameObject.AddComponent<PreviewDrag>().preview = preview;
         var hint = UIKit.Text(view.transform, "drag to turn", 20, new Color(1, 1, 1, 0.55f), TextAlignmentOptions.Bottom);
         hint.rectTransform.Place(new Vector2(0.5f, 0), new Vector2(0.5f, 0), new Vector2(0, 22), new Vector2(400, 30));
+        var swordInfo = UIKit.Img(customisePage.transform, "panel_dark", Color.white, "Sword information");
+        swordInfo.rectTransform.Place(new Vector2(0, .5f), new Vector2(0, 1), new Vector2(70, -270), new Vector2(560, 112));
+        swordStatus = UIKit.Text(swordInfo.transform, "", 25, UIKit.Parchment);
+        swordStatus.name = "Sword status";
+        swordStatus.rectTransform.Fill(16);
+        swordStatus.enableAutoSizing = true;
+        swordStatus.fontSizeMin = 20;
+        swordStatus.fontSizeMax = 25;
 
         var list = UIKit.VList(customisePage.transform, 8, null, TextAnchor.UpperLeft);
         ((RectTransform)list.transform).Place(new Vector2(1, 1), new Vector2(1, 1), new Vector2(-70, -150), new Vector2(880, 652));
@@ -193,9 +201,6 @@ public class MainMenuUI : MonoBehaviour
             ShowSword(i);
         });
         swordSelector.value.GetComponentInParent<HorizontalLayoutGroup>(true).name = "Sword selection";
-        swordStatus = UIKit.Text(list.transform, "", 24, UIKit.Parchment, TextAlignmentOptions.Center);
-        swordStatus.name = "Sword status";
-        swordStatus.Layout(48);
 
         var buttons = UIKit.HList(customisePage.transform, 24);
         ((RectTransform)buttons.transform).Place(new Vector2(1, 0), new Vector2(1, 0), new Vector2(-70, 46), new Vector2(880, 72));
@@ -218,9 +223,9 @@ public class MainMenuUI : MonoBehaviour
     {
         if (preview != null) preview.ShowSword(SwordWardrobe.Model(index));
         int owned = Enumerable.Range(0, SwordWardrobe.Names.Length).Count(SwordWardrobe.Available);
-        swordStatus.text = SwordWardrobe.Available(index)
-            ? $"Equipped    |    {owned} of {SwordWardrobe.Names.Length} unlocked"
-            : "Locked    |    " + SwordWardrobe.Challenge(index);
+        string detail = SwordWardrobe.Available(index) ? $"Equipped  |  {owned} of {SwordWardrobe.Names.Length} unlocked"
+            : "Locked  |  " + SwordWardrobe.Challenge(index);
+        swordStatus.text = $"<color=#F5CB73>{SwordWardrobe.Names[index]}</color>\n{detail}";
     }
 
     static string[] Names((string name, Color c)[] items)
@@ -237,32 +242,11 @@ public class MainMenuUI : MonoBehaviour
 
     // ------------------------------------------------------------ start / quit
 
-    void BuildLoading()
-    {
-        var img = UIKit.Img(root, null, new Color(0.02f, 0.015f, 0.01f, 1f), "Loading");
-        img.rectTransform.Fill();
-        img.raycastTarget = true;
-        var t = UIKit.Text(img.transform, "The gates open...", 56, UIKit.Gold, TextAlignmentOptions.Center, true);
-        t.rectTransform.Fill();
-        loading = img.gameObject.AddComponent<CanvasGroup>();
-        loading.alpha = 0f;
-        loading.blocksRaycasts = false;
-        img.transform.SetAsLastSibling();
-    }
-
     void StartMatch()
     {
+        if (BattleLoading.IsTransitioning) return;
         GameSettings.Save();
-        StartCoroutine(LoadGame());
-    }
-
-    IEnumerator LoadGame()
-    {
-        loading.blocksRaycasts = true;
-        for (float t = 0; t < 1f; t += Time.unscaledDeltaTime * 3f) { loading.alpha = t; yield return null; }
-        loading.alpha = 1f;
         AudioManager.StopMusic();
-        yield return null;
         BattleLoading.EnterBattle();
     }
 

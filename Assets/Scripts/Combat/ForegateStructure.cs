@@ -140,11 +140,15 @@ public sealed class ForegateStructure : MonoBehaviour
 
     void BuildGallery()
     {
-        // Only the rear boards cross the opening. The flanking boards end
-        // at either lip of the two-metre-wide stone channel.
-        Box(transform, "Gallery crossing", new Vector3(0, 6.655f, -.97f), new Vector3(4.51f, .38f, 2.07f));
+        // Cover the full plank footprint, including the visible rear overhang.
+        // Run the side supports into the crossing and piers to prevent seams.
+        Box(transform, "Gallery crossing", new Vector3(0, 6.655f, -.985f), new Vector3(4.55f, .38f, 2.35f));
         for (int side = -1; side <= 1; side += 2)
-            Box(transform, "Channel walkway", new Vector3(side * 1.64f, 6.655f, 1.39f), new Vector3(1.23f, .38f, 2.65f));
+        {
+            Box(transform, "Channel walkway", new Vector3(side * 1.66f, 6.655f, 1.38f), new Vector3(1.23f, .38f, 2.66f));
+            Box(transform, "Channel side curb", new Vector3(side * 1.06f, 7.02f, 1.43f), new Vector3(.16f, .35f, 2.50f));
+        }
+        Box(transform, "Channel rear curb", new Vector3(0, 7.02f, .18f), new Vector3(2.28f, .35f, .16f));
         for (int side = -1; side <= 1; side += 2)
         {
             Box(transform, "Gallery parapet", new Vector3(side * 2.34f, 6.98f, 2.61f), new Vector3(.82f, .27f, .40f));

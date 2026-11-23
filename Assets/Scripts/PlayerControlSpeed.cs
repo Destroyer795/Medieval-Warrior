@@ -732,30 +732,9 @@ public class PlayerControlSpeed : MonoBehaviour
         Arrows--;
 
         Vector3 origin = rig != null ? rig.ArrowOrigin : transform.position + Vector3.up * 1.4f;
-        Vector3 target;
-        if (cameraTransform != null)
-        {
-            var ray = new Ray(cameraTransform.position, cameraTransform.forward);
-            target = ray.GetPoint(120f);
-            foreach (var hit in SortedHits(ray, 120f))
-            {
-                if (hit.transform.IsChildOf(transform)) continue;
-                Vector3 point = hit.point;
-                if (Vector3.Dot(point - origin, ray.direction) <= .01f)
-                {
-                    // At contact range the camera can see the front of an enemy
-                    // behind the bow rest, while its body still extends ahead.
-                    // Use its forward part and never reverse the shot.
-                    if (hit.collider.GetComponentInParent<EnemyController>() is not EnemyController enemy || enemy.IsDead)
-                        continue;
-                    point = hit.collider.bounds.center;
-                    if (Vector3.Dot(point - origin, ray.direction) <= .01f) continue;
-                }
-                target = point;
-                break;
-            }
-        }
-        else target = origin + transform.forward * 50f;
+        Vector3 target = cameraTransform != null
+            ? Arrow.AimTarget(new Ray(cameraTransform.position, cameraTransform.forward), origin, transform)
+            : origin + transform.forward * 50f;
 
         Vector3 dir = (target - origin).normalized;
         Arrow.FireBow(origin, dir, draw, transform,
@@ -765,13 +744,6 @@ public class PlayerControlSpeed : MonoBehaviour
         if (GameManager.instance != null) GameManager.instance.RegisterArrowFired();
         if (rig != null) rig.Release();
         FX.Shake(0.06f);
-    }
-
-    static RaycastHit[] SortedHits(Ray ray, float dist)
-    {
-        var hits = Physics.RaycastAll(ray, dist, ~0, QueryTriggerInteraction.Ignore);
-        System.Array.Sort(hits, (a, b) => a.distance.CompareTo(b.distance));
-        return hits;
     }
 
     void CancelDraw()

@@ -1,12 +1,35 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 // Ballistic arrow: drops, pierces exposed targets and sticks to animated bodies or shields.
+[DefaultExecutionOrder(175)]
 public class Arrow : MonoBehaviour
 {
+    readonly struct ContactHit
+    {
+        public readonly Collider collider;
+        public readonly EnemyController enemy;
+        public readonly ArrowSurface.Part part;
+        public readonly Transform anchor;
+        public readonly Vector3 point;
+        public readonly float distance;
+
+        public ContactHit(Collider collider, EnemyController enemy, ArrowSurface.Part part, Transform anchor, Vector3 point, float distance)
+        {
+            this.collider = collider;
+            this.enemy = enemy;
+            this.part = part;
+            this.anchor = anchor;
+            this.point = point;
+            this.distance = distance;
+        }
+    }
+
+    static readonly List<ContactHit> contacts = new List<ContactHit>(32);
     Vector3 velocity;
     float damage, knockback;
     Transform owner;
-    Vector3 bowMuzzle;
+    Vector3 muzzle;
     bool sweepFromMuzzle;
     bool firedByDuelist;
     GraveDuelist duelist;
@@ -28,8 +51,7 @@ public class Arrow : MonoBehaviour
     {
         var arrow = Fire(origin + direction * .2f, direction, Mathf.Lerp(24f, 58f, draw), Mathf.Lerp(1f, 3.4f, draw),
             Mathf.Lerp(2f, 9f, draw), owner, pierce, fire);
-        arrow.bowMuzzle = origin;
-        arrow.sweepFromMuzzle = true;
+        arrow.muzzle = origin;
         arrow.duelist = duelist;
         arrow.firedByDuelist = duelist != null;
         return arrow;
@@ -44,6 +66,8 @@ public class Arrow : MonoBehaviour
         a.damage = damage;
         a.knockback = knockback;
         a.owner = owner;
+        a.muzzle = position;
+        a.sweepFromMuzzle = true;
         a.pierce = pierce;
         a.isFire = fire;
         if (fire) a.flame = FX.AttachFlame(go.transform, Vector3.forward * Length, 0.65f, true);
@@ -68,7 +92,7 @@ public class Arrow : MonoBehaviour
         return ProceduralModels.Spawn("Arrow", ProceduralModels.ArrowMesh(), ProceduralModels.ArrowMaterials());
     }
 
-    void Update()
+    void LateUpdate()
     {
         if (firedByDuelist && (duelist == null || !duelist.CanFight)) { Destroy(gameObject); return; }
         age += Time.deltaTime;
@@ -86,44 +110,93 @@ public class Arrow : MonoBehaviour
         velocity += Physics.gravity * 0.45f * Time.deltaTime;
         Vector3 tip = transform.position + transform.forward * Length;
         Vector3 step = velocity * Time.deltaTime;
+        Quaternion nextRotation = Quaternion.LookRotation(velocity);
         Vector3 start = tip;
         if (sweepFromMuzzle)
         {
             // The rendered shaft starts in front of the rest. The first cast
             // must still cover every point from the rest to the moving tip.
-            start = bowMuzzle;
+            start = muzzle;
             sweepFromMuzzle = false;
             if (ResolveMuzzleOverlap()) return;
         }
-        Vector3 sweep = tip + step - start;
-        var hits = Physics.RaycastAll(start, sweep.normalized, sweep.magnitude + 0.05f, ~0, QueryTriggerInteraction.Collide);
-        System.Array.Sort(hits, (x, y) => x.distance.CompareTo(y.distance));
-        foreach (var hit in hits)
-            if (Contact(hit.collider, hit.point)) return;
+        Vector3 sweep = transform.position + step + nextRotation * Vector3.forward * Length - start;
+        Trace(new Ray(start, sweep), sweep.magnitude, owner, !firedByDuelist, true);
+        foreach (var hit in contacts)
+            if (Contact(hit)) return;
         transform.position += step;
-        transform.rotation = Quaternion.LookRotation(velocity);
+        transform.rotation = nextRotation;
     }
 
-    bool Ignore(Collider collider) =>
-        (collider.isTrigger && collider.GetComponent<RevenantHitZone>() == null) ||
-        (owner != null && collider.transform.IsChildOf(owner));
+    public static Vector3 AimTarget(Ray camera, Vector3 origin, Transform owner)
+    {
+        const float range = 120f;
+        float start = Mathf.Max(0, Vector3.Dot(origin - camera.origin, camera.direction) + .01f);
+        Trace(new Ray(camera.GetPoint(start), camera.direction), range - start, owner, true, false);
+        return contacts.Count > 0 ? contacts[0].point : camera.GetPoint(range);
+    }
+
+    static void Trace(Ray ray, float distance, Transform owner, bool traceEnemies, bool projectile)
+    {
+        contacts.Clear();
+        float stopAt = distance;
+        foreach (var hit in Physics.RaycastAll(ray, distance, ~0, QueryTriggerInteraction.Ignore))
+        {
+            if (owner != null && hit.transform.IsChildOf(owner)) continue;
+            var enemy = hit.collider.GetComponentInParent<EnemyController>();
+            if (enemy != null && (enemy.IsDead || ArrowSurface.CanTrace(enemy))) continue;
+            contacts.Add(new ContactHit(hit.collider, enemy, ArrowSurface.Part.Body, null, hit.point, hit.distance));
+            if (enemy == null) stopAt = Mathf.Min(stopAt, hit.distance);
+        }
+        if (traceEnemies)
+        {
+            foreach (var enemy in EnemyController.All)
+            {
+                if (enemy.IsDead || (owner != null && enemy.transform.IsChildOf(owner))) continue;
+                var body = enemy.ArrowBody;
+                if (body == null) continue;
+                // Published skin bounds include every animated pose and fitted prop.
+                if (!body.bounds.IntersectRay(ray, out float entry) || entry > stopAt) continue;
+                float nearest = stopAt;
+                if (ArrowSurface.Trace(enemy, ray, projectile, ref nearest, out var part, out var anchor))
+                    contacts.Add(new ContactHit(null, enemy, part, anchor, ray.GetPoint(nearest), nearest));
+            }
+        }
+        contacts.Sort((a, b) => a.distance.CompareTo(b.distance));
+    }
 
     bool ResolveMuzzleOverlap()
     {
         // Rays skip colliders containing their origin. Give solid cover
         // precedence when it and a character overlap the bow at release.
-        var overlaps = Physics.OverlapSphere(bowMuzzle, .02f, ~0, QueryTriggerInteraction.Collide);
+        var overlaps = Physics.OverlapSphere(muzzle, .005f, ~0, QueryTriggerInteraction.Ignore);
         foreach (var collider in overlaps)
-            if (collider.GetComponentInParent<EnemyController>() == null &&
-                collider.GetComponentInParent<PlayerHealth>() == null && Contact(collider, bowMuzzle)) return true;
+        {
+            if (owner != null && collider.transform.IsChildOf(owner)) continue;
+            if (!TouchesMuzzle(collider)) continue;
+            var enemy = collider.GetComponentInParent<EnemyController>();
+            if (enemy == null && collider.GetComponentInParent<PlayerHealth>() == null &&
+                Contact(new ContactHit(collider, null, ArrowSurface.Part.Body, null, muzzle, 0))) return true;
+        }
         foreach (var collider in overlaps)
-            if (Contact(collider, bowMuzzle)) return true;
+        {
+            if (owner != null && collider.transform.IsChildOf(owner)) continue;
+            if (!TouchesMuzzle(collider)) continue;
+            var enemy = collider.GetComponentInParent<EnemyController>();
+            if ((enemy != null && !ArrowSurface.CanTrace(enemy) || firedByDuelist && collider.GetComponentInParent<PlayerHealth>() != null) &&
+                Contact(new ContactHit(collider, enemy, ArrowSurface.Part.Body, null, muzzle, 0))) return true;
+        }
         return false;
     }
 
-    bool Contact(Collider collider, Vector3 point)
+    bool TouchesMuzzle(Collider collider) =>
+        collider is TerrainCollider || collider is MeshCollider mesh && !mesh.convex ||
+        (collider.ClosestPoint(muzzle) - muzzle).sqrMagnitude <= 1e-8f;
+
+    bool Contact(ContactHit hit)
     {
-        if (Ignore(collider)) return false;
+        var collider = hit.collider;
+        var point = hit.point;
         if (firedByDuelist)
         {
             if (collider.GetComponentInParent<PlayerHealth>() == duelist.Knight)
@@ -135,21 +208,25 @@ public class Arrow : MonoBehaviour
             Destroy(gameObject);
             return true;
         }
-        var enemy = collider.GetComponentInParent<EnemyController>();
+        var enemy = hit.enemy;
         if (enemy != null && (enemy.IsDead || pierced.Contains(enemy))) return false;
-        if (enemy != null && pierce > 0 && !enemy.GuardsContact(velocity.normalized, point))
+        if (enemy != null && pierce > 0 && hit.part != ArrowSurface.Part.Shield &&
+            (hit.anchor != null || !enemy.GuardsContact(velocity.normalized, point)))
         {
             pierce--;
             pierced.Add(enemy);
-            HitEnemy(enemy, point);
+            DealContact(hit);
             return false;
         }
-        Impact(collider, point, enemy);
+        Impact(hit);
         return true;
     }
 
-    void Impact(Collider collider, Vector3 point, EnemyController enemy)
+    void Impact(ContactHit hit)
     {
+        var collider = hit.collider;
+        var enemy = hit.enemy;
+        var point = hit.point;
         stuck = true;
         var trail = GetComponent<TrailRenderer>();
         if (trail != null) trail.emitting = false;
@@ -157,21 +234,8 @@ public class Arrow : MonoBehaviour
 
         if (enemy != null)
         {
-            bool landed=HitEnemy(enemy, point);
-            // stick to the nearest bone so the arrow moves with the body, not the upright root collider
-            var visual=enemy.GetComponent<RevenantVisual>();
-            if(!landed&&visual!=null)
-            {
-                Transform hand=visual.ShieldHand;Vector3 normal=hand.TransformDirection(visual.Form.left.normal).normalized;
-                Vector3 plane=hand.TransformPoint(visual.Form.left.position)+normal*.07f;float dot=Vector3.Dot(velocity.normalized,normal);
-                if(Mathf.Abs(dot)>.1f)
-                {
-                    float along=Vector3.Dot(plane-point,normal)/dot;
-                    if(Mathf.Abs(along)<1)transform.position=point+velocity.normalized*along-transform.forward*(Length-.18f);
-                }
-                transform.SetParent(hand,true);
-            }
-            else transform.SetParent(NearestBone(enemy, point), true);
+            DealContact(hit);
+            transform.SetParent(hit.anchor != null ? hit.anchor : NearestBone(enemy, point), true);
             stuckIn = enemy;
             stuckInEnemy = true;
             if (enemy.IsDead) BeginFall();
@@ -262,8 +326,27 @@ public class Arrow : MonoBehaviour
     bool HitEnemy(EnemyController enemy, Vector3 point)
     {
         bool headshot = point.y > enemy.transform.position.y + 1.45f * enemy.transform.localScale.y;
+        return DamageEnemy(enemy, point, headshot, false);
+    }
+
+    void DealContact(ContactHit hit)
+    {
+        if (hit.part == ArrowSurface.Part.Shield)
+        {
+            AudioManager.PlayAt("shield_block", hit.point, .85f);
+            FX.Sparks(hit.point, -velocity.normalized);
+            BurstSplinters(hit.point, hit.enemy);
+        }
+        else if (hit.anchor != null) DamageEnemy(hit.enemy, hit.point, hit.part == ArrowSurface.Part.Head, true);
+        else HitEnemy(hit.enemy, hit.point);
+    }
+
+    bool DamageEnemy(EnemyController enemy, Vector3 point, bool headshot, bool precise)
+    {
         float dmg = damage * (headshot ? 2f : 1f);
-        if(!enemy.ReceiveWeaponHit(dmg, velocity.normalized, knockback,point)){BurstSplinters(point,enemy);return false;}
+        bool landed = precise ? enemy.ReceivePreciseArrowHit(dmg, velocity.normalized, knockback, point) :
+            enemy.ReceiveWeaponHit(dmg, velocity.normalized, knockback, point);
+        if (!landed) { BurstSplinters(point, enemy); return false; }
         BurstSplinters(point,enemy);
         if(headshot&&!clustered)
         {clustered=true;ClusterVolley.Create(point,velocity.normalized,damage,isFire);}

@@ -74,16 +74,19 @@ public partial class SmokeTestDriver
             voices.Any(v => v.isPlaying && v.clip != null && v.clip.name == "shield_block"),
             "the gate impact and warning clang play on separate voices");
         CaptureFrom("siege_gate", gate.Approach + gate.Outward * 9 + Vector3.up * 3, gate.transform.position + Vector3.up * 1.8f);
+        body.position = gate.Approach + gate.Outward * 1.25f;
+        player.transform.position = body.position;
+        Physics.SyncTransforms();
+        float nearbyHealth = gate.Health;
         breacher.ReceiveWeaponHit(.25f, gate.Outward, 0, breacher.transform.position + Vector3.up);
-        yield return Wait(.65f);
-        var agent = breacher.GetComponent<NavMeshAgent>();
-        Check((agent.destination - player.transform.position).sqrMagnitude < 4, "weapon contact diverts a breacher to the knight");
+        deadline = Time.realtimeSinceStartup + 8;
+        while (gate.Health >= nearbyHealth && Time.realtimeSinceStartup < deadline) yield return null;
+        Check(gate.Health < nearbyHealth && Vector3.Distance(breacher.transform.position, gate.Approach) < .75f,
+            "a Walker committed to the Keep continues battering it when struck by the nearby knight");
+        Destroy(breacher.gameObject);
+        body.position = gate.Road;
         player.transform.position = gate.Road;
         Physics.SyncTransforms();
-        deadline = Time.realtimeSinceStartup + 8;
-        while ((gate.Health >= before - breacher.Stats.damage) && Time.realtimeSinceStartup < deadline) yield return null;
-        Check(gate.Health < before - breacher.Stats.damage, "the distracted Walker returns and strikes the gate again");
-        Destroy(breacher.gameObject);
 
         var spitter = Deploy(ZombieType.Spitter, gate.Approach + gate.Outward * 4);
         var battery = gate.Battery(spitter.GetInstanceID());
@@ -273,6 +276,22 @@ public partial class SmokeTestDriver
         Capture("outer_gate_parapet");
         CaptureFrom("outer_gate_front", wall.World(18, 14, -32), wall.World(0, 3.7f, 1));
         CaptureFrom("outer_gate_courtyard", wall.World(-9, 18, 20), wall.World(1, 3.4f, 2));
+        bool SupportsPlanks(float x, float inward) =>
+            Physics.Raycast(wall.World(x, 7.4f, inward), Vector3.down, out var floor, .7f, ~0, QueryTriggerInteraction.Ignore) &&
+            Mathf.Abs(floor.point.y - wall.World(x, 6.845f, inward).y) < .025f;
+        Check(SupportsPlanks(0, 2.14f) && SupportsPlanks(-1.44f, -.207f) && SupportsPlanks(1.44f, -.207f) &&
+            SupportsPlanks(0, -.077f), "both walkways, the plank crossing seam and rear lip support the knight");
+        Check(!Physics.Raycast(wall.World(0, 7.0f, -1.43f), Vector3.down, 1.8f, ~0, QueryTriggerInteraction.Ignore),
+            "the central stone chute remains open");
+        Place(wall.World(-.1f, 6.89f, .75f));
+        var forward = Vector3.ProjectOnPlane(Camera.main.GetComponent<CameraFollow>().LookDirection, Vector3.up).normalized;
+        var right = Vector3.Cross(Vector3.up, forward);
+        knight.DebugMove(new Vector2(Vector3.Dot(wall.Outward, right), Vector3.Dot(wall.Outward, forward)), true);
+        yield return Wait(.7f);
+        knight.DebugMove(null);
+        Check(Depth(body.position) >= -.18f && Mathf.Abs(body.position.y - wall.World(0, 6.845f, 0).y) < .3f,
+            "the fixed rear curb keeps a sprinting knight on the boards outside the drop channel");
+        Place(start);
         foreach (int side in new[] { -1, 1 })
         {
             var mid = wall.World(0, 4.7f, 12f);
@@ -340,6 +359,14 @@ public partial class SmokeTestDriver
         }
         Check(outer.FinalAssault && EnemyController.All.Count >= beforePush + 10,
             "the timer launches a large final assault");
+        float oldHold = outer.HoldSeconds;
+        clockField.SetValue(outer, OuterSiege.OuterDuration);
+        int atDeadline = EnemyController.All.Count;
+        yield return Wait(.9f);
+        Check(outer.ReinforcementsStopped && gm.State == GameManager.MatchState.Playing && atDeadline > 0 &&
+            EnemyController.All.Count == atDeadline && gm.Objective.Contains("Clear the survivors"),
+            "the outer deadline stops reinforcements while surviving attackers keep the match live");
+        clockField.SetValue(outer, oldHold);
         // The clock was advanced without the preceding 90 seconds of
         // structural damage. Stage a weakened gate and let a live hit finish it.
         outer.TakeDamage(Mathf.Max(0f, outer.Health - 6f));

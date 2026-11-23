@@ -279,8 +279,10 @@ for y in (-1.23,-.25):
 box('Tipping cradle',iron,-1.06,-.62,7.12,.105,1.56,.105)
 panel('Tipping cradle',iron,[(-1.10,7.11),(-1.01,7.11),(-.72,7.78),(-.82,7.82)],.10,.20)
 box('Tipping cradle',oak,-.77,.16,7.81,.16,.41,.13)
+# The chute stays open for stones, with fixed oak curbs at the walking edges.
 for x in (-1.06,1.06):
-    box('Drop channel',iron,x,-1.43,6.85,.08,2.50,.10)
+    box('Drop channel',beam,x,-1.43,7.02,.16,2.50,.35)
+box('Drop channel',beam,0,-.18,7.02,2.28,.16,.35)
 for name,(verts,faces,slots,indices,surface_data) in parts.items():
     mesh=bpy.data.meshes.new(name)
     mesh.from_pydata(verts,[],faces)

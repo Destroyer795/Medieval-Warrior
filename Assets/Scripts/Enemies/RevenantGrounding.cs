@@ -9,18 +9,20 @@ public sealed class RevenantGrounding : MonoBehaviour
     readonly RaycastHit[] hits=new RaycastHit[12];
     readonly Transform[] thigh=new Transform[2],calf=new Transform[2],foot=new Transform[2];
     readonly Vector3[] target=new Vector3[2],normal=new Vector3[2];
-    readonly Quaternion[] rotation=new Quaternion[2];
+    readonly Quaternion[] rotation=new Quaternion[2], poseBeforeGrounding=new Quaternion[6];
     readonly float[] delta=new float[2];
     Transform pelvis;
     RevenantVisual visual;
     EnemyController brain;
-    Animator animator;
+    Vector3 pelvisBeforeGrounding;
+    bool pelvisAdjusted;
+    int adjustedLegs;
     public float BodyOffset {get;private set;}
     public bool HasGround {get;private set;}
 
     public void Bind(RevenantVisual owner,Dictionary<string,Transform> bones)
     {
-        visual=owner;brain=GetComponent<EnemyController>();animator=GetComponent<Animator>();pelvis=bones["Base HumanPelvis"];
+        visual=owner;brain=GetComponent<EnemyController>();pelvis=bones["Base HumanPelvis"];
         thigh[0]=bones["Base HumanLLegThigh"];calf[0]=bones["Base HumanLLegCalf"];foot[0]=bones["Base HumanLLegFoot"];
         thigh[1]=bones["Base HumanRThigh"];calf[1]=bones["Base HumanRCalf"];foot[1]=bones["Base HumanRFoot"];
     }
@@ -40,15 +42,35 @@ public sealed class RevenantGrounding : MonoBehaviour
         return distance<float.PositiveInfinity;
     }
 
+    void Update()
+    {
+        if ((!pelvisAdjusted && adjustedLegs == 0) || visual == null || !visual.WillAnimate) return;
+        if (pelvisAdjusted) pelvis.localPosition = pelvisBeforeGrounding;
+        for (int side = 0; side < 2; side++)
+        {
+            if ((adjustedLegs & (1 << side)) == 0) continue;
+            thigh[side].localRotation = poseBeforeGrounding[side * 3];
+            calf[side].localRotation = poseBeforeGrounding[side * 3 + 1];
+            foot[side].localRotation = poseBeforeGrounding[side * 3 + 2];
+        }
+        pelvisAdjusted = false;
+        adjustedLegs = 0;
+    }
+
+    void GroundPelvis()
+    {
+        if (BodyOffset == 0f) return;
+        pelvisBeforeGrounding = pelvis.localPosition;
+        pelvisAdjusted = true;
+        pelvis.position += Vector3.up * BodyOffset;
+    }
+
     void LateUpdate()
     {
-        // Offsets are applied to a freshly evaluated animation pose. Reapplying
-        // them while paused or Animator-disabled would accumulate a floor drift.
-        if(animator==null||!animator.enabled||Time.timeScale<=0||Time.deltaTime<=0)return;
-        if(visual==null||!visual.Body.isVisible&&animator.cullingMode!=AnimatorCullingMode.AlwaysAnimate)return;
+        if (visual == null || !visual.CanAdjustPose) return;
         if(brain!=null&&brain.IsDead)
         {
-            pelvis.position+=Vector3.up*BodyOffset; // Keep the fall grounded; don't cancel corpse sinking.
+            GroundPelvis(); // Keep the fall grounded; don't cancel corpse sinking.
             return;
         }
         float scale=transform.lossyScale.y;HasGround=false;
@@ -63,11 +85,15 @@ public sealed class RevenantGrounding : MonoBehaviour
             else{delta[side]=0;normal[side]=Vector3.up;}
         }
         BodyOffset=Mathf.Min(delta[0],delta[1]);
-        pelvis.position+=Vector3.up*BodyOffset;
+        GroundPelvis();
         if(visual.DetailLevel>=2)return;
         for(int side=0;side<2;side++)
         {
             if(Mathf.Abs(delta[side]-BodyOffset)<.001f&&normal[side].y>.999f)continue;
+            adjustedLegs |= 1 << side;
+            poseBeforeGrounding[side * 3] = thigh[side].localRotation;
+            poseBeforeGrounding[side * 3 + 1] = calf[side].localRotation;
+            poseBeforeGrounding[side * 3 + 2] = foot[side].localRotation;
             var goal=target[side]+Vector3.up*delta[side];
             // The captured ankle height retains toe-off and swing clearance.
             PoseMath.ArmStable(thigh[side],calf[side],foot[side],goal,calf[side].position+transform.forward*.04f*scale);

@@ -70,7 +70,7 @@ public static class GameSettings
         ("Elven Ash", new Color(0.92f, 0.88f, 0.78f), new Color(0.95f, 0.75f, 0.25f)),
         ("Dragonbone", new Color(0.6f, 0.12f, 0.1f), new Color(0.2f, 0.2f, 0.2f)),
     };
-    public static readonly string[] Crests = { "Cross", "Plain", "Chevron", "Saltire" };
+    public static readonly string[] Crests = { "Cross", "Plain", "Chevron", "Saltire", "Raven", "Oak Leaf" };
 
     // ---------------- difficulty tuning
     public struct DifficultyProfile
@@ -97,7 +97,7 @@ public static class GameSettings
 
     public static string ModeBlurb(GameMode m) => m switch
     {
-        GameMode.DefendTheCastle => "Hold the outer wall with arrows and falling stones. If the doors break, fall back and keep the inner gate standing until relief arrives.",
+        GameMode.DefendTheCastle => "Defend the outer wall with arrows and falling stones. Fall back to the Keep if the doors break. Clear the remaining attackers when reinforcements stop.",
         GameMode.EndlessHorde => "Draft a power after every wave. Every third wave brings chaos; every fifth, a Brute. Forge a broken build. How long will your legend last?",
         _ => "The gates have fallen. Hold your ground until the reinforcements arrive at dawn.",
     };

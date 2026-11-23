@@ -320,13 +320,13 @@ public class GameManager : MonoBehaviour
     void UpdateSiege(GameSettings.DifficultyProfile profile)
     {
         if (Outer.Cinematic) return;
+        if (Outer.ReinforcementsStopped)
+        {
+            if (EnemyController.All.Count == 0) WinGame();
+            return;
+        }
         if (!Outer.Breached)
         {
-            if (Outer.HoldSeconds >= OuterSiege.OuterDuration)
-            {
-                WinGame();
-                return;
-            }
             if (Outer.FinalAssault && !finalOuterPush)
             {
                 finalOuterPush = true;
@@ -341,11 +341,6 @@ public class GameManager : MonoBehaviour
             return;
         }
 
-        if (Outer.KeepSeconds >= OuterSiege.KeepDuration)
-        {
-            WinGame();
-            return;
-        }
         float progress = Outer.KeepSeconds / OuterSiege.KeepDuration;
         if (!warlordSpawned && progress >= .68f) LaunchFinalAssault();
         int innerCap = Mathf.RoundToInt(Mathf.Lerp(4, profile.maxAlive, progress));
@@ -470,6 +465,7 @@ public class GameManager : MonoBehaviour
             (playerHealth != null && playerHealth.IsDead)) return;
         if (Mode == GameMode.DefendTheCastle)
         {
+            if (Outer.ReinforcementsStopped) return;
             int due = Outer.KeepSeconds >= 28f ? 2 : Outer.HoldSeconds >= 45f ? 1 : 0;
             if (defendBoonsGiven < due) { defendBoonsGiven++; OfferBoon(); }
         }
@@ -723,6 +719,8 @@ public class GameManager : MonoBehaviour
 
     public string Objective => Mode switch
     {
+        GameMode.DefendTheCastle when Outer != null && Outer.ReinforcementsStopped =>
+            $"Clear the survivors   ·   {EnemyController.All.Count} remain",
         GameMode.DefendTheCastle when Outer != null && !Outer.Breached =>
             $"{(Outer.FinalAssault ? "Final Push" : "Hold the Outer Wall")}   {ClockLabel(OuterSiege.OuterDuration - Outer.HoldSeconds)}",
         GameMode.DefendTheCastle when Outer != null => $"Survive at the Keep   {ClockLabel(OuterSiege.KeepDuration - Outer.KeepSeconds)}",

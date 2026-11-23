@@ -36,6 +36,22 @@ public class EnemyController : MonoBehaviour
     public float LastHitTime { get; private set; } = -99f;
     public float HealthFraction => MaxHealth > 0 ? Mathf.Clamp01(Health / MaxHealth) : 0f;
     public Vector3 HeadPosition => transform.position + Vector3.up * 1.9f * transform.localScale.y;
+    MarchwardenVisual graveArrowVisual;
+    Transform graveArrowHead;
+    internal SkinnedMeshRenderer ArrowBody => revenant != null ? revenant.Body : graveArrowVisual != null ? graveArrowVisual.Body : null;
+    internal Transform ArrowHead => revenant != null ? revenant.ArrowHead : graveArrowHead;
+    internal Transform ArrowShieldHand => revenant != null ? revenant.ShieldHand : null;
+    internal MeshFilter ArrowHelmet => revenant != null ? revenant.ArrowHelmet : null;
+    internal MeshFilter ArrowShield
+    {
+        get
+        {
+            if (graveArrowVisual == null) return null;
+            var shield = graveArrowVisual.Shield;
+            if (!shield.gameObject.activeInHierarchy) shield = duelist.Gear.StowedShield;
+            return shield != null ? shield.GetComponent<MeshFilter>() : null;
+        }
+    }
 
     enum State { Emerging, Hunt, Circle, Attack, Kite, Fuse, Charge, Dead, Staggered }
     State state = State.Hunt;
@@ -83,6 +99,7 @@ public class EnemyController : MonoBehaviour
     NavMeshPath runnerPath;
     OuterSiege outerOrder;
     bool outerAttackKnight;
+    bool outerGateCommitted, keepGateCommitted;
     bool siegePrefersKnight;
     float nextSiegeTargetCheck;
     int outerLane;
@@ -163,6 +180,9 @@ public class EnemyController : MonoBehaviour
     {
         initialised = true;
         duelist = opponent;
+        graveArrowVisual = GetComponentInChildren<MarchwardenVisual>();
+        if (graveArrowVisual != null)
+            graveArrowHead = System.Array.Find(graveArrowVisual.Body.bones, b => b.name == "Bip001 Head");
         player = knight.transform;
         playerHealth = knight;
         type = ZombieType.Swordsman;
@@ -349,7 +369,9 @@ public class EnemyController : MonoBehaviour
         bool rush = outerOrder.Breached;
         if (rush && !outerOrder.PassageClear) return;
         Vector3 station = outerOrder.MarchPoint(this, outerLane, rush ? outerStage : -1);
-        if (KnightAccessible(5f) &&
+        Vector3 delta = Flat(station - transform.position);
+        if (!rush && delta.sqrMagnitude <= .025f) outerGateCommitted = true;
+        if ((rush || !outerGateCommitted) && KnightAccessible(5f) &&
             DistanceToPlayer < Vector3.Distance(transform.position, station) + attackRange)
         {
             FaceTowards(player.position, 11);
@@ -366,7 +388,6 @@ public class EnemyController : MonoBehaviour
             MarchOnGround(direction * (DistanceToPlayer - attackRange), baseSpeed);
             return;
         }
-        Vector3 delta = Flat(station - transform.position);
         if (delta.sqrMagnitude > .025f)
         {
             FaceTowards(station, 11);
@@ -437,6 +458,7 @@ public class EnemyController : MonoBehaviour
 
     void DivertToKnight()
     {
+        if (keepGateCommitted) return;
         divertedUntil = Time.time + 3.5f;
         if (objectiveSwing) SetState(State.Hunt);
     }
@@ -444,18 +466,24 @@ public class EnemyController : MonoBehaviour
     bool UpdateSiegeOrder()
     {
         bool artillery = type == ZombieType.Spitter;
-        if (!artillery && (!IsBreacher || Time.time < divertedUntil)) return false;
-        if (Time.time >= nextSiegeTargetCheck)
-        {
-            nextSiegeTargetCheck = Time.time + .4f;
-            float threshold = Vector3.Distance(transform.position, siegeGate.Approach) + (siegePrefersKnight ? .75f : -.35f);
-            siegePrefersKnight = KnightAccessible(threshold);
-        }
-        if (siegePrefersKnight) return false;
-        ReleaseToken();
+        if (!artillery && !IsBreacher) return false;
         Vector3 station = artillery ? siegeGate.Battery(GetInstanceID()) : siegeGate.Approach;
         float range = artillery ? 1.25f : Mathf.Max(.65f, attackRange - .6f);
-        if ((transform.position - station).sqrMagnitude > range * range)
+        bool atStation = (transform.position - station).sqrMagnitude <= range * range;
+        if (atStation) keepGateCommitted = true;
+        if (!keepGateCommitted)
+        {
+            if (!artillery && Time.time < divertedUntil) return false;
+            if (Time.time >= nextSiegeTargetCheck)
+            {
+                nextSiegeTargetCheck = Time.time + .4f;
+                float threshold = Vector3.Distance(transform.position, siegeGate.Approach) + (siegePrefersKnight ? .75f : -.35f);
+                siegePrefersKnight = KnightAccessible(threshold);
+            }
+            if (siegePrefersKnight) return false;
+        }
+        ReleaseToken();
+        if (!atStation)
             Chase(station, baseSpeed);
         else
         {
@@ -918,12 +946,18 @@ public class EnemyController : MonoBehaviour
     // Environmental damage and nonlethal hits continue the brain uninterrupted.
     // Only weapon contacts go through the physical guard rules.
     public bool ReceiveWeaponHit(float amount,Vector3 direction,float knockback,Vector3 point,bool bash=false,Vector3? bloodDirection=null)
+        => ReceiveContact(amount, direction, knockback, point, bash, bloodDirection, true);
+
+    internal bool ReceivePreciseArrowHit(float amount, Vector3 direction, float knockback, Vector3 point)
+        => ReceiveContact(amount, direction, knockback, point, false, null, false);
+
+    bool ReceiveContact(float amount, Vector3 direction, float knockback, Vector3 point, bool bash, Vector3? bloodDirection, bool checkGuard)
     {
         if(IsDead||awaitingRoyalVolley||amount<=0||state==State.Emerging&&stateTimer<.4f||duelist!=null&&!duelist.CanFight)return false;
         if (siegeGate != null && IsBreacher) DivertToKnight();
         bool frontal=Vector3.Dot(transform.forward,-Flat(direction).normalized)>.40f;
         if(bash&&type==ZombieType.Bulwark&&frontal)guardBrokenUntil=Time.time+1.25f;
-        if(!bash&&GuardsContact(direction,point))
+        if(checkGuard&&!bash&&GuardsContact(direction,point))
         {
             FX.Sparks(point,-direction);AudioManager.PlayAt("shield_block",point,.85f);
             return false;
@@ -1125,7 +1159,8 @@ public class EnemyController : MonoBehaviour
         timeBetweenAttacks *= 0.65f;
         AudioManager.PlayZombieVoice("brute_roar", transform.position, type);
         FX.Shake(0.6f);
-        GameHUD.Announce("The Warlord is enraged - the dead answer its call!", UIKit.Blood);
+        GameHUD.Announce(GameManager.instance?.Outer?.ReinforcementsStopped == true
+            ? "The Warlord is enraged!" : "The Warlord is enraged - the dead answer its call!", UIKit.Blood);
         Summon(3);
         nextSummon = Time.time + 18f;
     }
@@ -1194,6 +1229,7 @@ public class EnemyController : MonoBehaviour
 
     void Summon(int count)
     {
+        if (GameManager.instance?.Outer?.ReinforcementsStopped == true) return;
         summoned.RemoveAll(z => z == null || z.IsDead);
         var spawner = ZombieSpawner.Instance;
         if (spawner == null || spawner.zombiePrefab == null) return;

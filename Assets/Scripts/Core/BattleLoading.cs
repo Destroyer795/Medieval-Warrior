@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using TMPro;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
@@ -16,7 +17,7 @@ public sealed class BattleLoading : MonoBehaviour
     readonly List<UnityEngine.Object> residentAssets=new List<UnityEngine.Object>();
     [Serializable] public sealed class Manifest {public string[] clips,meshes;}
     Canvas screen;
-    Text caption;
+    TextMeshProUGUI caption, progressLabel;
     public static bool Ready=>instance!=null&&instance.ready;
     public static bool IsTransitioning=>instance!=null&&instance.transitioning;
     public static string Phase {get;private set;}="Menu";
@@ -105,13 +106,20 @@ public sealed class BattleLoading : MonoBehaviour
         {
             var go=new GameObject("Loading screen");go.transform.SetParent(transform,false);
             screen=go.AddComponent<Canvas>();screen.renderMode=RenderMode.ScreenSpaceOverlay;screen.sortingOrder=32000;
-            go.AddComponent<CanvasScaler>().uiScaleMode=CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            var scaler = go.AddComponent<CanvasScaler>();
+            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+            scaler.referenceResolution = new Vector2(1920, 1080);
+            scaler.matchWidthOrHeight = .5f;
             go.AddComponent<GraphicRaycaster>();
-            var panel=new GameObject("Background").AddComponent<Image>();panel.transform.SetParent(go.transform,false);panel.color=new Color(.018f,.022f,.025f,1);
-            var rect=panel.rectTransform;rect.anchorMin=Vector2.zero;rect.anchorMax=Vector2.one;rect.offsetMin=rect.offsetMax=Vector2.zero;
-            caption=new GameObject("Preparing the courtyard").AddComponent<Text>();caption.transform.SetParent(panel.transform,false);
-            caption.font=Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");caption.fontSize=28;caption.color=new Color(.86f,.77f,.56f);caption.alignment=TextAnchor.MiddleCenter;
-            caption.rectTransform.anchorMin=Vector2.zero;caption.rectTransform.anchorMax=Vector2.one;caption.rectTransform.offsetMin=caption.rectTransform.offsetMax=Vector2.zero;
+            var panel = UIKit.Img(go.transform, null, new Color(.02f, .015f, .01f), "Loading backdrop");
+            panel.raycastTarget = true;
+            panel.rectTransform.Fill();
+            var center = new Vector2(.5f, .5f);
+            caption = UIKit.Text(panel.transform, "", 56f, UIKit.Gold, TextAlignmentOptions.Center, true);
+            caption.name = "Loading title";
+            caption.rectTransform.Place(center, center, new Vector2(0f, 24f), new Vector2(960f, 80f));
+            progressLabel = UIKit.Text(panel.transform, "", 26f, UIKit.Parchment);
+            progressLabel.rectTransform.Place(center, center, new Vector2(0f, -52f), new Vector2(690f, 44f));
         }
         screen.gameObject.SetActive(show);
     }
@@ -120,16 +128,18 @@ public sealed class BattleLoading : MonoBehaviour
         ShowScreen(true);CombatTime.SetScale(1);
         try
         {
+            caption.text = target == "MainMenu" ? "Returning to the Keep" : "The gates open...";
+            progressLabel.text = "";
             if(target=="Semi-Final")
             {
                 Prepare();
                 while(!ready)
                 {
-                    caption.text="Preparing the courtyard"+new string('.',1+(int)(Time.realtimeSinceStartup*2)%3)+"\n"+Mathf.RoundToInt(progress*100)+"%";
+                    progressLabel.text = $"Preparing the courtyard  {Mathf.RoundToInt(progress * 100)}%";
                     yield return null;
                 }
             }
-            caption.text=target=="MainMenu"?"Returning to the keep...":"The gates open...";
+            progressLabel.text = "";
             yield return null;
             if(!SceneManager.GetSceneByName("Background").isLoaded)
                 yield return SceneManager.LoadSceneAsync("Background",LoadSceneMode.Additive);

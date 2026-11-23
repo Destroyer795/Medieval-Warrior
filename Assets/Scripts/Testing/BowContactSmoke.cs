@@ -3,6 +3,7 @@ using System.Collections;
 using System.Linq;
 using System.Reflection;
 using UnityEngine;
+using UnityEngine.AI;
 
 public partial class SmokeTestDriver
 {
@@ -63,6 +64,9 @@ public partial class SmokeTestDriver
                 ? (shot.transform.position + shot.transform.forward * .72f - origin).z : float.PositiveInfinity;
             Check(shot != null && shot.GetComponent<Pickup>() != null && lodgedTipDepth < .15f,
                 "an arrow stops at cover in front of the muzzle before reaching the target");
+            wall.SetActive(false);
+            target.SetActive(false);
+            yield return ReviewArrowSilhouette(player, origin + Vector3.forward * 5f);
         }
         finally
         {
@@ -80,6 +84,54 @@ public partial class SmokeTestDriver
             if (!wasKinematic) body.linearVelocity = velocity;
             Physics.SyncTransforms();
         }
+    }
+
+    IEnumerator ReviewArrowSilhouette(PlayerControlSpeed player, Vector3 location)
+    {
+        var actor = Instantiate(BattleLoading.ZombiePrefab, location, Quaternion.identity);
+        var enemy = actor.GetComponent<EnemyController>();
+        enemy.Init(ZombieType.Walker, false, false);
+        actor.GetComponent<NavMeshAgent>().enabled = false;
+        var animator = actor.GetComponent<Animator>();
+        animator.Play("Locomotion", 0, 0);
+        animator.Update(0);
+        animator.enabled = false;
+        var capsule = actor.GetComponent<CapsuleCollider>();
+        Physics.SyncTransforms();
+        float before = enemy.Health;
+        Ray miss = default;
+        bool found = false;
+        for (float y = .48f; y <= 1.2f && !found; y += .12f)
+            for (int side = -1; side <= 1 && !found; side += 2)
+            {
+                var origin = actor.transform.TransformPoint(new Vector3(capsule.radius * .87f * side, y, -1.5f));
+                var candidate = new Ray(origin, actor.transform.forward);
+                float distance = 3f;
+                found = capsule.Raycast(candidate, out _, 3f) &&
+                    !ArrowSurface.Trace(enemy, candidate, false, ref distance, out _, out _);
+                if (found) miss = candidate;
+            }
+        Check(found, "the testing ray passes through the Walker movement capsule outside the actual silhouette");
+        if (found)
+        {
+            Vector3 target = Arrow.AimTarget(miss, miss.origin, player.transform);
+            var arrow = Arrow.FireBow(miss.origin, miss.direction, .5f, player.transform);
+            yield return Wait(.17f);
+            Check((target - miss.origin).magnitude > 100f && Mathf.Approximately(enemy.Health, before),
+                "neither crosshair convergence nor a flying arrow awards a Walker hit outside its actual silhouette");
+            if (arrow != null) Destroy(arrow.gameObject);
+        }
+
+        var chest = enemy.ArrowBody.bones.First(b => b.name == "Base HumanRibcage").position;
+        var bodyRay = new Ray(chest - actor.transform.forward * .8f, actor.transform.forward);
+        Vector3 bodyTarget = Arrow.AimTarget(bodyRay, bodyRay.origin, player.transform);
+        var bodyShot = Arrow.Fire(bodyRay.origin, bodyRay.direction, 55f, .23f, 0, player.transform);
+        yield return Wait(.12f);
+        Check((bodyTarget - bodyRay.origin).magnitude < 1f &&
+            Mathf.Abs(before - enemy.Health - .23f) < .001f,
+            "a point-blank arrow contacts the visible torso and deals normal body damage");
+        if (bodyShot != null) Destroy(bodyShot.gameObject);
+        Destroy(actor);
     }
 }
 #endif

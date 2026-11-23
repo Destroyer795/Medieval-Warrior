@@ -112,6 +112,16 @@ public partial class SmokeTestDriver : MonoBehaviour
                         turntable.knight.position, Vector3.up).normalized;
                     Check(Vector3.Dot(towardsViewer, turntable.knight.forward) > .7f,
                         "the customization turntable opens facing the viewer with the sword visible");
+                    var info = GameObject.Find("Sword information").GetComponent<RectTransform>();
+                    var frame = GameObject.Find("Preview Frame").GetComponent<RectTransform>();
+                    var label = info.GetComponentInChildren<TMPro.TextMeshProUGUI>();
+                    var frameCorners = new Vector3[4];
+                    var infoCorners = new Vector3[4];
+                    frame.GetWorldCorners(frameCorners);
+                    info.GetWorldCorners(infoCorners);
+                    Check(infoCorners[1].y < frameCorners[0].y && Mathf.Abs(infoCorners[0].x - frameCorners[0].x) < .01f &&
+                        label.text.Contains(SwordWardrobe.Names[SwordWardrobe.Selected]) && !label.isTextOverflowing,
+                        "the equipped sword's information fits directly beneath the knight preview");
                 }
                 Capture("02_menu_" + page);
             }
@@ -147,12 +157,28 @@ public partial class SmokeTestDriver : MonoBehaviour
             yield break;
         }
 
-        yield return ReviewSiege();
+        bool uiReviewOnly = System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "-mwUiReview") >= 0;
+        if (menu != null && preview != null)
+        {
+            menu.DebugShow("customise");
+            yield return ReviewShieldFinishes(preview, menu);
+        }
+        if (!uiReviewOnly) yield return ReviewSiege();
 
         // ---------------------------------------------------------- Defend the Castle
         GameSettings.Mode = GameMode.DefendTheCastle;
-        var mc = FindFirstObjectByType<MainController>();
-        if (mc != null) mc.StartGame(); else SceneManager.LoadScene("Semi-Final");
+        menu = FindFirstObjectByType<MainMenuUI>();
+        menu.DebugShow("play");
+        var battleButton = menu.GetComponentsInChildren<UnityEngine.UI.Button>()
+            .First(b => b.GetComponentInChildren<TMPro.TextMeshProUGUI>()?.text == "To Battle!");
+        battleButton.onClick.Invoke();
+        Canvas.ForceUpdateCanvases();
+        var gateTitles = FindObjectsByType<TMPro.TextMeshProUGUI>(FindObjectsSortMode.None)
+            .Where(t => t.text == "The gates open...").ToArray();
+        Check(BattleLoading.IsTransitioning && gateTitles.Length == 1 && gateTitles[0].font == UIKit.TitleFont &&
+            !FindObjectsByType<UnityEngine.UI.Text>(FindObjectsSortMode.None).Any(t => t.text == "The gates open..."),
+            "To Battle shows one gates-open message in the same title font as the menu");
+        Capture("09_loading");
         float loadDeadline=Time.realtimeSinceStartup+30f;
         while((!BattleLoading.Ready||BattleLoading.IsTransitioning||GameManager.instance==null)&&Time.realtimeSinceStartup<loadDeadline)
             yield return null;
@@ -171,8 +197,29 @@ public partial class SmokeTestDriver : MonoBehaviour
         Capture("10_game_intro");
         yield return Wait(7f);
         Check(gm != null && gm.State == GameManager.MatchState.Playing, "match moved from intro to playing");
+        Canvas.ForceUpdateCanvases();
+        var hintLabel = GameObject.Find("Controls and interactions")?.GetComponent<TMPro.TextMeshProUGUI>();
+        Check(hintLabel != null && hintLabel.font == UIKit.BodyFont && !hintLabel.isTextOverflowing &&
+            hintLabel.GetComponentInParent<CanvasGroup>().alpha > .9f,
+            "combat controls or an interaction hint fit inside the bottom plaque with the body font");
         Check(EnemyController.All.Count > 0, $"zombies spawned on their own ({EnemyController.All.Count} alive)");
         Capture("11_game_horde");
+        var shieldKnight = GameObject.FindWithTag("Player")?.GetComponent<PlayerControlSpeed>();
+        if (shieldKnight != null && shieldKnight.Gear != null)
+        {
+            var visual = shieldKnight.GetComponent<MarchwardenVisual>();
+            var heldPlate = visual.Shield.GetComponent<MeshRenderer>();
+            var carriedPlate = shieldKnight.Gear.StowedShield.GetComponent<MeshRenderer>();
+            Check(heldPlate.sharedMaterials[12] == carriedPlate.sharedMaterials[12] &&
+                heldPlate.sharedMaterials[12].shader.name == "Medieval Warrior/Shield Heraldry",
+                "the held and slung shields use the same heraldic steel material");
+        }
+        if (uiReviewOnly)
+        {
+            if (shieldKnight != null) yield return CaptureDarkCrestInBattle(shieldKnight);
+            Finish(savedMode, savedDiff);
+            yield break;
+        }
 
         var playerGo = GameObject.FindWithTag("Player");
         var player = playerGo != null ? playerGo.GetComponent<PlayerControlSpeed>() : null;
@@ -908,9 +955,14 @@ public partial class SmokeTestDriver : MonoBehaviour
             EnemyController.All.Count(e => e != null && e.SiegeEscort && e.type == ZombieType.Bulwark) == 2 &&
             EnemyController.All.Count(e => e != null && e.SiegeEscort && e.type == ZombieType.Swordsman) == 2,
             "the Warlord leads two Bulwarks and two Swordsmen before the survival timer ends");
-        int expectedDefenseBonus = gm.Gate != null ? Mathf.RoundToInt(gm.Gate.Integrity * 3000) : -1;
         keepClock.SetValue(gm.Outer, OuterSiege.KeepDuration - .05f);
+        yield return Wait(.65f);
+        Check(gm.Outer.ReinforcementsStopped && gm.State == GameManager.MatchState.Playing &&
+            EnemyController.All.Count > 0, "the expired Keep timer leaves the existing attackers in play");
+        foreach (var enemy in EnemyController.All.ToArray())
+            if (enemy != null && !enemy.IsDead) enemy.TakeDamage(9999f, Vector3.forward, 0f);
         yield return Wait(2.5f);
+        int expectedDefenseBonus = gm.Gate != null ? Mathf.RoundToInt(gm.Gate.Integrity * 3000) : -1;
         Check(gm.State == GameManager.MatchState.Won && gm.GateBonus == expectedDefenseBonus, "Defend victory grants the surviving gate integrity bonus");
         Capture("19_victory");
 
@@ -968,6 +1020,95 @@ public partial class SmokeTestDriver : MonoBehaviour
         yield return ReviewLastStand();
 
         Finish(savedMode, savedDiff);
+    }
+
+    IEnumerator ReviewShieldFinishes(MenuPreview preview, MainMenuUI menu)
+    {
+        int savedCrest = GameSettings.Crest, savedTabard = GameSettings.Tabard;
+        var shield = preview.knight.GetComponent<MarchwardenVisual>().Shield;
+        var plate = shield.GetComponent<MeshRenderer>();
+        var pigment = new MaterialPropertyBlock();
+        var artwork = new HashSet<Sprite>();
+        try
+        {
+            for (int i = 0; i < GameSettings.Crests.Length; i++)
+            {
+                GameSettings.Crest = i;
+                GameSettings.Tabard = 7;
+                menu.DebugShow("customise");
+                preview.Appearance.Apply();
+                yield return Wait(.45f);
+                plate.GetPropertyBlock(pigment, 12);
+                var charge = ShieldHeraldry.ChargeSprite(i);
+                if (charge != null) artwork.Add(charge);
+                Check(pigment.GetColor("_Field") == GameSettings.TabardColors[7].color &&
+                    pigment.GetFloat("_HasCharge") == (charge == null ? 0f : 1f) &&
+                    pigment.GetTexture("_Charge") == (charge == null ? Texture2D.blackTexture : charge.texture) &&
+                    pigment.GetColor("_Pigment") == ShieldHeraldry.ChargeColor(i) &&
+                    shield.GetComponentsInChildren<MeshRenderer>().Length == 1,
+                    GameSettings.Crests[i] + " uses the chosen colour and shared HUD crest on the steel surface");
+                Capture("crest_" + GameSettings.Crests[i].ToLowerInvariant().Replace(' ', '_'));
+            }
+            Check(artwork.Count == 5 && GameSettings.Crests[1] == "Plain" && ShieldHeraldry.ChargeSprite(1) == null,
+                "five distinct charges and the original blank shield are available");
+            foreach (int crest in new[] { 2, 4 })
+            {
+                GameSettings.Crest = crest;
+                GameSettings.Tabard = 6;
+                menu.DebugShow("customise");
+                preview.Appearance.Apply();
+                yield return Wait(.45f);
+                plate.GetPropertyBlock(pigment, 12);
+                Check(pigment.GetColor("_Pigment").grayscale < .18f && pigment.GetColor("_ChargeEdge").a > 0f,
+                    "dark " + GameSettings.Crests[crest] + " keeps its black pigment and has an edge on Raven Black");
+                Capture("crest_black_" + GameSettings.Crests[crest].ToLowerInvariant());
+            }
+        }
+        finally
+        {
+            GameSettings.Crest = savedCrest;
+            GameSettings.Tabard = savedTabard;
+            preview.Appearance.Apply();
+            menu.DebugShow("title");
+        }
+    }
+
+    IEnumerator CaptureDarkCrestInBattle(PlayerControlSpeed knight)
+    {
+        int previousCrest = GameSettings.Crest, previousField = GameSettings.Tabard;
+        Weapon previousWeapon = knight.CurrentWeapon;
+        var visual = knight.GetComponent<MarchwardenVisual>();
+        try
+        {
+            GameSettings.Crest = 4;
+            GameSettings.Tabard = 6;
+            visual.ApplyColors(6, GameSettings.Metal, GameSettings.Leather);
+            knight.Equip(Weapon.Sword);
+            knight.DebugBlock(true);
+            yield return Wait(.4f);
+            CaptureFrom("crest_guard", visual.Shield.position + visual.Shield.forward * 2.5f + Vector3.up * .32f,
+                visual.Shield.position);
+            knight.DebugBlock(false);
+            knight.Equip(Weapon.Bow);
+            yield return Wait(.4f);
+            var carried = knight.Gear.StowedShield;
+            CaptureFrom("crest_slung", carried.position + carried.forward * 2.5f + Vector3.up * .32f, carried.position);
+            var heldPaint = new MaterialPropertyBlock();
+            var slungPaint = new MaterialPropertyBlock();
+            visual.Shield.GetComponent<MeshRenderer>().GetPropertyBlock(heldPaint, 12);
+            carried.GetComponent<MeshRenderer>().GetPropertyBlock(slungPaint, 12);
+            Check(slungPaint.GetTexture("_Charge") == heldPaint.GetTexture("_Charge") &&
+                slungPaint.GetColor("_ChargeEdge") == heldPaint.GetColor("_ChargeEdge"),
+                "the dark Raven keeps the same pattern and edge when slung after a block");
+        }
+        finally
+        {
+            knight.DebugBlock(false);
+            knight.Equip(previousWeapon);
+            GameSettings.Crest = previousCrest;
+            GameSettings.Tabard = previousField;
+            visual.ApplyColors(previousField, GameSettings.Metal, GameSettings.Leather);
+        }
     }
 
     IEnumerator ReviewSwordMotion(PlayerControlSpeed player)
@@ -1202,8 +1343,10 @@ public partial class SmokeTestDriver : MonoBehaviour
                         bool wasAnimating=anim.enabled;anim.enabled=false;Physics.SyncTransforms();
                         float beforeArrow=e.Health;
                         var frozenArm=armZone.bounds.center;
+                        EnemyController.All.Add(e); // This disabled fixture still stands in for a live target.
                         var limbArrow=Arrow.Fire(armContact+e.transform.forward*2.1f,-e.transform.forward,25,.15f,0,player.transform);
                         yield return Wait(.18f);
+                        EnemyController.All.Remove(e);
                         Check(Vector3.Distance(frozenArm,armZone.bounds.center)<.01f,"procedural posing does not accumulate on a disabled animation rig");
                         Check(e.Health<beforeArrow&&visual.Injuries.BloodCount==2,"a real arrow can wound an exposed arm through the anatomical hit volume");
                         if(limbArrow!=null)Destroy(limbArrow.gameObject);anim.enabled=wasAnimating;
@@ -1252,6 +1395,8 @@ public partial class SmokeTestDriver : MonoBehaviour
                         Call(e,"BeginAttack");e.transform.rotation*=Quaternion.Euler(0,100,0);Clock(e,e.Stats.windup+.12f);float missBefore=health.currentHealth;Call(e,"UpdateAttack");
                         Check(health.currentHealth==missBefore,kind+" misses when its committed blade passes beside the warrior");
                     }
+                    if (kind == ZombieType.Bulwark || kind == ZombieType.Brute)
+                        yield return ReviewRevenantHitMotion(e, visual, anim);
                 }
                 finally{ZombieDirector.ReleaseToken(e);Destroy(e.gameObject);}
                 yield return null;

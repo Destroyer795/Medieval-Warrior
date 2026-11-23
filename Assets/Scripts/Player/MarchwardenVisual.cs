@@ -109,7 +109,7 @@ public class MarchwardenVisual : MonoBehaviour
         palette[2].color = GameSettings.TabardColors[Mathf.Clamp(cloth, 0, GameSettings.TabardColors.Length - 1)].color;
         palette[3].color = new Color(.26f, .16f, .10f) * GameSettings.LeatherTints[Mathf.Clamp(leather, 0, GameSettings.LeatherTints.Length - 1)].tint;
         if(Linen!=null)Linen.SetColor(palette[2].color);
-        foreach (var crest in GetComponentsInChildren<ShieldHeraldry>(true)) crest.Apply();
+        foreach (var crest in GetComponentsInChildren<ShieldHeraldry>(true)) crest.Apply(cloth);
     }
 
     public void SetSwordAppearance(GameObject design)

@@ -40,6 +40,7 @@ public class GameHUD : MonoBehaviour
     // feedback
     RectTransform bannerRoot, toastRoot, feedRoot;
     TextMeshProUGUI bannerTitle, bannerSub, fpsText, hintText;
+    CanvasGroup hintPanel;
     float bannerTimer, bannerDuration, hintTimer = 14f;
     readonly List<(RectTransform rt, float born, float life)> transients = new List<(RectTransform, float, float)>();
     readonly List<Image> threatPool = new List<Image>();
@@ -91,18 +92,20 @@ public class GameHUD : MonoBehaviour
         // don't stack identical messages
         foreach (var tr in instance.transients)
             if (tr.rt != null && tr.rt.parent == instance.toastRoot && tr.rt.GetComponentInChildren<TextMeshProUGUI>().text == text) return;
-        var row = UIKit.HList(instance.toastRoot, 10);
-        row.Layout(wrap ? 60 : 46);
+        var plate = UIKit.Img(instance.toastRoot, "panel_dark", Color.white, "Notification");
+        plate.Layout(wrap ? 68 : 46, wrap ? 800 : 570);
+        var row = UIKit.HList(plate.transform, 12);
+        ((RectTransform)row.transform).Fill(8);
         row.childForceExpandHeight = false;
+        row.childForceExpandWidth = false;
         if (icon != null) UIKit.Icon(row.transform, icon, 38).Layout(38, 38);
-        var t = UIKit.Text(row.transform, text, size, color);
-        if (wrap) t.Layout(60, 830);
-        else
-        {
-            t.textWrappingMode = TextWrappingModes.NoWrap;
-            var fit = t.gameObject.AddComponent<ContentSizeFitter>(); fit.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
-        }
-        instance.transients.Add(((RectTransform)row.transform, Time.unscaledTime, life));
+        var t = UIKit.Text(row.transform, text, size, color, TextAlignmentOptions.MidlineLeft);
+        t.Layout(wrap ? 52 : 34, flexW: 1);
+        t.enableAutoSizing = true;
+        t.fontSizeMax = size;
+        t.fontSizeMin = Mathf.Min(21f, size);
+        t.textWrappingMode = wrap ? TextWrappingModes.Normal : TextWrappingModes.NoWrap;
+        instance.transients.Add((plate.rectTransform, Time.unscaledTime, life));
     }
 
     // ---- boon choice: three parchment cards, time frozen until one is picked
@@ -280,13 +283,21 @@ public class GameHUD : MonoBehaviour
         emblemField.rectTransform.Place(new Vector2(0, 1), new Vector2(0, 1), Vector2.zero, new Vector2(128, 128));
         emblemField.preserveAspect = true;
         emblemCharge = UIKit.Img(emblemField.transform, "emblem_charge", Color.white, "Charge");
-        emblemCharge.rectTransform.Fill();
+        emblemCharge.rectTransform.Place(new Vector2(.5f, .5f), new Vector2(.5f, .5f),
+            new Vector2(0f, 8f), new Vector2(107f, 107f));
         emblemCharge.preserveAspect = true;
         var tab = GameSettings.TabardColors[Mathf.Clamp(GameSettings.Tabard, 0, GameSettings.TabardColors.Length - 1)].color;
         emblemField.color = tab;
-        emblemCharge.gameObject.SetActive(GameSettings.Crest != 1);
-        if (GameSettings.Crest == 2) emblemCharge.rectTransform.localRotation = Quaternion.Euler(0, 0, 180);
-        if (GameSettings.Crest == 3) emblemCharge.rectTransform.localRotation = Quaternion.Euler(0, 0, 45);
+        emblemCharge.sprite = ShieldHeraldry.ChargeSprite(GameSettings.Crest);
+        emblemCharge.color = ShieldHeraldry.ChargeColor(GameSettings.Crest);
+        Color crestEdge = ShieldHeraldry.ChargeEdge(GameSettings.Crest, tab);
+        if (crestEdge.a > 0f)
+        {
+            var line = emblemCharge.gameObject.AddComponent<Outline>();
+            line.effectColor = crestEdge;
+            line.effectDistance = new Vector2(.85f, .85f);
+        }
+        emblemCharge.gameObject.SetActive(emblemCharge.sprite != null);
 
         heroName = UIKit.Text(group, GameSettings.HeroName, 30, UIKit.Gold, TextAlignmentOptions.BottomLeft, true);
         heroName.rectTransform.Place(new Vector2(0, 1), new Vector2(0, 1), new Vector2(140, 0), new Vector2(560, 40));
@@ -419,11 +430,14 @@ public class GameHUD : MonoBehaviour
         bannerTitle.enableAutoSizing = true; bannerTitle.fontSizeMax = 60; bannerTitle.fontSizeMin = 30;
         bannerSub = UIKit.Text(bannerRoot, "", 32, UIKit.Parchment);
         bannerSub.rectTransform.Place(new Vector2(0.5f, 0), new Vector2(0.5f, 0), Vector2.zero, new Vector2(1000, 50));
+        bannerSub.enableAutoSizing = true;
+        bannerSub.fontSizeMin = 22;
+        bannerSub.fontSizeMax = 32;
         bannerRoot.gameObject.SetActive(false);
 
         var toasts = UIKit.VList(combatRoot, 6, null, TextAnchor.LowerCenter);
         toastRoot = (RectTransform)toasts.transform;
-        toastRoot.Place(new Vector2(0.5f, 0), new Vector2(0.5f, 0), new Vector2(0, 230), new Vector2(900, 300));
+        toastRoot.Place(new Vector2(0.5f, 0), new Vector2(0.5f, 0), new Vector2(0, 115), new Vector2(900, 300));
         toasts.childForceExpandWidth = false;
         toasts.childControlWidth = true;
 
@@ -431,10 +445,20 @@ public class GameHUD : MonoBehaviour
         feedRoot = (RectTransform)feed.transform;
         feedRoot.Place(new Vector2(0, 0), new Vector2(0, 0), new Vector2(34, 30), new Vector2(520, 260));
 
-        hintText = UIKit.Text(combatRoot, "WASD move  ·  Shift sprint  ·  Space dodge  ·  LMB attack  ·  RMB block / aim  ·  Q swap weapon  ·  Esc pause", 22, new Color(1, 1, 1, 0.8f));
-        hintText.rectTransform.Place(new Vector2(0.5f, 0), new Vector2(0.5f, 0), new Vector2(0, 12), new Vector2(1500, 34));
-        hintText.outlineColor = new Color32(16, 14, 12, 255);
-        hintText.outlineWidth = .18f;
+        var hints = UIKit.Img(combatRoot, "panel_dark", Color.white, "Hint panel");
+        var hintRect = hints.rectTransform;
+        hintRect.anchorMin = new Vector2(.25f, 0);
+        hintRect.anchorMax = new Vector2(.75f, 0);
+        hintRect.offsetMin = new Vector2(0, 16);
+        hintRect.offsetMax = new Vector2(0, 94);
+        hintPanel = hints.gameObject.AddComponent<CanvasGroup>();
+        hintPanel.alpha = 0;
+        hintText = UIKit.Text(hints.transform, "", 25, UIKit.Parchment);
+        hintText.name = "Controls and interactions";
+        hintText.rectTransform.Fill(12);
+        hintText.enableAutoSizing = true;
+        hintText.fontSizeMin = 19;
+        hintText.fontSizeMax = 25;
 
         fpsText = UIKit.Text(root, "", 20, Color.white, TextAlignmentOptions.TopLeft);
         fpsText.rectTransform.Place(new Vector2(0, 0), new Vector2(0, 0), new Vector2(8, 300), new Vector2(200, 30));
@@ -688,41 +712,47 @@ public class GameHUD : MonoBehaviour
         UpdateEnemyBars();
         UpdateThreats();
 
-        hintTimer -= dt;
-        if (hintTimer > 0f) hintText.text = GameInput.ControlsHint;
-        hintText.alpha = Mathf.Clamp01(hintTimer / 2f) * 0.85f;
-        if (gm != null && gm.Outer != null && gm.State == GameManager.MatchState.Playing &&
-            !gm.IsPaused && !gm.ChoosingBoon && !gm.Outer.Cinematic)
-        {
-            string prompt = gm.Outer.InteractionPrompt;
-            if (!string.IsNullOrEmpty(prompt))
-            {
-                hintText.text = $"<size=120%><b>{prompt}</b></size>";
-                hintText.alpha = 1f;
-            }
-        }
-        if (gm != null && gm.Mode == GameMode.EndlessHorde && gm.State == GameManager.MatchState.Playing && !gm.ChoosingBoon)
-        {
-            var horde = gm.Horde;
-            if (horde.GobletActive)
-            {
-                hintText.alpha = 1f;
-                hintText.text = "Goblet active   ·   Double spawn rate, movement and kill score";
-            }
-            else if (horde.Goblet != null && player != null && horde.Goblet.InReach(player.transform.position))
-            {
-                hintText.alpha = 1f;
-                hintText.text = horde.CanClaimGoblet ?
-                    $"<size=125%><b>{(GameInput.UsingGamepad ? "X / Square" : "F")}   Drink from the goblet</b></size>   ·   2× spawns, speed and kill score this wave" :
-                    "The goblet reopens next wave";
-            }
-        }
+        UpdateHint(dt);
 
         fpsText.gameObject.SetActive(GameSettings.ShowFps);
         if (GameSettings.ShowFps)
         {
             fpsFrames++; fpsTimer += dt;
             if (fpsTimer > 0.5f) { fpsText.text = Mathf.RoundToInt(fpsFrames / fpsTimer) + " fps"; fpsFrames = 0; fpsTimer = 0; }
+        }
+    }
+
+    void UpdateHint(float dt)
+    {
+        hintPanel.alpha = 0f;
+        if (gm == null || gm.IsPaused || gm.ChoosingBoon || gm.Outer?.Cinematic == true ||
+            gm.LastStand?.RevealingGrave == true || gm.HordeGrave?.Revealing == true ||
+            gm.State != GameManager.MatchState.Playing)
+            return;
+
+        hintTimer -= dt;
+        string prompt = gm.Outer?.InteractionPrompt;
+        var horde = gm.Horde;
+        if (horde != null)
+        {
+            if (horde.GobletActive)
+                prompt = "Goblet active\nDouble spawn rate, movement speed and kill score";
+            else if (horde.Goblet != null && player != null && horde.Goblet.InReach(player.transform.position))
+            {
+                string key = GameInput.UsingGamepad ? "X / Square" : "F";
+                prompt = horde.CanClaimGoblet ? $"<b>{key}  Drink from the goblet</b>\nDouble spawns, speed and kill score this wave"
+                    : "The goblet reopens next wave";
+            }
+        }
+        if (!string.IsNullOrEmpty(prompt))
+        {
+            hintText.text = prompt;
+            hintPanel.alpha = 1f;
+        }
+        else if (hintTimer > 0f)
+        {
+            hintText.text = GameInput.ControlsHint;
+            hintPanel.alpha = Mathf.Clamp01(hintTimer / 2f);
         }
     }
 

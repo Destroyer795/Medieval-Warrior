@@ -2,6 +2,8 @@
 import sys, math, random
 import numpy as np
 from PIL import Image, ImageDraw, ImageFilter, ImageChops
+from pathlib import Path
+from crest_charges import write_charge_masks
 
 OUT = sys.argv[1]
 SS = 4  # supersampling
@@ -415,11 +417,7 @@ def emblem():
     d.polygon(P(S, [(x * 0.98 + 0.01, y * 0.98 + 0.01) for x, y in outer]), fill=GOLD + (255,))
     d.polygon(P(S, inner), fill=(255, 255, 255, 255))
     save(down(img, s, s), 'emblem')
-    # cross / chevron charge drawn on top, separately so the field can be tinted
-    img = Image.new('RGBA', (S, S), (0, 0, 0, 0)); d = ImageDraw.Draw(img)
-    d.rectangle(P(S, [(0.44, 0.16), (0.56, 0.8)]), fill=GOLD_L + (255,))
-    d.rectangle(P(S, [(0.22, 0.34), (0.78, 0.45)]), fill=GOLD_L + (255,))
-    save(down(img, s, s), 'emblem_charge')
 
 emblem()
+write_charge_masks(Path(OUT))
 print('ui ok')

@@ -29,6 +29,8 @@ public sealed class RevenantVisual : MonoBehaviour
     public RevenantAsset.Form Form {get;private set;}
     public Transform SwordHand {get;private set;}
     public Transform ShieldHand=>leftHand;
+    internal Transform ArrowHead => headMount;
+    internal MeshFilter ArrowHelmet => helmet != null && helmet.enabled ? helmet.GetComponent<MeshFilter>() : null;
     Transform leftUpper,leftFore,leftHand;
     EnemyController brain;
     Animator rigAnimator;
@@ -37,6 +39,9 @@ public sealed class RevenantVisual : MonoBehaviour
     Transform chest;
     float reactionAt=-100;
     Vector3 reactionAxis;
+    Quaternion chestBeforeRecoil, upperBeforeGuard, foreBeforeGuard, handBeforeGuard;
+    bool recoilApplied, guardApplied;
+    float guardLowering;
     int level;
     MeshRenderer hair,helmet,sword;
     bool hidden;
@@ -167,6 +172,32 @@ public sealed class RevenantVisual : MonoBehaviour
         renderer.GetComponent<MeshFilter>().sharedMesh=mesh;renderer.sharedMaterial=material;
         renderer.SetPropertyBlock(block);renderer.enabled=mesh!=null;
     }
+
+    internal bool WillAnimate => Body != null && !hidden && rigAnimator != null &&
+        rigAnimator.isActiveAndEnabled && Time.timeScale > 0 && Time.deltaTime > 0;
+
+    internal bool CanAdjustPose => WillAnimate &&
+        (Body.isVisible || rigAnimator.cullingMode == AnimatorCullingMode.AlwaysAnimate);
+
+    void Update()
+    {
+        if (!WillAnimate) return;
+        // Remove the previous frame's layers before Animator evaluation. Some
+        // culled/transition frames do not update every authored Transform.
+        if (guardApplied)
+        {
+            leftUpper.localRotation = upperBeforeGuard;
+            leftFore.localRotation = foreBeforeGuard;
+            leftHand.localRotation = handBeforeGuard;
+            guardApplied = false;
+        }
+        if (recoilApplied)
+        {
+            chest.localRotation = chestBeforeRecoil;
+            recoilApplied = false;
+        }
+    }
+
     void LateUpdate()
     {
         if(Body==null||hidden)return;
@@ -185,19 +216,43 @@ public sealed class RevenantVisual : MonoBehaviour
                 if(helmet!=null)helmet.enabled=level<2&&HelmetStyle>=0;
             }
         }
-        if(Form.type==ZombieType.Bulwark&&brain!=null&&!brain.IsDead&&!brain.IsAttacking&&!brain.GuardRaised)
-        {
-            PoseMath.ArmStable(leftUpper,leftFore,leftHand,transform.TransformPoint(new Vector3(-.34f,1.00f,.22f)),transform.TransformPoint(new Vector3(-.52f,1.20f,.02f)));
-            var desired=transform.rotation*PoseMath.AlongBlade(Vector3.up,Vector3.forward)*Quaternion.Inverse(Form.left.rotation);
-            PoseMath.SetWrist(leftFore,leftHand,desired,Form.left.distal,Form.leftWristRest);
-        }
+        if (!CanAdjustPose || brain == null || brain.IsDead) return;
+        // Match the authored charge/strike/fall while the overlay is absent.
+        // Apply recovery before the shield solve so the shield stays outward.
         float phase=(Time.time-reactionAt)/.18f;
-        bool freshPose=Time.timeScale>0&&Time.deltaTime>0&&rigAnimator!=null&&rigAnimator.enabled&&(Body.isVisible||rigAnimator.cullingMode==AnimatorCullingMode.AlwaysAnimate);
-        if(freshPose&&chest!=null&&brain!=null&&!brain.IsDead&&phase>=0&&phase<1)
+        if(phase>=0&&phase<1)
         {
+            chestBeforeRecoil = chest.localRotation;
+            recoilApplied = true;
             float recoil=Mathf.Sin(phase*Mathf.PI)*Mathf.Exp(-phase*1.25f)*8;
             chest.rotation=Quaternion.AngleAxis(recoil,reactionAxis)*chest.rotation;
         }
+        if (Form.type == ZombieType.Bulwark) PoseLoweredShield();
+    }
+
+    void PoseLoweredShield()
+    {
+        float target = !brain.IsAttacking && !brain.GuardRaised ? 1f : 0f;
+        guardLowering = Mathf.MoveTowards(guardLowering, target, Time.deltaTime / .18f);
+        if (guardLowering <= 0f) return;
+        guardApplied = true;
+        upperBeforeGuard = leftUpper.localRotation;
+        foreBeforeGuard = leftFore.localRotation;
+        handBeforeGuard = leftHand.localRotation;
+
+        // Preserve the animated elbow's roll. Reconstructing its bend plane
+        // from blended joint positions can flip the roll near an extended arm.
+        PoseMath.Arm(leftUpper, leftFore, leftHand,
+            transform.TransformPoint(new Vector3(-.34f, 1.00f, .22f)),
+            transform.TransformPoint(new Vector3(-.52f, 1.20f, .02f)));
+        var outward = transform.rotation * PoseMath.AlongBlade(Vector3.up, Vector3.forward) *
+            Quaternion.Inverse(Form.left.rotation);
+        PoseMath.SetWrist(leftFore, leftHand, outward, Form.left.distal, Form.leftWristRest);
+
+        float weight = Mathf.SmoothStep(0f, 1f, guardLowering);
+        leftUpper.localRotation = Quaternion.Slerp(upperBeforeGuard, leftUpper.localRotation, weight);
+        leftFore.localRotation = Quaternion.Slerp(foreBeforeGuard, leftFore.localRotation, weight);
+        leftHand.localRotation = Quaternion.Slerp(handBeforeGuard, leftHand.localRotation, weight);
     }
     public void React(Vector3 direction)
     {

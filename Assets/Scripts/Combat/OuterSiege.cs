@@ -15,6 +15,7 @@ public sealed class OuterSiege : MonoBehaviour
     public bool Cinematic { get; private set; }
     public float HoldSeconds { get; private set; }
     public float KeepSeconds { get; private set; }
+    public bool ReinforcementsStopped => HoldSeconds >= OuterDuration || KeepSeconds >= KeepDuration;
     internal bool FinalAssault => HoldSeconds >= FinalAssaultAt;
     internal float OuterProgress => Mathf.Clamp01(HoldSeconds / FinalAssaultAt);
     public int StonesRemaining { get; private set; }
@@ -101,6 +102,8 @@ public sealed class OuterSiege : MonoBehaviour
 
     internal EnemyController Deploy(ZombieSpawner spawner, ZombieType type, bool boss)
     {
+        if (ReinforcementsStopped) return null;
+
         // Leave the breach route active for part of the reinforcement stream.
         // The other lanes start at the front of the keep, on its connected NavMesh.
         if (Breached && keepEntries.Count > 0)
@@ -208,8 +211,11 @@ public sealed class OuterSiege : MonoBehaviour
     void Update()
     {
         if (!Active) return;
-        if (!Breached) HoldSeconds += Time.deltaTime;
-        else if (!Cinematic) KeepSeconds += Time.deltaTime;
+        if (!ReinforcementsStopped)
+        {
+            if (!Breached) HoldSeconds = Mathf.Min(OuterDuration, HoldSeconds + Time.deltaTime);
+            else if (!Cinematic) KeepSeconds = Mathf.Min(KeepDuration, KeepSeconds + Time.deltaTime);
+        }
         if (Cinematic)
         {
             breachTime += Time.unscaledDeltaTime;
@@ -218,7 +224,8 @@ public sealed class OuterSiege : MonoBehaviour
             if (breachTime >= 1)
             {
                 EndCinematic();
-                GameHUD.Banner("THE OUTER GATE HAS FALLEN", "Down the stairs! Hold the Keep sanctuary.", 2.8f);
+                GameHUD.Banner("THE OUTER GATE HAS FALLEN", ReinforcementsStopped
+                    ? "Protect the Keep and clear the survivors." : "Down the stairs! Hold the Keep sanctuary.", 2.8f);
             }
         }
         UpdateStone();

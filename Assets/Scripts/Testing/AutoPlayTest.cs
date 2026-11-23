@@ -201,6 +201,27 @@ public class AutoPlayTest : MonoBehaviour
             float avg = frames / (Time.realtimeSinceStartup - start);
             Debug.Log($"[AUTOTEST] perf: {avg:F0} fps average, worst frame {worst * 1000f:F0} ms, {EnemyController.All.Count} zombies, {Screen.width}x{Screen.height}, quality {QualitySettings.names[QualitySettings.GetQualityLevel()]}");
             Expect(EnemyController.All.Count > 0, "horde keeps coming");
+            if (outer != null && outer.Breached)
+            {
+                var countAtDeadline = EnemyController.All.Count;
+                typeof(OuterSiege).GetField("<KeepSeconds>k__BackingField",
+                    System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)
+                    .SetValue(outer, OuterSiege.KeepDuration);
+                yield return new WaitForSecondsRealtime(.8f);
+                Expect(outer.ReinforcementsStopped && gm.State == GameManager.MatchState.Playing &&
+                    !gm.ChoosingBoon && countAtDeadline > 0 && EnemyController.All.Count == countAtDeadline &&
+                    ZombieSpawner.Instance.Spawn(ZombieType.Walker, false) == null,
+                    "the Keep deadline stops reinforcements without ending the fight");
+                float cleanupDeadline = Time.realtimeSinceStartup + 5f;
+                while (gm.State == GameManager.MatchState.Playing && Time.realtimeSinceStartup < cleanupDeadline)
+                {
+                    foreach (var enemy in EnemyController.All.ToArray())
+                        if (enemy != null && !enemy.IsDead && enemy.Health > 0) enemy.TakeDamage(999f, Vector3.forward, 0);
+                    yield return null;
+                }
+                Expect(gm.State == GameManager.MatchState.Won && EnemyController.All.Count == 0,
+                    $"clearing the surviving attackers after the deadline wins the siege ({gm.State}, {EnemyController.All.Count} remain)");
+            }
         }
 
         GameSettings.Mode = GameMode.EndlessHorde;

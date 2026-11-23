@@ -104,7 +104,7 @@ grass, flowers, forests, a mountain ring and roads that run to the real gates.
 
 **Game modes**
 
-- **Defend the Castle** – begin on the outer wall and hold until the 2:05 assault ends. Refill arrows at either armory and use the central cradle to drop up to five stones onto attackers. The assault sends a larger column at 1:30. If the doors give way, take either stair into the courtyard and follow the cobbled road to the Keep. Survive there for 1:40 with the sanctuary intact. Enemies reinforce from the front and the Warlord arrives with four guards. Pitch barrels and arrow braziers support the inner defense. Gate integrity is worth up to 3,000 bonus points.
+- **Defend the Castle** – begin on the outer wall with a 2:05 assault timer. Refill arrows at either armory and use the central cradle to drop up to five stones onto attackers. The assault sends a larger column at 1:30. If the doors give way before the deadline, take either stair into the courtyard and follow the cobbled road to the Keep for a 1:40 defense. When the active timer reaches zero, reinforcements stop and you must defeat the remaining attackers with the sanctuary intact. Enemies reinforce from the front and the Warlord arrives with four guards. Pitch barrels and arrow braziers support the inner defense. Gate integrity is worth up to 3,000 bonus points.
 - **Endless Horde** – escalating waves; every 5th wave brings a Brute champion, every 10th the
   Warlord alongside it. Wounds are tended between waves. Draft one of three powers
   after every wave; every third wave brings Blood Moon, Toxic Fog or a Cursed Totem.
@@ -160,6 +160,8 @@ finish, previewed live on a turntable. **Settings** – volumes, mouse sensitivi
 graphics quality, fullscreen, screen shake, damage numbers, FPS counter.
 
 In **Customise Knight**, cycle through seven cosmetic swords to see each in the knight's hand. Choosing an available sword equips it for battle. Locked swords show their challenge. Northmere Sword, Fenland Falchion and Briar Estoc are free. Win Defend the Castle for Saltire Broadsword, survive Last Stand for Saffron Kilij, reach Endless Horde wave 10 for Ivory Cinquedea, and clear wave 20 for the King's Sword. Existing feats count. [View the sword collection](Docs/screenshots/sword-collection.jpg)
+
+Under **Heraldry**, choose Cross, Chevron, Saltire, Raven or Oak Leaf. Plain leaves the selected shield colour visible without a symbol. The same crest appears on the held shield, the slung shield and the HUD.
 
 ## Controls
 

@@ -40,6 +40,8 @@ public class AutoPlayTest : MonoBehaviour
 
     IEnumerator Run()
     {
+        bool hadMode = PlayerPrefs.HasKey("mw.mode");
+        var originalMode = GameSettings.Mode;
         yield return new WaitForSecondsRealtime(3f);
         Expect(FindFirstObjectByType<MainMenuUI>() != null, "menu built");
         Expect(Application.version == "1.2", "Windows player reports version 1.2");
@@ -91,6 +93,33 @@ public class AutoPlayTest : MonoBehaviour
                 yield return new WaitForSecondsRealtime(0.4f);
             }
             pc.Equip(Weapon.Sword);
+            var visual = pc.GetComponent<MarchwardenVisual>();
+            var hip = pc.transform.Find("Sheathed Sword");
+            var designs = Resources.LoadAll<GameObject>("SwordCollection");
+            Expect(designs.Length == 7 && hip != null && visual != null, "seven cosmetic swords and both equipment mounts load in the player");
+            if (hip != null && visual != null)
+            {
+                foreach (var design in designs)
+                {
+                    visual.SetSwordAppearance(design);
+                    var mesh = design.GetComponent<MeshFilter>().sharedMesh;
+                    pc.DebugSwingVariant(5);
+                    yield return new WaitForSeconds(.15f);
+                    bool gripped = visual.Sword.gameObject.activeSelf && visual.SwordGripError < .002f &&
+                        visual.Sword.GetComponent<MeshFilter>().sharedMesh == mesh;
+                    pc.Equip(Weapon.Bow);
+                    yield return null;
+                    bool stowed = hip.gameObject.activeInHierarchy && !visual.Sword.gameObject.activeSelf &&
+                        hip.GetComponent<MeshFilter>().sharedMesh == mesh &&
+                        hip.GetComponent<MeshRenderer>().sharedMaterials.SequenceEqual(design.GetComponent<MeshRenderer>().sharedMaterials);
+                    pc.Equip(Weapon.Sword);
+                    Expect(gripped && stowed && !hip.gameObject.activeSelf && visual.Sword.gameObject.activeSelf,
+                        design.name + " fits during thrust, stows on the hip and redraws");
+                }
+                visual.SetSwordAppearance(null);
+                Expect(visual.Sword.GetComponent<MeshFilter>().sharedMesh == MarchwardenVisual.Asset.sword &&
+                    hip.GetComponent<MeshFilter>().sharedMesh == MarchwardenVisual.Asset.sword, "restoring the original sword updates both mounts");
+            }
             pc.DebugSwing();
             foreach (var z in EnemyController.All.ToArray()) z.TakeDamage(999f, Vector3.forward, 4f);
             yield return new WaitForSecondsRealtime(3f);
@@ -153,6 +182,8 @@ public class AutoPlayTest : MonoBehaviour
         foreach (var p in problems.Distinct().Take(30)) Debug.Log("[AUTOTEST] problem: " + p);
         Debug.Log(problems.Count == 0 ? "[AUTOTEST] RESULT PASS" : $"[AUTOTEST] RESULT FAIL ({problems.Count})");
         GameSettings.TestMode = false;
+        if (hadMode) GameSettings.Mode = originalMode; else PlayerPrefs.DeleteKey("mw.mode");
+        PlayerPrefs.Save();
         Application.Quit(problems.Count == 0 ? 0 : 1);
     }
 }

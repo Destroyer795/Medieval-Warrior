@@ -291,7 +291,7 @@ public class PlayerControlSpeed : MonoBehaviour
         }
         else if (IsDrawing) CancelDraw();
         if (CurrentWeapon != Weapon.Sword || Stunned || Dodging || isBlocking)
-        {pendingHits.Clear();pendingSwishes.Clear();swordBufferedUntil=-99f;}
+            CancelSwordAttack();
         else ProcessPendingHits();
         UpdateSwordLayer();
 
@@ -406,6 +406,14 @@ public class PlayerControlSpeed : MonoBehaviour
     }
 
     // ------------------------------------------------------------ sword
+
+    void CancelSwordAttack()
+    {
+        swordPoseStarted = -99f;
+        swordBufferedUntil = -99f;
+        pendingHits.Clear();
+        pendingSwishes.Clear();
+    }
 
     void UpdateSword()
     {
@@ -640,6 +648,7 @@ public class PlayerControlSpeed : MonoBehaviour
                 Vector3 toCollider = hit.bounds.center - swordOrigin;
                 if (toCollider.sqrMagnitude > 0.0001f && hit.Raycast(new Ray(swordOrigin, toCollider.normalized), out var swordHit, toCollider.magnitude))
                     contact = swordHit.point;
+                if (!CombatBoons.ClearLine(transform.position + Vector3.up, contact, enemy.transform)) continue;
                 bool landed=enemy.ReceiveWeaponHit(damage, dir, knock,contact,bloodDirection:swingDirection);
                 hitEnemies.Add(enemy); // one hit per enemy
                 if(landed){landedHits++;if(phantom)CombatBoons.PhantomHit(enemy,contact);}
@@ -668,15 +677,16 @@ public class PlayerControlSpeed : MonoBehaviour
         if (rb != null) rb.AddForce(transform.forward * 4f, ForceMode.VelocityChange);
         bool any = false;
         bool bracing = GameManager.instance != null && GameManager.instance.Gate != null;
-        var struck = bracing ? new HashSet<EnemyController>() : null;
+        var struck = new HashSet<EnemyController>();
         foreach (var c in Physics.OverlapSphere(transform.position + transform.forward * 1.1f + Vector3.up, 1.6f))
         {
             var e = c.GetComponentInParent<EnemyController>();
-            if (e == null || e.IsDead) continue;
+            if (e == null || e.IsDead || struck.Contains(e)) continue;
             Vector3 dir = (e.transform.position - transform.position).normalized;
             if (Vector3.Dot(transform.forward, dir) < 0.2f) continue;
-            if (bracing && (!struck.Add(e) || !CombatBoons.ClearLine(transform.position + Vector3.up,
-                e.transform.position + Vector3.up, e.transform))) continue;
+            Vector3 origin = transform.position + Vector3.up;
+            if (!CombatBoons.ClearLine(origin, c.ClosestPoint(origin), e.transform)) continue;
+            struck.Add(e);
             e.ReceiveWeaponHit(0.5f, dir, 11f,e.transform.position+Vector3.up*1.15f,true);
             if (bracing && !e.IsDead) e.Repel(transform.position, 2.4f);
             any = true;
@@ -818,6 +828,7 @@ public class PlayerControlSpeed : MonoBehaviour
     public void Equip(Weapon w)
     {
         if (w == CurrentWeapon) return;
+        if (CurrentWeapon == Weapon.Sword) CancelSwordAttack();
         CurrentWeapon = w;
         if (gear != null) gear.SetStowed(w == Weapon.Bow);   // two hands for the bow: sword to the hip, shield to the back
         CancelDraw();
@@ -855,16 +866,19 @@ public class PlayerControlSpeed : MonoBehaviour
     {
         CancelDraw();
         IsAiming = false;
-        pendingHits.Clear();
-        pendingSwishes.Clear();
-        swordBufferedUntil = -99f;
+        CancelSwordAttack();
+        swordLayerWeight = 0f;
         desiredVelocity = Vector3.zero;
         hasFacing = turnToMove = false;
         shieldDefense?.Restore();
         if (animator != null) { SetAnimationBool("isMoving", false); SetAnimationBool("isRunning", false); }
         isBlocking = false;
         if (myHealthScript != null) myHealthScript.isShieldBlocking = false;
-        if (swordMixer.IsValid()) swordMixer.SetInputWeight(1, 0f);
+        if (swordMixer.IsValid())
+        {
+            swordMixer.SetInputWeight(1, 0f);
+            swordMixer.SetInputWeight(2, 0f);
+        }
     }
 
     void OnDestroy()

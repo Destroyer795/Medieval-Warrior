@@ -93,7 +93,7 @@ public static class GameSettings
 
     public static string ModeBlurb(GameMode m) => m switch
     {
-        GameMode.DefendTheCastle => "Guard the Keep gate. Ignite arrows at the braziers, break the siege with pitch barrels, and slay the Warlord.",
+        GameMode.DefendTheCastle => "Hold the outer wall with arrows and falling stones. If the doors break, fall back and keep the inner gate standing until relief arrives.",
         GameMode.EndlessHorde => "Draft a power after every wave. Every third wave brings chaos; every fifth, a Brute. Forge a broken build. How long will your legend last?",
         _ => "The gates have fallen. Hold your ground until the reinforcements arrive at dawn.",
     };

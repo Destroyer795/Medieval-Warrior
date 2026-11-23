@@ -7,6 +7,8 @@ public class MarchwardenVisual : MonoBehaviour
     public static MarchwardenAsset Asset => loaded != null ? loaded : loaded = Resources.Load<MarchwardenAsset>("Marchwarden/Warrior");
     public SkinnedMeshRenderer Body { get; private set; }
     public Transform Sword { get; private set; }
+    [Tooltip("Optional cosmetic sword prefab with its mesh and materials on the root.")]
+    [SerializeField] GameObject swordAppearance;
     public Transform Shield { get; private set; }
     Transform[] bodyBones;
     int leftPalmIndex;
@@ -57,6 +59,7 @@ public class MarchwardenVisual : MonoBehaviour
         Linen=MarchwardenCloth.Prepare(gameObject,Body,data);
         WaistArmor=MarchwardenArmor.Prepare(gameObject,Body,data,Linen);
         Sword = Prop("Marchwarden Sword", data.sword);
+        if (swordAppearance != null) SetSwordAppearance(swordAppearance);
         Shield = Prop("Marchwarden Shield", data.shield);
         ShieldHeraldry.Attach(Shield, data.shield);
         if (GetComponent<PlayerControlSpeed>() == null && GetComponentInParent<GraveDuelist>() == null)
@@ -107,6 +110,25 @@ public class MarchwardenVisual : MonoBehaviour
         palette[3].color = new Color(.26f, .16f, .10f) * GameSettings.LeatherTints[Mathf.Clamp(leather, 0, GameSettings.LeatherTints.Length - 1)].tint;
         if(Linen!=null)Linen.SetColor(palette[2].color);
         foreach (var crest in GetComponentsInChildren<ShieldHeraldry>(true)) crest.Apply();
+    }
+
+    public void SetSwordAppearance(GameObject design)
+    {
+        Mesh mesh = null;
+        Material[] materials = null;
+        if (design != null)
+        {
+            if (!design.TryGetComponent<MeshFilter>(out var filter) || filter.sharedMesh == null ||
+                !design.TryGetComponent<MeshRenderer>(out var renderer))
+                throw new System.ArgumentException("A sword appearance needs a mesh and renderer on its root.", nameof(design));
+            mesh = filter.sharedMesh;
+            materials = renderer.sharedMaterials;
+        }
+        swordAppearance = design;
+        if (Sword == null) return;
+        Sword.GetComponent<MeshFilter>().sharedMesh = mesh != null ? mesh : data.sword;
+        Sword.GetComponent<MeshRenderer>().sharedMaterials = materials ?? palette;
+        if (TryGetComponent<KnightGear>(out var gear)) gear.RefreshStowedSword();
     }
 
     public void SetStowed(bool value)

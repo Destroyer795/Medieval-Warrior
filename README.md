@@ -153,12 +153,13 @@ heraldic shield in your colours, objective plaque, combo meter, boss bar, weapon
 count, crosshair, hit markers, enemy health bars, off-screen threat arrows, kill feed, banners,
 pause menu, end-of-match stats. Main menu over a live fly-around of the castle.
 
-**Feats** – fifteen achievements that persist between sessions (Centurion, Eagle Eye, Kingslayer,
-Chain Reaction, Untouchable, Legend, ...) with progress shown in the main menu.
+**Feats** – sixteen achievements with progress in the main menu, including Last Oath for clearing Endless Horde wave 20.
 
 **Customisation** – hero name, tabard/shield colour, crest, armour metal, leather tone and bow
 finish, previewed live on a turntable. **Settings** – volumes, mouse sensitivity, invert Y, FOV,
 graphics quality, fullscreen, screen shake, damage numbers, FPS counter.
+
+Version 1.2 also includes seven cosmetic sword prefabs for the knight. The collection is ready for a future equipment menu. [View the sword collection](Docs/screenshots/sword-collection.jpg)
 
 ## Controls
 

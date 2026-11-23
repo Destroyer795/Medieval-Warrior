@@ -40,7 +40,9 @@ Use waves 5, 10, 15, 20 and 25 as entry points for each new tier. Apply the tier
 
 ## Sword selection concept
 
-Keep this as a design proposal. Let players choose different appearances with optional score and combo bonuses. Leave damage equal. Consider unlocking a King's Sword with a detailed gold hilt and polished silver blade after clearing wave 20. Decide the progression currency before building any reward modifier. The current game awards score.
+Seven cosmetic prefabs are ready under `Assets/Resources/SwordCollection`. They share the knight’s existing sword mount and combat stats. The editable Blender collection is `ArtSource/Marchwarden/SwordCollection.blend`. A future equipment menu can call `MarchwardenVisual.SetSwordAppearance(prefab)` or pass null to restore the original. The picker, score and combo modifiers, and the proposed wave-20 King's Sword reward remain design ideas.
+
+To regenerate the prefabs, run Python on `Tools/ArtPipeline/sword_collection.py`, then use the Unity menu **Medieval Warrior → Art → Build sword collection**. Running the same Python file inside Blender also regenerates the editable master. **Medieval Warrior → Combat → Review collection sword handling** checks every design against the animated knight and shield.
 
 ## Checkpoint
 
@@ -49,6 +51,8 @@ Keep this as a design proposal. Let players choose different appearances with op
 - Batch 3 is integrated locally. The focused Horde run passed 100 checks in Artifacts/v12-horde-20261123-021115/report.txt. It covered the delayed draft, central goblet, tier boundaries, grave and recovery. The reviewer raised the provisional pacing score from 5/10 to 7/10 and clarity from 6/10 to 7/10. Those scores use scripted gameplay and screenshots.
 - Batches 4 and 5 are integrated. Point-blank bow and thin cover checks passed. The Brute weight correction is present in three Unity meshes and the Blender exporter. The shield crest appears in the guard capture in Artifacts/v12-clean-20261123-022802/10d_heater_defense.png.
 - The combined 1.2 update passed 707 muted Unity checks without logged errors or exceptions. See Artifacts/v12-clean-20261123-022802/report.txt. The Windows executable was rebuilt in Builds/Windows and passed 21 muted checks in Logs/v12-release-player-20261123-023510.log. The build completed with 19 warnings and no errors.
-- GitHub main was fetched and matched the local base at 2dbe817. The 1.2 checkpoint is local. Sword selection remains a design proposal. Full-run difficulty tuning remains open.
+- The first local integration checkpoint was 821247b, based on GitHub main at 2dbe817. Full-run difficulty tuning remains open.
+- The sword collection passed 1,005 held poses per design, including shield raises, strikes and combo blends with a 4 mm shield margin. See `Artifacts/SwordCollection/sword-handling.txt`. The guard now opens the sword elbow as the shield comes up. An interrupted cut stays cancelled, solid cover blocks melee, and shield bashes hit each enemy once. The grave double carries its equipment through the reveal and waits for control to return before engaging.
+- The sword release passed 716 muted play-mode checks in `Artifacts/swords-release/report.txt` and 30 muted built-player checks in `Logs/swords-windows-player.log`, including all seven thrust, stow and redraw checks and restoration of the original sword. The Windows build completed with zero errors and 19 warnings.
 
 For the editor suite, use the existing SmokeTest.RunBatch with the -mwMute switch and an absolute -shotDir. For a siege-only check, temporarily create Artifacts/SiegeReviewOnly.txt and remove it afterward. The Windows build command is BuildTool.BuildWindowsBatch and the standalone check uses -batchmode -mwMute -autotest.

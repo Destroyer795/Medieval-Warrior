@@ -188,6 +188,8 @@ public partial class SmokeTestDriver
         yield return null;
         var body = knight.GetComponent<Rigidbody>();
         var control = knight.GetComponent<PlayerControlSpeed>();
+        var previousWeapon = control.CurrentWeapon;
+        control.Equip(Weapon.Bow);
         var camera = Camera.main;
         var orbit = camera.GetComponent<CameraFollow>();
         float immunity = knight.InvulnerableUntil;
@@ -204,6 +206,7 @@ public partial class SmokeTestDriver
             "the selected run raises its grave automatically and reserves the Warlord and boon reveal");
         if (grave == null)
         {
+            control.Equip(previousWeapon);
             body.isKinematic = originallyKinematic;
             knight.InvulnerableUntil = immunity;
             if (GameHUD.BoonsOpen) GameHUD.DebugPickBoon(0);
@@ -238,6 +241,13 @@ public partial class SmokeTestDriver
             NavMesh.SamplePosition(knight.transform.position, out var foot, 3f, NavMesh.AllAreas) &&
             NavMesh.CalculatePath(duelist.transform.position, foot.position, NavMesh.AllAreas, path) &&
             path.status == NavMeshPathStatus.PathComplete, "the shadow emerges beside its grave on a complete path to the knight");
+        var figure = duelist != null ? duelist.GetComponentInChildren<MarchwardenVisual>() : null;
+        var hipSword = figure != null ? figure.transform.Find("Sheathed Sword") : null;
+        Check(stand.RevealingGrave && duelist != null && duelist.StartingWeapon == Weapon.Bow && duelist.Gear.Ready &&
+            figure != null && !figure.Sword.gameObject.activeInHierarchy && !figure.Shield.gameObject.activeInHierarchy &&
+            hipSword != null && hipSword.gameObject.activeInHierarchy && duelist.Gear.StowedShield.gameObject.activeInHierarchy &&
+            hipSword.GetComponent<MeshFilter>().sharedMesh == knight.GetComponent<MarchwardenVisual>().Sword.GetComponent<MeshFilter>().sharedMesh,
+            "the emerging bow-equipped double wears the knight's sword on its hip and shield on its back");
         Capture("last_stand_grave_02_emergence");
         yield return Until(7.05f);
         Check(!stand.RevealingGrave && stand.GraveActive && !orbit.FramingGrave && control.enabled &&
@@ -258,6 +268,7 @@ public partial class SmokeTestDriver
         }
         Check(!stand.GraveActive && stand.GetComponentsInChildren<LastStandGrave>().Length == 1,
             "the slain double releases the encounter and the grave cannot trigger twice");
+        control.Equip(previousWeapon);
 
         IEnumerator Until(float targetAge)
         {

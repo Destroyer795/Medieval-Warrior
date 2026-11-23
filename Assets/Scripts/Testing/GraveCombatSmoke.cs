@@ -68,6 +68,13 @@ public partial class SmokeTestDriver
             yield return Observe(() => knight.currentHealth < hp, 5f);
             Check(Mathf.Abs(hp - knight.currentHealth - Boons.SwordDamage) < .02f,
                 $"an unguarded grave sword cut deals the knight's light sword damage ({hp - knight.currentHealth:F2})");
+            var figure = duelist.GetComponentInChildren<MarchwardenVisual>();
+            var hipSword = figure.transform.Find("Sheathed Sword");
+            Check(duelist.CurrentWeapon == Weapon.Sword && figure.Sword.gameObject.activeInHierarchy &&
+                figure.Shield.gameObject.activeInHierarchy && hipSword != null && !hipSword.gameObject.activeInHierarchy &&
+                !duelist.Gear.StowedShield.gameObject.activeInHierarchy &&
+                figure.Sword.GetComponent<MeshFilter>().sharedMesh == control.GetComponent<MarchwardenVisual>().Sword.GetComponent<MeshFilter>().sharedMesh,
+                "the grave double draws the knight's sword and shield into its hands at melee range");
 
             control.DebugBlock(true);
             hp = knight.currentHealth;

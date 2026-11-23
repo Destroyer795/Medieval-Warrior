@@ -794,7 +794,7 @@ public class GameHUD : MonoBehaviour
         float upperMargin = gm != null && gm.Mode == GameMode.EndlessHorde && bossRoot.gameObject.activeSelf ? 290f : 225f;
         point.y=Mathf.Clamp(point.y,-root.rect.height*.5f+130,root.rect.height*.5f-upperMargin);
         eventMarker.anchorMin=eventMarker.anchorMax=eventMarker.pivot=new Vector2(.5f,.5f);eventMarker.anchoredPosition=point;
-        eventTarget.text=$"◆ {label}\n{Mathf.RoundToInt(Vector3.Distance(player.transform.position,target))} m";
+        eventTarget.text=$"{label}\n{Mathf.RoundToInt(Vector3.Distance(player.transform.position,target))} m";
         eventTarget.color=color;eventMarker.gameObject.SetActive(true);
     }
 

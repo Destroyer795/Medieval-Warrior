@@ -18,7 +18,8 @@ public sealed class GraveDuelist : MonoBehaviour
     public bool IsDefeated => enemy != null && enemy.IsDead;
     public bool CanFight => emerged && !IsDefeated && Knight != null && !Knight.IsDead &&
         (GameManager.instance == null || GameManager.instance.State == GameManager.MatchState.Playing &&
-        (GameManager.instance.LastStand == null || !GameManager.instance.LastStand.RevealingGrave));
+        (GameManager.instance.LastStand == null || !GameManager.instance.LastStand.RevealingGrave) &&
+        (GameManager.instance.HordeGrave == null || !GameManager.instance.HordeGrave.Revealing));
     public bool IsDrawing => action == Action.Draw && CanFight;
     public float DrawAmount => IsDrawing ? Mathf.Clamp01(age / drawTime) : 0f;
     public Vector3 AimDirection => action == Action.Draw ? (aimPoint - bow.ArrowOrigin).normalized : transform.forward;

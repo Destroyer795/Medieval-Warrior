@@ -57,6 +57,37 @@ public partial class SmokeTestDriver
         {
             gm.enabled=false;player.enabled=false;body.linearVelocity=Vector3.zero;body.isKinematic=true;health.InvulnerableUntil=float.PositiveInfinity;
             director.ClearWave();ClearEnemies();yield return null;
+            var meleeTarget = Enemy(ZombieType.Brute, position + player.transform.forward * 1.7f);
+            var screen = new GameObject("Melee cover fixture");
+            fixtures.Add(screen);
+            screen.transform.SetPositionAndRotation(position + player.transform.forward * .75f + Vector3.up, rotation);
+            screen.AddComponent<BoxCollider>().size = new Vector3(4f, 3f, .1f);
+            Physics.SyncTransforms();
+            var swing = typeof(PlayerControlSpeed).GetMethod("CheckForHits", flags);
+            var bash = typeof(PlayerControlSpeed).GetMethod("ShieldBash", flags);
+            var bashReady = typeof(PlayerControlSpeed).GetField("bashReady", flags);
+            var stamina = typeof(PlayerControlSpeed).GetField("<Stamina>k__BackingField", flags);
+            float savedBash = (float)bashReady.GetValue(player), savedStamina = player.Stamina;
+            float targetHp = meleeTarget.Health;
+            swing.Invoke(player, new object[] { 0, 0 });
+            Check(meleeTarget.Health == targetHp, "a thin wall stops a sword cut within reach");
+            bashReady.SetValue(player, -99f);
+            bash.Invoke(player, null);
+            Check(meleeTarget.Health == targetHp, "a thin wall stops a shield bash in Horde");
+            screen.SetActive(false);
+            Physics.SyncTransforms();
+            targetHp = meleeTarget.Health;
+            bashReady.SetValue(player, -99f);
+            bash.Invoke(player, null);
+            Check(Mathf.Approximately(targetHp - meleeTarget.Health, .5f),
+                "an exposed enemy with several hit volumes takes one shield bash");
+            targetHp = meleeTarget.Health;
+            swing.Invoke(player, new object[] { 0, 0 });
+            Check(Mathf.Approximately(targetHp - meleeTarget.Health, SwordMoves.Damage(0)),
+                "removing the wall lets the same cut deal its normal damage once");
+            bashReady.SetValue(player, savedBash);
+            stamina.SetValue(player, savedStamina);
+            ClearEnemies();yield return null;
             var seen=new HashSet<HordeEvent>();
             for(int n=1;n<=12;n++)
             {
@@ -244,9 +275,16 @@ public partial class SmokeTestDriver
             tick.Invoke(gm, null);
             Check(gm.HordeGraveActive && !player.enabled, "a quiet point in wave 8 raises the grave and locks the reveal");
             bool capturedGrave = false;
+            bool observedRisenDouble = false, foughtDuringReveal = false;
             while (gm.HordeGraveActive && gm.HordeGrave.Revealing && Time.realtimeSinceStartup < graveDeadline)
             {
                 tick.Invoke(gm, null);
+                var revealing = gm.HordeGrave;
+                if (revealing.Revealing && revealing.Duelist != null && revealing.Age > 5.55f)
+                {
+                    observedRisenDouble = true;
+                    foughtDuringReveal |= revealing.Duelist.CanFight;
+                }
                 if (!capturedGrave && gm.HordeGrave.Age > 4.7f)
                 {
                     Capture("horde_grave_reveal");
@@ -254,6 +292,8 @@ public partial class SmokeTestDriver
                 }
                 yield return null;
             }
+            Check(observedRisenDouble && !foughtDuringReveal,
+                "the fully risen Horde double waits for the cinematic to release the knight before fighting");
             var duel = gm.HordeGrave != null ? gm.HordeGrave.Duelist : null;
             Check(duel != null && player.enabled && duel.CanFight && gm.Wave == 8 &&
                 Mathf.Approximately(gm.AmbientSpawnRateMultiplier, .2f),

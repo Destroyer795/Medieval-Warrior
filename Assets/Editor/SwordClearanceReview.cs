@@ -17,7 +17,9 @@ public static class SwordClearanceReview
     }
 
     [MenuItem("Medieval Warrior/Review sword and shield clearance")]
-    public static void Run()
+    public static void Run() => ReviewPoses(null);
+
+    internal static void ReviewPoses(Action<string, Matrix4x4, Matrix4x4, Vector3> inspect)
     {
         var data=MarchwardenVisual.Asset;
         var go=UnityEngine.Object.Instantiate(AssetDatabase.LoadAssetAtPath<GameObject>(MarchwardenBuilder.Source));
@@ -55,6 +57,12 @@ public static class SwordClearanceReview
         {for(int i=0;i<nodes.Length;i++)nodes[i].localRotation=Quaternion.Slerp(a[i],b[i],weight);}
         float Gap()=>Clearance(bones[data.swordBone].localToWorldMatrix*data.swordMount,
             bones[data.shieldBone].localToWorldMatrix*data.shieldMount,data.shield.bounds);
+        void Inspect(string pose)
+        {
+            inspect(pose, bones[data.swordBone].localToWorldMatrix * data.swordMount,
+                bones[data.shieldBone].localToWorldMatrix * data.shieldMount,
+                bones[data.swordBone].TransformPoint(data.rightPalm.GetColumn(3)));
+        }
         var report=new StringBuilder();int failures=0;
         report.AppendLine("Conservative full-weapon capsule / shield bounds clearance, metres. Samples at 180 Hz.");
         // The eye line is measured from the authored head in bind space, then
@@ -83,6 +91,7 @@ public static class SwordClearanceReview
             defense.Restore();
             Pose(null,0);defense.Apply(step/60f);
             MeasureGrips();
+            if(inspect!=null) Inspect($"block {step}/60");
             chestGap=Mathf.Min(chestGap,defense.ChestGap);footDrift=Mathf.Max(footDrift,defense.FootDrift);
             sightline&=defense.SightlineClear;
             var current=nodes.Select(n=>n.localRotation).ToArray();
@@ -119,6 +128,8 @@ public static class SwordClearanceReview
                 Blend(rest,pose,weight);
                 float gap=Gap();
                 MeasureGrips();
+                if(inspect!=null && (frame%6==0 || frame==Mathf.RoundToInt(SwordMoves.All[variant].contact*180)))
+                    Inspect($"strike {variant:00} at {time:F3}s");
                 var shieldMatrix=bones[data.shieldBone].localToWorldMatrix*data.shieldMount;
                 var gloveToShield=shieldMatrix.inverse*bones[gloveBone].localToWorldMatrix*data.body.bindposes[gloveBone];
                 foreach(var vertex in glove)
@@ -151,6 +162,8 @@ public static class SwordClearanceReview
                     float entryWeight=1-Mathf.SmoothStep(0,1,(start-SwordMoves.All[previous].duration+SwordMoves.RecoveryFade)/SwordMoves.RecoveryFade);
                     Blend(rest,mixed,Mathf.Lerp(entryWeight,1,Mathf.SmoothStep(0,1,time/SwordMoves.FadeIn)));
                     minimum=Mathf.Min(minimum,Gap());
+                    if(inspect!=null && frame%5==0)
+                        Inspect($"chain {previous:00}->{next:00} from {start:F3}s at +{time:F3}s");
                 }
             if(minimum<.008f)failures++;
             report.AppendLine($"{(minimum>=.008f?"PASS":"FAIL")} blend {previous:00}->{next:00}: {minimum:F4} m");

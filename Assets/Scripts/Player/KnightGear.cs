@@ -67,7 +67,8 @@ public class KnightGear : MonoBehaviour
         replacement = GetComponent<MarchwardenVisual>();
         try { if (replacement != null) SetupReplacement(); else Analyse(); }
         catch (System.Exception e) { Report = "analysis failed: " + e.Message; Ready = false; }
-        if (owner != null) SetStowed(owner.CurrentWeapon == Weapon.Bow);
+        SetStowed((owner != null && owner.CurrentWeapon == Weapon.Bow) ||
+            (duelist != null && duelist.CurrentWeapon == Weapon.Bow));
         Debug.Log("[KnightGear] " + Report);
     }
 
@@ -87,7 +88,7 @@ public class KnightGear : MonoBehaviour
         shieldProp = Make("Slung Shield", asset.shield);
         ShieldHeraldry.Attach(shieldProp, asset.shield);
         float scale=Mathf.Abs(transform.lossyScale.x);
-        swordLength = asset.sword.bounds.size.x*scale;
+        RefreshStowedSword();
         shieldHeight = asset.shield.bounds.size.x*scale;
         shieldThickness = Mathf.Max(0, -asset.shield.bounds.min.z)*scale;
         var verts = asset.body.vertices;
@@ -108,6 +109,16 @@ public class KnightGear : MonoBehaviour
         hipHalfWidth = Mathf.Clamp(hipHalfWidth, .18f, .35f);
         Ready = true;
         Report = "original Marchwarden sword and shield, explicit equipment mounts";
+    }
+
+    internal void RefreshStowedSword()
+    {
+        if (replacement == null || replacement.Sword == null || swordProp == null) return;
+        var held = replacement.Sword;
+        var mesh = held.GetComponent<MeshFilter>().sharedMesh;
+        swordProp.GetComponent<MeshFilter>().sharedMesh = mesh;
+        swordProp.GetComponent<MeshRenderer>().sharedMaterials = held.GetComponent<MeshRenderer>().sharedMaterials;
+        swordLength = mesh.bounds.size.x * Mathf.Abs(transform.lossyScale.x);
     }
 
     static Transform FindBone(Transform root, string name)

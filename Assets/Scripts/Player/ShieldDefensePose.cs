@@ -6,7 +6,7 @@ using UnityEngine;
 // analytic IK with an orientation constraint and a chest separating plane.
 public sealed class ShieldDefensePose
 {
-    readonly Transform root,pelvis,spine,head,upper,fore,hand;
+    readonly Transform root,pelvis,spine,head,upper,fore,hand,swordArm,swordHand;
     readonly Transform[] thigh=new Transform[2],calf=new Transform[2],foot=new Transform[2];
     readonly MarchwardenAsset asset;
     readonly Vector3[] shieldVertices;
@@ -49,6 +49,7 @@ public sealed class ShieldDefensePose
         Transform Find(string n)=>Array.Find(bones,b=>b.name=="Bip001 "+n);
         pelvis=Find("Pelvis");spine=Find("Spine");head=Find("Head");
         upper=Find("L UpperArm");fore=Find("L Forearm");hand=Find("L Hand");
+        swordArm=Find("R UpperArm");swordHand=Find("R Hand");
         for(int i=0;i<2;i++){string s=i==0?"L ":"R ";thigh[i]=Find(s+"Thigh");calf[i]=Find(s+"Calf");foot[i]=Find(s+"Foot");}
         chestFrameOffset=asset.chestFrameRotation;
         int spineIndex=Array.IndexOf(bones,spine);
@@ -64,7 +65,7 @@ public sealed class ShieldDefensePose
         // Independent of whether Start runs before or after the first animation
         // evaluation; both constraints are exported from the anatomical bind pose.
         eyeLocal=asset.headEyeLocal;
-        posed=new[]{spine,upper,fore,thigh[0],thigh[1],calf[0],calf[1],foot[0],foot[1]};
+        posed=new[]{spine,upper,fore,swordArm,thigh[0],thigh[1],calf[0],calf[1],foot[0],foot[1]};
         originalRotations=new Quaternion[posed.Length];
         Measure(spine.rotation*chestFrameOffset);
     }
@@ -91,6 +92,9 @@ public sealed class ShieldDefensePose
         Quaternion leftRot=foot[0].rotation,rightRot=foot[1].rotation;
         pelvis.position-=root.up*(.027f*weight*rigScale);
         spine.rotation=root.rotation*Quaternion.Euler(7*weight,-11*weight,0)*Quaternion.Inverse(root.rotation)*spine.rotation;
+        // Open the sword elbow as the shield crosses the chest so the hilt clears its inner rim.
+        Vector3 armReach = swordHand.position - swordArm.position;
+        swordArm.rotation = Quaternion.FromToRotation(armReach, armReach + root.right * (.20f * weight * rigScale)) * swordArm.rotation;
         for(int i=0;i<2;i++)
         {
             Vector3 target=i==0?left:right;

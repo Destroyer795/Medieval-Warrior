@@ -441,6 +441,17 @@ public partial class SmokeTestDriver : MonoBehaviour
             Check(player.SwordCrossfade<.10f,"combo cross-fade begins on the outgoing pose");
             for(int frame=0;frame<Mathf.CeilToInt((SwordMoves.Crossfade+.035f)*120);frame++)yield return null;
             Check(player.SwordCrossfade>.99f,"combo cross-fade reaches the next attack continuously");
+            foreach (bool block in new[] { false, true })
+            {
+                player.DebugSwingStep(0);
+                for (int frame = 0; frame < 5; frame++) yield return null;
+                if (block) player.DebugBlock(true); else player.Equip(Weapon.Bow);
+                for (int frame = 0; frame < 3; frame++) yield return null;
+                if (block) player.DebugBlock(false); else player.Equip(Weapon.Sword);
+                for (int frame = 0; frame < 9; frame++) yield return null;
+                Check(player.SwordLayerWeight < .01f, (block ? "releasing block" : "redrawing the sword") +
+                    " leaves the interrupted cut cancelled at its former contact time");
+            }
         }
         finally{Time.captureDeltaTime=comboCapture;}
         yield return Wait(.65f);

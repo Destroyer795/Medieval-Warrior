@@ -105,6 +105,14 @@ public partial class SmokeTestDriver : MonoBehaviour
             {
                 menu.DebugShow(page);
                 yield return Wait(0.6f);
+                if (page == "customise")
+                {
+                    var turntable = FindFirstObjectByType<MenuPreview>();
+                    var towardsViewer = Vector3.ProjectOnPlane(turntable.previewCamera.transform.position -
+                        turntable.knight.position, Vector3.up).normalized;
+                    Check(Vector3.Dot(towardsViewer, turntable.knight.forward) > .7f,
+                        "the customization turntable opens facing the viewer with the sword visible");
+                }
                 Capture("02_menu_" + page);
             }
             menu.DebugShow("title");
@@ -116,6 +124,28 @@ public partial class SmokeTestDriver : MonoBehaviour
         Check(preview!=null&&preview.knight.GetComponent<MarchwardenStature>()!=null&&
             Mathf.Abs(preview.knight.GetComponent<MarchwardenStature>().Multiplier-1.10f)<.001f,
             "customisation preview loads the ten-percent-taller warrior");
+        if (System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "-mwMenuReview") >= 0)
+        {
+            menu.DebugShow("customise");
+            yield return null;
+            var knight = preview.knight.GetComponent<MarchwardenVisual>();
+            for (int i = 0; i < SwordWardrobe.Names.Length; i++)
+            {
+                knight.SetSwordAppearance(SwordWardrobe.Model(i));
+                yield return null;
+                var sword = knight.Sword;
+                var palm = knight.RightPalmPosition;
+                var side = sword.forward;
+                if (Vector3.Dot(side, palm - preview.knight.position) < 0) side = -side;
+                CaptureFrom("hand_" + i, palm + side * .47f + preview.knight.forward * .16f,
+                    palm + sword.right * .045f);
+                Check(knight.SwordGripError < .002f, SwordWardrobe.Names[i] + " remains seated in the preview palm");
+            }
+            knight.SetSwordAppearance(SwordWardrobe.Model(SwordWardrobe.Selected));
+            menu.DebugShow("title");
+            Finish(savedMode, savedDiff);
+            yield break;
+        }
 
         yield return ReviewSiege();
 

@@ -17,12 +17,14 @@ FINISHES = {
     "PatinatedBronze": ("94704e", .69, .49),
     "PaleBrass": ("d4ab65", .74, .66),
     "RoyalGold": ("f7c361", .82, .78),
-    "Walnut": ("824b31", .04, .34),
-    "Oxblood": ("773731", .04, .40),
+    "Walnut": ("985939", .04, .34),
+    "Oxblood": ("853a32", .04, .40),
+    "WoadLeather": ("344f65", .03, .34),
+    "WineLeather": ("642e43", .04, .40),
     "BlackCalf": ("383234", .03, .36),
-    "Horn": ("473d34", .06, .55),
+    "Horn": ("856334", .06, .55),
     "BoneIvory": ("dfd0b1", .04, .52),
-    "Sapphire": ("214d9a", .28, .86),
+    "Sapphire": ("183f9b", .16, .86),
 }
 
 FULLER = [(-1,0),(-.66,.81),(-.33,1),(-.18,.53),(.18,.53),(.33,1),(.66,.81),(1,0)]
@@ -104,7 +106,7 @@ def estoc():
 
 def broadsword():
     m = Model("SaltireBroadsword","Saltire Broadsword",
-              ("ColdSteel","EtchedIron","Oxblood","PaleBrass"))
+              ("ColdSteel","EtchedIron","WoadLeather","PaleBrass"))
     m.blade([(-.279,0,.027,.0065),(-.214,0,.029,.0063),(.10,0,.025,.0052),
              (.306,0,.019,.0042),(.381,0,.010,.0033),(.43,0,0,0)], FULLER)
     m.grip([(-.419,0,.014,.013),(-.38,0,.018,.015),(-.34,0,.017,.015),
@@ -193,7 +195,7 @@ def cinquedea():
 
 
 def kings_sword():
-    m = Model("KingsSword","King's Sword",("PolishedSilver","RoyalGold","Oxblood","Sapphire"))
+    m = Model("KingsSword","King's Sword",("PolishedSilver","RoyalGold","WineLeather","Sapphire"))
     m.blade([(-.277,0,.030,.0073),(-.243,0,.033,.0073),(-.193,0,.035,.007),
              (-.171,0,.03,.0066),(.135,0,.023,.006),(.315,0,.016,.0048),
              (.379,0,.009,.003),(.43,0,0,0)],FULLER)
@@ -225,15 +227,15 @@ def kings_sword():
     m.seal("Faceted blue cross stone",3,-.277,0,[(.0165,.012,.013),(.0205,.007,.008)],8,pi/8)
     m.seal("Wheel pommel",1,-.439,0,[(.0001,.027,.030),(.009,.027,.030),
              (.014,.023,.026),(.0155,.019,.022)],20,pi/20)
-    # The central roundel is surrounded by eight individual gold rays.
-    m.seal("Pommel enamel ground",3,-.439,0,[(.0153,.0175,.0203),(.0163,.0165,.0193)],16)
+    # A double-sided setting below the palm remains visible in either guard.
+    m.seal("Burnished pommel bezel",1,-.439,0,[(.0152,.020,.023),(.017,.019,.022)],12,pi/12)
+    m.seal("Pommel sapphire",3,-.439,0,[(.0168,.0172,.0197),(.0185,.0172,.0197),
+            (.022,.0112,.0134),(.0237,.0051,.0063)],10,pi/10)
     for sz in (-1,1):
-        for i in range(8):
-            angle=tau*i/8
-            m.stroke("Sunburst ray",1,[(-.439+.006*cos(angle),.007*sin(angle),sz*.0175),
-                    (-.439+.016*cos(angle),.019*sin(angle),sz*.0168)],
-                    [.0029,.0010],[.0017,.0011],sides=6)
-    m.seal("Concave sun button",1,-.439,0,[(.0163,.0078,.0088),(.0192,.005,.006)],10)
+        for i in range(4):
+            angle=pi/4+tau*i/4
+            m.bead("Rounded gold claw",1,(-.439+.0167*cos(angle),.0194*sin(angle),sz*.0185),
+                   (.0025,.0025,.0022),8,5)
     return m
 
 

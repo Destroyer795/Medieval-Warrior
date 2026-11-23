@@ -159,7 +159,7 @@ pause menu, end-of-match stats. Main menu over a live fly-around of the castle.
 finish, previewed live on a turntable. **Settings** – volumes, mouse sensitivity, invert Y, FOV,
 graphics quality, fullscreen, screen shake, damage numbers, FPS counter.
 
-Version 1.2 also includes seven cosmetic sword prefabs for the knight. The collection is ready for a future equipment menu. [View the sword collection](Docs/screenshots/sword-collection.jpg)
+In **Customise Knight**, cycle through seven cosmetic swords to see each in the knight's hand. Choosing an available sword equips it for battle. Locked swords show their challenge. Northmere Sword, Fenland Falchion and Briar Estoc are free. Win Defend the Castle for Saltire Broadsword, survive Last Stand for Saffron Kilij, reach Endless Horde wave 10 for Ivory Cinquedea, and clear wave 20 for the King's Sword. Existing feats count. [View the sword collection](Docs/screenshots/sword-collection.jpg)
 
 ## Controls
 

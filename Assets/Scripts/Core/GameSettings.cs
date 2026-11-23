@@ -8,6 +8,10 @@ public static class GameSettings
 {
     // ---------------- audio / controls / display
     static readonly bool MutePlayback = System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "-mwMute") >= 0;
+    // The standalone wardrobe checks equip weapons and earn feats. Keep those
+    // test selections and awards in a separate PlayerPrefs namespace.
+    internal static readonly string EquipmentProfile =
+        System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "-autotest") >= 0 ? "mw.autotest." : "mw.";
     public static float MasterVolume { get => PlayerPrefs.GetFloat("mw.master", 0.85f); set { PlayerPrefs.SetFloat("mw.master", value); AudioListener.volume = MutePlayback ? 0f : value; } }
     public static float SfxVolume { get => PlayerPrefs.GetFloat("mw.sfx", 0.9f); set => PlayerPrefs.SetFloat("mw.sfx", value); }
     public static float MusicVolume { get => PlayerPrefs.GetFloat("mw.music", 0.55f); set { PlayerPrefs.SetFloat("mw.music", value); AudioManager.RefreshMusicVolume(); } }

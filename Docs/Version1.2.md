@@ -38,9 +38,9 @@ Use waves 5, 10, 15, 20 and 25 as entry points for each new tier. Apply the tier
 - Invert the drag direction in knight customization. Fit the selected crest to the shield face, then inspect its placement and orientation during preview, guarding and movement.
 - Run regression and muted standalone checks and rebuild in Builds/Windows.
 
-## Sword selection concept
+## Sword selection
 
-Seven cosmetic prefabs are ready under `Assets/Resources/SwordCollection`. They share the knight’s existing sword mount and combat stats. The editable Blender collection is `ArtSource/Marchwarden/SwordCollection.blend`. A future equipment menu can call `MarchwardenVisual.SetSwordAppearance(prefab)` or pass null to restore the original. The picker, score and combo modifiers, and the proposed wave-20 King's Sword reward remain design ideas.
+Customise Knight previews all seven designs and saves the equipped sword by asset ID. The three starter swords are Northmere, Fenland and Briar. Saltire, Saffron, Ivory and King's Sword use the existing Defender of the Realm, Dawn Breaks, Unbroken and Last Oath feats, respectively. Each design shares the knight’s standard combat stats. The prefabs live under `Assets/Resources/SwordCollection` and the editable Blender collection is `ArtSource/Marchwarden/SwordCollection.blend`.
 
 To regenerate the prefabs, run Python on `Tools/ArtPipeline/sword_collection.py`, then use the Unity menu **Medieval Warrior → Art → Build sword collection**. Running the same Python file inside Blender also regenerates the editable master. **Medieval Warrior → Combat → Review collection sword handling** checks every design against the animated knight and shield.
 
@@ -54,5 +54,6 @@ To regenerate the prefabs, run Python on `Tools/ArtPipeline/sword_collection.py`
 - The first local integration checkpoint was 821247b, based on GitHub main at 2dbe817. Full-run difficulty tuning remains open.
 - The sword collection passed 1,005 held poses per design, including shield raises, strikes and combo blends with a 4 mm shield margin. See `Artifacts/SwordCollection/sword-handling.txt`. The guard now opens the sword elbow as the shield comes up. An interrupted cut stays cancelled, solid cover blocks melee, and shield bashes hit each enemy once. The grave double carries its equipment through the reveal and waits for control to return before engaging.
 - The sword release passed 716 muted play-mode checks in `Artifacts/swords-release/report.txt` and 30 muted built-player checks in `Logs/swords-windows-player.log`, including all seven thrust, stow and redraw checks and restoration of the original sword. The Windows build completed with zero errors and 19 warnings.
+- The customization update passed 716 regression checks, 15 focused menu and in-hand checks, and 42 checks in the final Windows executable. Reports are `Artifacts/wardrobe-release/report.txt`, `Artifacts/wardrobe-menu-final/report.txt`, and `Logs/wardrobe-player-final.log`. The [model comparison](screenshots/sword-collection.jpg) includes actual Unity captures of all seven grips.
 
 For the editor suite, use the existing SmokeTest.RunBatch with the -mwMute switch and an absolute -shotDir. For a siege-only check, temporarily create Artifacts/SiegeReviewOnly.txt and remove it afterward. The Windows build command is BuildTool.BuildWindowsBatch and the standalone check uses -batchmode -mwMute -autotest.

@@ -42,9 +42,22 @@ public class MenuPreview : MonoBehaviour
         if (previewCamera != null) previewCamera.enabled = on;
         // Hidden preview cloth/armor must not consume the gameplay CPU budget.
         if(knight!=null)knight.gameObject.SetActive(on);
+        if (on && knight != null && previewCamera != null)
+        {
+            Vector3 towardsViewer = Vector3.ProjectOnPlane(previewCamera.transform.position - knight.position, Vector3.up);
+            if (towardsViewer.sqrMagnitude > .001f)
+                knight.rotation = Quaternion.AngleAxis(-25f, Vector3.up) * Quaternion.LookRotation(towardsViewer);
+            dragVelocity = 0f;
+        }
     }
 
     public void Drag(float dx) => dragVelocity = -dx * 0.4f;
+
+    public void ShowSword(GameObject model)
+    {
+        if (knight != null && knight.TryGetComponent<MarchwardenVisual>(out var visual))
+            visual.SetSwordAppearance(model);
+    }
 
     void Update()
     {

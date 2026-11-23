@@ -38,6 +38,63 @@ public class AutoPlayTest : MonoBehaviour
         if (!ok) problems.Add("check failed: " + what);
     }
 
+    void ReviewWardrobe(MainMenuUI menu)
+    {
+        var feats = new[] { "defender", "dawn", "unbroken", "last_oath" };
+        foreach (var feat in feats) PlayerPrefs.DeleteKey(Feats.Preference(feat));
+        PlayerPrefs.SetString(SwordWardrobe.Preference, "retired-design");
+        try
+        {
+            Expect(SwordWardrobe.Selected == 0 &&
+                Enumerable.Range(0, 7).All(i => SwordWardrobe.Available(i) == (i < 3)),
+                "a new knight has three starter swords and recovers from a missing saved design");
+            menu.DebugShow("customise");
+            var row = menu.GetComponentsInChildren<Transform>(true).FirstOrDefault(t => t.name == "Sword selection");
+            var next = row != null ? row.Find("Next")?.GetComponent<UnityEngine.UI.Button>() : null;
+            var preview = FindFirstObjectByType<MenuPreview>();
+            Expect(next != null && preview != null, "sword cycling is accessible in Customise Knight");
+            if (next != null && preview != null)
+            {
+                var filter = preview.knight.GetComponent<MarchwardenVisual>().Sword.GetComponent<MeshFilter>();
+                for (int i = 1; i <= 3; i++)
+                {
+                    next.onClick.Invoke();
+                    Expect(filter.sharedMesh == SwordWardrobe.Model(i).GetComponent<MeshFilter>().sharedMesh &&
+                        SwordWardrobe.Selected == Mathf.Min(i, 2),
+                        SwordWardrobe.Names[i] + " previews with the correct ownership state");
+                    if (i == 3)
+                    {
+                        Canvas.ForceUpdateCanvases();
+                        var hint = menu.GetComponentsInChildren<TMPro.TextMeshProUGUI>().FirstOrDefault(t => t.name == "Sword status");
+                        Expect(hint != null && hint.text.Contains(SwordWardrobe.Challenge(i)) && !hint.isTextOverflowing,
+                            "the locked sword shows its complete challenge beside the preview");
+                    }
+                }
+                menu.DebugShow("title");
+                menu.DebugShow("customise");
+                Expect(filter.sharedMesh == SwordWardrobe.Model(2).GetComponent<MeshFilter>().sharedMesh,
+                    "reopening customization restores the equipped sword after inspecting a locked one");
+            }
+            menu.DebugShow("title");
+            for (int i = 3; i < 7; i++)
+            {
+                bool wasLocked = !SwordWardrobe.TryEquip(i);
+                GameSettings.TestMode = false;
+                Feats.Unlock(feats[i - 3]);
+                GameSettings.TestMode = true;
+                Expect(wasLocked && SwordWardrobe.TryEquip(i) && SwordWardrobe.Selected == i &&
+                    Enumerable.Range(i+1, 6-i).All(j => !SwordWardrobe.Available(j)),
+                    feats[i-3] + " unlocks its sword and keeps later challenges locked");
+            }
+        }
+        finally
+        {
+            GameSettings.TestMode = true;
+            foreach (var feat in feats) PlayerPrefs.DeleteKey(Feats.Preference(feat));
+            SwordWardrobe.TryEquip(1);
+        }
+    }
+
     IEnumerator Run()
     {
         bool hadMode = PlayerPrefs.HasKey("mw.mode");
@@ -45,6 +102,8 @@ public class AutoPlayTest : MonoBehaviour
         yield return new WaitForSecondsRealtime(3f);
         Expect(FindFirstObjectByType<MainMenuUI>() != null, "menu built");
         Expect(Application.version == "1.2", "Windows player reports version 1.2");
+        var menu = FindFirstObjectByType<MainMenuUI>();
+        if (menu != null) ReviewWardrobe(menu);
 
         GameSettings.Mode = GameMode.DefendTheCastle;
         SceneManager.LoadScene("Semi-Final");
@@ -95,6 +154,10 @@ public class AutoPlayTest : MonoBehaviour
             pc.Equip(Weapon.Sword);
             var visual = pc.GetComponent<MarchwardenVisual>();
             var hip = pc.transform.Find("Sheathed Sword");
+            Expect(visual != null && hip != null &&
+                visual.Sword.GetComponent<MeshFilter>().sharedMesh == SwordWardrobe.Model(1).GetComponent<MeshFilter>().sharedMesh &&
+                hip.GetComponent<MeshFilter>().sharedMesh == visual.Sword.GetComponent<MeshFilter>().sharedMesh,
+                "the saved Fenland Falchion loads on both battle mounts");
             var designs = Resources.LoadAll<GameObject>("SwordCollection");
             Expect(designs.Length == 7 && hip != null && visual != null, "seven cosmetic swords and both equipment mounts load in the player");
             if (hip != null && visual != null)

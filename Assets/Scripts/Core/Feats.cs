@@ -31,7 +31,8 @@ public static class Feats
         new Def { id = "legend", name = "Legend", description = "Win any battle on Warlord difficulty.", icon = "crown" },
     };
 
-    public static bool IsUnlocked(string id) => PlayerPrefs.GetInt("mw.feat." + id, 0) == 1;
+    internal static string Preference(string id) => GameSettings.EquipmentProfile + "feat." + id;
+    public static bool IsUnlocked(string id) => PlayerPrefs.GetInt(Preference(id), 0) == 1;
     public static int Stat(string stat) => PlayerPrefs.GetInt("mw.stat." + stat, 0);
     public static int UnlockedCount => All.Count(f => IsUnlocked(f.id));
 
@@ -49,9 +50,11 @@ public static class Feats
         if (GameSettings.TestMode || IsUnlocked(id)) return;
         var f = All.FirstOrDefault(d => d.id == id);
         if (f == null) return;
-        PlayerPrefs.SetInt("mw.feat." + id, 1);
+        PlayerPrefs.SetInt(Preference(id), 1);
         PlayerPrefs.Save();
-        GameHUD.Toast("Feat unlocked: " + f.name, UIKit.Gold, "crown", 3.5f, 34);
+        string reward = SwordWardrobe.RewardFor(id);
+        GameHUD.Toast(reward == null ? "Feat unlocked: " + f.name : f.name + "  ·  " + reward + " unlocked",
+            UIKit.Gold, "crown", 3.5f, reward == null ? 34 : 28, reward != null);
         AudioManager.Play2D("pickup", 1f, 0.8f);
     }
 

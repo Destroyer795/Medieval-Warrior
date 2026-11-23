@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Linq;
 using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
@@ -12,6 +13,8 @@ public class MainMenuUI : MonoBehaviour
     UIPage titlePage, playPage, customisePage, settingsPage, helpPage, featsPage, creditsPage;
     CanvasGroup loading;
     MenuPreview preview;
+    UIKit.SelectorHandle swordSelector;
+    TextMeshProUGUI swordStatus;
     readonly Image[] modeCards = new Image[3];
     TextMeshProUGUI modeInfo;
 
@@ -48,6 +51,12 @@ public class MainMenuUI : MonoBehaviour
             if (p != null && p != page) p.Hide();
         page.Show();
         if (preview != null) preview.SetActive(page == customisePage);
+        if (page == customisePage)
+        {
+            int equipped = SwordWardrobe.Selected;
+            swordSelector.Set(equipped, false);
+            ShowSword(equipped);
+        }
     }
 
     // ------------------------------------------------------------ title
@@ -164,8 +173,8 @@ public class MainMenuUI : MonoBehaviour
         var hint = UIKit.Text(view.transform, "drag to turn", 20, new Color(1, 1, 1, 0.55f), TextAlignmentOptions.Bottom);
         hint.rectTransform.Place(new Vector2(0.5f, 0), new Vector2(0.5f, 0), new Vector2(0, 22), new Vector2(400, 30));
 
-        var list = UIKit.VList(customisePage.transform, 14, null, TextAnchor.UpperLeft);
-        ((RectTransform)list.transform).Place(new Vector2(1, 1), new Vector2(1, 1), new Vector2(-70, -150), new Vector2(880, 640));
+        var list = UIKit.VList(customisePage.transform, 8, null, TextAnchor.UpperLeft);
+        ((RectTransform)list.transform).Place(new Vector2(1, 1), new Vector2(1, 1), new Vector2(-70, -150), new Vector2(880, 652));
 
         UIKit.InputField(list.transform, "Hero name", GameSettings.HeroName, v => GameSettings.HeroName = v);
         SharedPanels.Section(list.transform, "Heraldry");
@@ -174,10 +183,19 @@ public class MainMenuUI : MonoBehaviour
         SharedPanels.Section(list.transform, "Armour");
         var metal = UIKit.Selector(list.transform, "Metal", Names(GameSettings.MetalTints), GameSettings.Metal, i => { GameSettings.Metal = i; Refresh(); }, i => GameSettings.MetalTints[i].tint * 0.7f);
         var leather = UIKit.Selector(list.transform, "Leather", Names(GameSettings.LeatherTints), GameSettings.Leather, i => { GameSettings.Leather = i; Refresh(); }, i => GameSettings.LeatherTints[i].tint * new Color(0.45f, 0.3f, 0.2f));
-        SharedPanels.Section(list.transform, "Bow");
+        SharedPanels.Section(list.transform, "Weapons");
         var bowNames = new string[GameSettings.BowFinishes.Length];
         for (int i = 0; i < bowNames.Length; i++) bowNames[i] = GameSettings.BowFinishes[i].name;
         var bow = UIKit.Selector(list.transform, "Bow finish", bowNames, GameSettings.BowFinish, i => GameSettings.BowFinish = i, i => GameSettings.BowFinishes[i].wood);
+        swordSelector = UIKit.Selector(list.transform, "Sword", SwordWardrobe.Names, SwordWardrobe.Selected, i =>
+        {
+            SwordWardrobe.TryEquip(i);
+            ShowSword(i);
+        });
+        swordSelector.value.GetComponentInParent<HorizontalLayoutGroup>(true).name = "Sword selection";
+        swordStatus = UIKit.Text(list.transform, "", 24, UIKit.Parchment, TextAlignmentOptions.Center);
+        swordStatus.name = "Sword status";
+        swordStatus.Layout(48);
 
         var buttons = UIKit.HList(customisePage.transform, 24);
         ((RectTransform)buttons.transform).Place(new Vector2(1, 0), new Vector2(1, 0), new Vector2(-70, 46), new Vector2(880, 72));
@@ -189,9 +207,20 @@ public class MainMenuUI : MonoBehaviour
             leather.Set(Random.Range(0, GameSettings.LeatherTints.Length));
             bow.Set(Random.Range(0, GameSettings.BowFinishes.Length));
             crest.Set(Random.Range(0, GameSettings.Crests.Length));
+            var available = Enumerable.Range(0, SwordWardrobe.Names.Length).Where(SwordWardrobe.Available).ToArray();
+            swordSelector.Set(available[Random.Range(0, available.Length)]);
         }, 300, 70, 32, "button_dark");
         UIKit.Button(buttons.transform, "Done", () => { GameSettings.Save(); Show(titlePage); }, 300, 70, 34);
         Refresh();
+    }
+
+    void ShowSword(int index)
+    {
+        if (preview != null) preview.ShowSword(SwordWardrobe.Model(index));
+        int owned = Enumerable.Range(0, SwordWardrobe.Names.Length).Count(SwordWardrobe.Available);
+        swordStatus.text = SwordWardrobe.Available(index)
+            ? $"Equipped    |    {owned} of {SwordWardrobe.Names.Length} unlocked"
+            : "Locked    |    " + SwordWardrobe.Challenge(index);
     }
 
     static string[] Names((string name, Color c)[] items)
@@ -264,7 +293,9 @@ public class MainMenuUI : MonoBehaviour
             n.rectTransform.Place(new Vector2(0, 1), new Vector2(0, 1), new Vector2(100, -14), new Vector2(330, 34));
             n.textWrappingMode = TextWrappingModes.NoWrap;
             n.enableAutoSizing = true; n.fontSizeMax = 26; n.fontSizeMin = 14;
-            var d = UIKit.Text(cell.transform, f.description, 19, UIKit.Parchment, TextAlignmentOptions.TopLeft);
+            string reward = SwordWardrobe.RewardFor(f.id);
+            string description = reward == null ? f.description : f.description + "\nSword: " + reward;
+            var d = UIKit.Text(cell.transform, description, 19, UIKit.Parchment, TextAlignmentOptions.TopLeft);
             d.rectTransform.Place(new Vector2(0, 1), new Vector2(0, 1), new Vector2(100, -48), new Vector2(330, 44));
             var p = UIKit.Text(cell.transform, Feats.Progress(f), 18, done ? new Color(0.6f, 0.9f, 0.5f) : UIKit.GoldDim, TextAlignmentOptions.BottomRight);
             p.rectTransform.Place(new Vector2(1, 0), new Vector2(1, 0), new Vector2(-16, 10), new Vector2(200, 24));

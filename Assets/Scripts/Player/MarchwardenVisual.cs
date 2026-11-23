@@ -59,7 +59,7 @@ public class MarchwardenVisual : MonoBehaviour
         Linen=MarchwardenCloth.Prepare(gameObject,Body,data);
         WaistArmor=MarchwardenArmor.Prepare(gameObject,Body,data,Linen);
         Sword = Prop("Marchwarden Sword", data.sword);
-        if (swordAppearance != null) SetSwordAppearance(swordAppearance);
+        SetSwordAppearance(swordAppearance != null ? swordAppearance : SwordWardrobe.Model(SwordWardrobe.Selected));
         Shield = Prop("Marchwarden Shield", data.shield);
         ShieldHeraldry.Attach(Shield, data.shield);
         if (GetComponent<PlayerControlSpeed>() == null && GetComponentInParent<GraveDuelist>() == null)

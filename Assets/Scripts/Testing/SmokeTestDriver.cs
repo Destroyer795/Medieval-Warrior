@@ -70,6 +70,22 @@ public partial class SmokeTestDriver : MonoBehaviour
         var savedMode = GameSettings.Mode;
         var savedDiff = GameSettings.Difficulty;
         GameSettings.Difficulty = Difficulty.Knight;
+        if (System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "-mwReadabilityReview") >= 0)
+        {
+            yield return Wait(2.5f);
+            var openingMenu = FindFirstObjectByType<MainMenuUI>();
+            openingMenu.DebugShow("customise");
+            yield return null;
+            ReviewSwordCaption(openingMenu);
+            if (System.Array.IndexOf(System.Environment.GetCommandLineArgs(), "-mwReviewSiege") >= 0)
+                yield return ReviewSiege();
+            GameSettings.Mode = GameMode.EndlessHorde;
+            BattleLoading.EnterBattle();
+            yield return ReviewHordeOpeningHud();
+            yield return ReviewBowContact(FindFirstObjectByType<PlayerControlSpeed>());
+            Finish(savedMode, savedDiff);
+            yield break;
+        }
         if (File.Exists("Artifacts/SiegeReviewOnly.txt"))
         {
             yield return ReviewSiege(); Finish(savedMode, savedDiff); yield break;
@@ -113,6 +129,7 @@ public partial class SmokeTestDriver : MonoBehaviour
                     Check(Vector3.Dot(towardsViewer, turntable.knight.forward) > .7f,
                         "the customization turntable opens facing the viewer with the sword visible");
                     var info = GameObject.Find("Sword information").GetComponent<RectTransform>();
+                    ReviewSwordCaption(menu);
                     var frame = GameObject.Find("Preview Frame").GetComponent<RectTransform>();
                     var label = info.GetComponentInChildren<TMPro.TextMeshProUGUI>();
                     var frameCorners = new Vector3[4];
@@ -976,7 +993,7 @@ public partial class SmokeTestDriver : MonoBehaviour
         // ---------------------------------------------------------- Endless Horde
         GameSettings.Mode = GameMode.EndlessHorde;
         FindFirstObjectByType<MainController>().StartGame();
-        yield return Wait(9f);
+        yield return ReviewHordeOpeningHud();
         gm = GameManager.instance;
         Check(gm != null && gm.Gate == null && gm.Wave >= 1, $"endless horde wave started (wave {gm?.Wave})");
         Capture("30_endless");

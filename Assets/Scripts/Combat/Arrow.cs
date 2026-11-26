@@ -36,6 +36,7 @@ public class Arrow : MonoBehaviour
     bool stuck, falling, stuckInEnemy;
     public bool isFire { get; private set; }
     bool splintered;
+    bool countedForAccuracy;
     EnemyController stuckIn;
     Vector3 fallVelocity, spin;
     int pierce;
@@ -364,7 +365,11 @@ public class Arrow : MonoBehaviour
             }
         }
         AudioManager.PlayAt("arrow_flesh", point, 0.9f);
-        if (GameManager.instance != null) GameManager.instance.RegisterArrowHit(enemy, headshot);
+        if (GameManager.instance != null)
+        {
+            GameManager.instance.RegisterArrowHit(enemy, headshot, !countedForAccuracy);
+            countedForAccuracy = true;
+        }
         GameHUD.HitMarker(headshot);
         return true;
     }

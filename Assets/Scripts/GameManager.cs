@@ -694,10 +694,10 @@ public class GameManager : MonoBehaviour
 
     public void RegisterArrowFired() => ArrowsFired++;
 
-    public void RegisterArrowHit(EnemyController enemy, bool headshot)
+    public void RegisterArrowHit(EnemyController enemy, bool headshot, bool firstHitFromArrow = true)
     {
-        if (State == MatchState.Dawn) return;
-        ArrowsHit++;
+        if (gameEnded || State == MatchState.Dawn) return;
+        if (firstHitFromArrow) ArrowsHit++;
         if (headshot) { Headshots++; Score += 25 * GobletScoreMultiplier; Feats.Add("headshots"); }
     }
 
@@ -725,6 +725,7 @@ public class GameManager : MonoBehaviour
             $"{(Outer.FinalAssault ? "Final Push" : "Hold the Outer Wall")}   {ClockLabel(OuterSiege.OuterDuration - Outer.HoldSeconds)}",
         GameMode.DefendTheCastle when Outer != null => $"Survive at the Keep   {ClockLabel(OuterSiege.KeepDuration - Outer.KeepSeconds)}",
         GameMode.DefendTheCastle => "Hold the Castle",
+        GameMode.EndlessHorde when State == MatchState.Intro => "Prepare for wave 1",
         GameMode.EndlessHorde when State == MatchState.Intermission && draftPending =>
             $"Draft in {Mathf.CeilToInt(Mathf.Max(0f, IntermissionLeft - (HordeIntermission - HordeDraftDelay)))}",
         GameMode.EndlessHorde when State == MatchState.Intermission => $"Next wave in {Mathf.CeilToInt(IntermissionLeft)}",

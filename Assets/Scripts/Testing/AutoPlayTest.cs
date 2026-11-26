@@ -5,7 +5,7 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 
 // Self-test for a built player: run  MedievalWarrior.exe -batchmode -autotest -logFile autotest.log
-// It plays a short Defend the Castle match and an Endless Horde run without input, then quits with
+// It visits all three modes without input, then quits through the title menu with
 // exit code 0 if nothing went wrong. Does nothing unless "-autotest" is on the command line.
 public class AutoPlayTest : MonoBehaviour
 {
@@ -36,6 +36,29 @@ public class AutoPlayTest : MonoBehaviour
     {
         Debug.Log("[AUTOTEST] " + (ok ? "PASS " : "FAIL ") + what);
         if (!ok) problems.Add("check failed: " + what);
+    }
+
+    void CheckNotificationBounds()
+    {
+        const string tip = "Hold right mouse to raise your shield - block as a blow lands for a Perfect Block";
+        GameHUD.Toast(tip, UIKit.Parchment, "shield", 2f, 28);
+        Canvas.ForceUpdateCanvases();
+        var label = FindObjectsByType<TMPro.TextMeshProUGUI>(FindObjectsSortMode.None)
+            .FirstOrDefault(t => t.text == tip);
+        RectTransform plate = label != null ? label.rectTransform.parent as RectTransform : null;
+        while (plate != null && plate.name != "Notification") plate = plate.parent as RectTransform;
+        bool fits = plate != null;
+        if (fits)
+        {
+            label.ForceMeshUpdate();
+            fits = !label.isTextTruncated && label.textInfo.characterCount == tip.Length;
+            foreach (var ch in label.textInfo.characterInfo.Take(label.textInfo.characterCount).Where(c => c.isVisible))
+            {
+                fits &= plate.rect.Contains((Vector2)plate.InverseTransformPoint(label.transform.TransformPoint(ch.bottomLeft)));
+                fits &= plate.rect.Contains((Vector2)plate.InverseTransformPoint(label.transform.TransformPoint(ch.topRight)));
+            }
+        }
+        Expect(fits, $"the complete shield tip stays on its plaque in the {Screen.width}x{Screen.height} Windows player");
     }
 
     void ReviewWardrobe(MainMenuUI menu)
@@ -123,6 +146,7 @@ public class AutoPlayTest : MonoBehaviour
                 pc.CurrentWeapon == Weapon.Bow, "Defend opens on the fortified wall with the bow");
             if (outer != null)
             {
+                CheckNotificationBounds();
                 var gateLabel = FindObjectsByType<TMPro.TextMeshProUGUI>(FindObjectsSortMode.None)
                     .FirstOrDefault(t => t.text.StartsWith("OUTER GATE"));
                 var objective = FindObjectsByType<TMPro.TextMeshProUGUI>(FindObjectsSortMode.None)
@@ -255,19 +279,77 @@ public class AutoPlayTest : MonoBehaviour
         Expect(gm.ChoosingBoon && gm.Wave == 1 && Time.time - clearedAt >= 1.9f,
             "the boon draft opens after two seconds and holds the wave");
         if (gm.ChoosingBoon) GameHUD.DebugPickBoon(0);
+        CheckWaveTwentyReward(gm);
         defender.InvulnerableUntil = 0f;
         defender.TakeDamage(9999f, null, 0f, true);
         yield return new WaitForSecondsRealtime(4f);
         Expect(gm.State == GameManager.MatchState.Lost, "run ends on death");
+        int endScore = gm.Score, endHits = gm.ArrowsHit, endHeads = gm.Headshots;
+        gm.RegisterArrowHit(null, true);
+        Expect(gm.Score == endScore && gm.ArrowsHit == endHits && gm.Headshots == endHeads,
+            "an arrow arriving after defeat leaves the final score and accuracy intact");
+
+        GameSettings.Mode = GameMode.LastStand;
+        gm.RestartGame();
+        float standDeadline = Time.realtimeSinceStartup + 45f;
+        while (Time.realtimeSinceStartup < standDeadline &&
+            (GameManager.instance == null || GameManager.instance.Mode != GameMode.LastStand ||
+             GameManager.instance.State != GameManager.MatchState.Playing)) yield return null;
+        gm = GameManager.instance;
+        bool standReady = gm != null && gm.LastStand != null && gm.State == GameManager.MatchState.Playing;
+        Expect(standReady && gm.Outer == null && gm.TimeLeft > 290f && gm.Wave == 0 &&
+            gm.Horde.Goblet == null && !GameHUD.BoonsOpen, "Last Stand starts a fresh five-minute run after Horde defeat");
+        if (standReady)
+        {
+            gm.Pause();
+            float pausedAt = gm.TimeLeft;
+            yield return new WaitForSecondsRealtime(.3f);
+            Expect(gm.IsPaused && gm.TimeLeft == pausedAt, "the Windows pause menu freezes the dawn clock");
+            gm.Resume();
+            yield return new WaitForSecondsRealtime(.4f);
+            Expect(!gm.IsPaused && gm.TimeLeft < pausedAt, "returning to Last Stand resumes the dawn clock");
+        }
+        if (gm == null) { Application.Quit(1); yield break; }
         gm.QuitGame();
         yield return new WaitForSecondsRealtime(3f);
         Expect(FindFirstObjectByType<MainMenuUI>() != null, "back at menu");
 
+        var titleMenu = FindFirstObjectByType<MainMenuUI>();
+        var quit = titleMenu == null ? null : titleMenu.GetComponentsInChildren<UnityEngine.UI.Button>()
+            .FirstOrDefault(b => b.GetComponentInChildren<TMPro.TextMeshProUGUI>()?.text == "Quit");
+        Expect(quit != null && quit.interactable, "the title Quit button is available after all three modes");
         foreach (var p in problems.Distinct().Take(30)) Debug.Log("[AUTOTEST] problem: " + p);
         Debug.Log(problems.Count == 0 ? "[AUTOTEST] RESULT PASS" : $"[AUTOTEST] RESULT FAIL ({problems.Count})");
         GameSettings.TestMode = false;
         if (hadMode) GameSettings.Mode = originalMode; else PlayerPrefs.DeleteKey("mw.mode");
         PlayerPrefs.Save();
-        Application.Quit(problems.Count == 0 ? 0 : 1);
+        if (problems.Count == 0) quit.onClick.Invoke();
+        else Application.Quit(1);
+    }
+
+    void CheckWaveTwentyReward(GameManager gm)
+    {
+        // Start near the boundary using the real wave and reward handlers.
+        // -autotest routes these feats and the wardrobe to a separate save.
+        const System.Reflection.BindingFlags flags =
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic;
+        var startWave = typeof(GameManager).GetMethod("StartWave", flags);
+        var clearWave = typeof(GameManager).GetMethod("WaveCleared", flags);
+        startWave.Invoke(gm, new object[] { 19 });
+        GameSettings.TestMode = false;
+        try
+        {
+            clearWave.Invoke(gm, null);
+            startWave.Invoke(gm, new object[] { 20 });
+            Expect(!Feats.IsUnlocked("last_oath") && !SwordWardrobe.Available(6),
+                "reaching wave 20 leaves the King's Sword locked");
+            clearWave.Invoke(gm, null);
+            Expect(Feats.IsUnlocked("last_oath") && SwordWardrobe.Available(6),
+                "clearing wave 20 awards Last Oath and unlocks the King's Sword in the same run");
+        }
+        finally
+        {
+            GameSettings.TestMode = true;
+        }
     }
 }

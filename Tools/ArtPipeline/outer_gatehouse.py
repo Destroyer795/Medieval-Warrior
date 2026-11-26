@@ -283,6 +283,29 @@ box('Tipping cradle',oak,-.77,.16,7.81,.16,.41,.13)
 for x in (-1.06,1.06):
     box('Drop channel',beam,x,-1.43,7.02,.16,2.50,.35)
 box('Drop channel',beam,0,-.18,7.02,2.28,.16,.35)
+
+# Carry the timber crossing flush with the courtyard side of both stone piers.
+for j in range(3):
+    y = 2.16 + (j + .5) * .205
+    split = .72 if j % 2 else -.84
+    for a,b in ((-2.255,split),(split,2.255)):
+        box('Arch and gallery',oak,(a+b)/2,y,6.77,b-a-.009,.198,.15)
+
+def courtyard_rail(part, x0, x1, y, floor):
+    length = x1-x0
+    spans = math.ceil(length/1.6)
+    for j in range(spans+1):
+        x = x0+.075+(length-.15)*j/spans
+        box(part,beam,x,y,floor+.46,.15,.15,.92)
+        box(part,iron,x,y,floor+.66,.158,.158,.052)
+    for z in (.40,.84):
+        box(part,oak,(x0+x1)/2,y,floor+z,length,.14,.13)
+
+courtyard_rail('Arch and gallery',-6.21,6.21,2.655,6.845)
+for side,label in ((-1,'West'),(1,'East')):
+    x0,x1 = sorted((side*9.66,side*14.48))
+    courtyard_rail(label+' curtain',x0,x1,1.54,6.23)
+
 for name,(verts,faces,slots,indices,surface_data) in parts.items():
     mesh=bpy.data.meshes.new(name)
     mesh.from_pydata(verts,[],faces)

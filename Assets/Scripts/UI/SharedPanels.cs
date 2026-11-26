@@ -50,14 +50,16 @@ public static class SharedPanels
         var crt = (RectTransform)cols.transform;
         crt.Fill(); crt.offsetMin = new Vector2(70, 120); crt.offsetMax = new Vector2(-70, -138);
 
-        var left = UIKit.VList(cols.transform, 8, null, TextAnchor.UpperLeft);
+        var left = UIKit.VList(cols.transform, 5, null, TextAnchor.UpperLeft);
         left.Layout(-1, 620);
         Section(left.transform, "Controls");
         foreach (var (key, what) in new[]
         {
             ("W A S D", "Move"), ("Mouse", "Look around"), ("Shift", "Sprint (uses stamina)"), ("Space", "Dodge roll - brief invulnerability"),
-            ("Left click", "Sword combo / hold to draw the bow"), ("Right click / E", "Raise shield (sword) or aim (bow)"),
-            ("Block + click", "Shield bash - damages nearby zombies"), ("Q  or  1 / 2", "Swap sword and bow"), ("Scroll", "Zoom camera"), ("Esc", "Pause"),
+            ("Left click", "Strike / hold to draw the bow"), ("Right click / E", "Raise shield (sword) or aim (bow)"),
+            ("Block + click", "Bash with your shield"), ("Q  or  1 / 2", "Swap sword and bow"), ("Scroll", "Zoom camera"), ("Esc", "Pause"),
+            ("R / B / Circle", "Drop a stone or refill at an armory"),
+            ("F / X / Square", "Drink the Verdant Goblet in Horde"),
         })
         {
             var row = UIKit.HList(left.transform, 12, TextAnchor.MiddleLeft);

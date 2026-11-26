@@ -131,6 +131,28 @@ public partial class SmokeTestDriver
             Mathf.Abs(before - enemy.Health - .23f) < .001f,
             "a point-blank arrow contacts the visible torso and deals normal body damage");
         if (bodyShot != null) Destroy(bodyShot.gameObject);
+        // Line up two stationary torsos above the arena. This single projectile
+        // must damage both while contributing just one hit to shot accuracy.
+        var rear = Instantiate(BattleLoading.ZombiePrefab, location + actor.transform.forward * 1.3f, actor.transform.rotation);
+        var rearEnemy = rear.GetComponent<EnemyController>();
+        rearEnemy.Init(ZombieType.Walker, false, false);
+        rear.GetComponent<NavMeshAgent>().enabled = false;
+        var rearAnimator = rear.GetComponent<Animator>();
+        rearAnimator.Play("Locomotion", 0, 0);
+        rearAnimator.Update(0);
+        rearAnimator.enabled = false;
+        var rearChest = rearEnemy.ArrowBody.bones.First(b => b.name == "Base HumanRibcage");
+        rear.transform.position += chest + actor.transform.forward * 1.3f - rearChest.position;
+        Physics.SyncTransforms();
+        var gm = GameManager.instance;
+        int hitsBefore = gm.ArrowsHit;
+        float frontHealth = enemy.Health, rearHealth = rearEnemy.Health;
+        var piercingShot = Arrow.Fire(bodyRay.origin, bodyRay.direction, 55f, .23f, 0, player.transform, 1);
+        yield return Wait(.18f);
+        Check(enemy.Health < frontHealth && rearEnemy.Health < rearHealth && gm.ArrowsHit - hitsBefore == 1,
+            $"one piercing shaft hits two torsos but counts once for accuracy (damage {frontHealth-enemy.Health:F2}/{rearHealth-rearEnemy.Health:F2}, counted {gm.ArrowsHit-hitsBefore})");
+        if (piercingShot != null) Destroy(piercingShot.gameObject);
+        Destroy(rear);
         Destroy(actor);
     }
 }

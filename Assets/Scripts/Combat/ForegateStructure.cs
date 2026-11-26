@@ -16,6 +16,7 @@ public sealed class ForegateStructure : MonoBehaviour
 
     readonly List<GameObject> displaced = new();
     Mesh stairCollision;
+    PhysicsMaterial railMaterial;
     Terrain terrain;
     TerrainData originalTerrain, siegeTerrain;
 
@@ -72,6 +73,9 @@ public sealed class ForegateStructure : MonoBehaviour
         }
 
         ClearApproachVegetation();
+        railMaterial = new PhysicsMaterial("Gatehouse rails") {
+            staticFriction = 0f, dynamicFriction = 0f, frictionCombine = PhysicsMaterialCombine.Minimum
+        };
         BuildWalkways();
         BuildGallery();
         foreach (string name in new[] { "Wall (7)", "House (3)", "House (20)",
@@ -135,6 +139,10 @@ public sealed class ForegateStructure : MonoBehaviour
                     new Vector3(.42f, .57f, .46f));
             Box(transform, "Arrow bin", new Vector3(side * 11.3f, 6.54f, -.47f),
                 new Vector3(1.86f, .55f, .62f));
+            // The courtyard stairs open between x=7.28 and 9.58. Guard only
+            // the exposed walk beyond each landing, leaving both stairs clear.
+            Box(transform, "Armory back rail", new Vector3(side * 12.07f, 6.69f, -1.54f),
+                new Vector3(4.82f, .92f, .15f)).sharedMaterial = railMaterial;
         }
     }
 
@@ -142,7 +150,9 @@ public sealed class ForegateStructure : MonoBehaviour
     {
         // Cover the full plank footprint, including the visible rear overhang.
         // Run the side supports into the crossing and piers to prevent seams.
-        Box(transform, "Gallery crossing", new Vector3(0, 6.655f, -.985f), new Vector3(4.55f, .38f, 2.35f));
+        Box(transform, "Gallery crossing", new Vector3(0, 6.655f, -1.2925f), new Vector3(4.55f, .38f, 2.965f));
+        Box(transform, "Gallery back rail", new Vector3(0, 7.305f, -2.655f),
+            new Vector3(12.42f, .92f, .15f)).sharedMaterial = railMaterial;
         for (int side = -1; side <= 1; side += 2)
         {
             Box(transform, "Channel walkway", new Vector3(side * 1.66f, 6.655f, 1.38f), new Vector3(1.23f, .38f, 2.66f));
@@ -328,6 +338,7 @@ public sealed class ForegateStructure : MonoBehaviour
         }
         if (siegeTerrain != null) Destroy(siegeTerrain);
         if (stairCollision != null) Destroy(stairCollision);
+        if (railMaterial != null) Destroy(railMaterial);
         foreach (var piece in displaced) if (piece != null) piece.SetActive(true);
     }
 }

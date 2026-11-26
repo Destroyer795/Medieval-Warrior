@@ -93,18 +93,22 @@ public class GameHUD : MonoBehaviour
         foreach (var tr in instance.transients)
             if (tr.rt != null && tr.rt.parent == instance.toastRoot && tr.rt.GetComponentInChildren<TextMeshProUGUI>().text == text) return;
         var plate = UIKit.Img(instance.toastRoot, "panel_dark", Color.white, "Notification");
-        plate.Layout(wrap ? 68 : 46, wrap ? 800 : 570);
-        var row = UIKit.HList(plate.transform, 12);
-        ((RectTransform)row.transform).Fill(8);
-        row.childForceExpandHeight = false;
-        row.childForceExpandWidth = false;
-        if (icon != null) UIKit.Icon(row.transform, icon, 38).Layout(38, 38);
-        var t = UIKit.Text(row.transform, text, size, color, TextAlignmentOptions.MidlineLeft);
-        t.Layout(wrap ? 52 : 34, flexW: 1);
-        t.enableAutoSizing = true;
-        t.fontSizeMax = size;
-        t.fontSizeMin = Mathf.Min(21f, size);
-        t.textWrappingMode = wrap ? TextWrappingModes.Normal : TextWrappingModes.NoWrap;
+        const float edge = 20f, iconSize = 34f;
+        float inset = edge + (icon == null ? 0f : iconSize + 12f);
+        // Keep the center column clear of the equipment and kill feed. Measure
+        // the label at its actual width so multiline tips grow their background.
+        float maxWidth = Mathf.Min(wrap ? 800f : 750f, instance.combatRoot.rect.width * .46f);
+        var t = UIKit.Text(plate.transform, text, size, color, TextAlignmentOptions.MidlineLeft);
+        if (t.preferredWidth + inset + edge > maxWidth) t.fontSize = Mathf.Min(size, 28f);
+        float width = Mathf.Min(maxWidth, Mathf.Max(180f, Mathf.Ceil(t.preferredWidth) + inset + edge + 2f));
+        float textHeight = t.GetPreferredValues(text, Mathf.Max(1f, width - inset - edge), Mathf.Infinity).y;
+        plate.Layout(Mathf.Ceil(Mathf.Max(icon == null ? 0f : iconSize, textHeight)) + 20f, width);
+        t.rectTransform.Fill();
+        t.rectTransform.offsetMin = new Vector2(inset, 8f);
+        t.rectTransform.offsetMax = new Vector2(-edge, -8f);
+        if (icon != null)
+            UIKit.Icon(plate.transform, icon, iconSize).rectTransform.Place(new Vector2(0, .5f),
+                new Vector2(0, .5f), new Vector2(edge, 0), new Vector2(iconSize, iconSize));
         instance.transients.Add((plate.rectTransform, Time.unscaledTime, life));
     }
 
@@ -654,7 +658,7 @@ public class GameHUD : MonoBehaviour
             if (gm.Mode == GameMode.EndlessHorde)
             {
                 var tier = HordeDirector.Pressure(gm.Wave);
-                hordeTierLabel.gameObject.SetActive(true);
+                hordeTierLabel.gameObject.SetActive(gm.Wave > 0);
                 hordeTierLabel.text = tier.Name;
                 hordeTierLabel.color = tier.Accent;
                 objectiveFrame.color = Color.Lerp(Color.white, tier.Accent, .58f);

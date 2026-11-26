@@ -4,6 +4,8 @@ Fight the undead to save your castle. A third-person medieval action game made i
 (built-in render pipeline): sword and shield, a bow you can sling on your back, eight kinds of
 zombie, three game modes, and a fully customisable knight.
 
+The [1.2 playtest review and open issues](Docs/PlaytestReview.md) tracks confirmed bugs, test results and the next player-facing improvements.
+
 ## Latest character and gameplay changes
 
 The playable warrior is now **Marchwarden**, with an editable Blender source and

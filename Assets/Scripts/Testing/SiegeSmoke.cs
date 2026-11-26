@@ -276,6 +276,49 @@ public partial class SmokeTestDriver
         Capture("outer_gate_parapet");
         CaptureFrom("outer_gate_front", wall.World(18, 14, -32), wall.World(0, 3.7f, 1));
         CaptureFrom("outer_gate_courtyard", wall.World(-9, 18, 20), wall.World(1, 3.4f, 2));
+        // Reproduce the no-input backstep at the armory, then approach the lever
+        // from each stockpile while pushing diagonally toward the courtyard.
+        var spawnFacing = body.rotation;
+        var dodge = typeof(PlayerControlSpeed).GetMethod("TryDodge",
+            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+        float previousCaptureDelta = Time.captureDeltaTime;
+        Time.captureDeltaTime = Time.fixedDeltaTime;
+        try
+        {
+            dodge.Invoke(knight, new object[] { Vector3.zero });
+            for (int i = 0; i < 44; i++) yield return null;
+            Vector3 afterDodge = wall.transform.InverseTransformPoint(body.position);
+            Check(afterDodge.y > 6.05f && -afterDodge.z < 1.7f,
+                $"stationary dodge at the armory stays on the wall walk (feet {afterDodge:F2})");
+            var cameraRig = Camera.main.GetComponent<CameraFollow>();
+            foreach (int side in new[] { -1, 1 })
+            {
+                Place(wall.World(side * 3.82f, 6.88f, 2.02f));
+                var heading = (wall.transform.right * -side - wall.Outward * .50f).normalized;
+                float lowest = 10;
+                for (int frame = 0; frame < 145; frame++)
+                {
+                    var look = Vector3.ProjectOnPlane(cameraRig.LookDirection, Vector3.up).normalized;
+                    knight.DebugMove(new Vector2(Vector3.Dot(heading, Vector3.Cross(Vector3.up, look)), Vector3.Dot(heading, look)));
+                    yield return null;
+                    var feet = wall.transform.InverseTransformPoint(body.position);
+                    lowest = Mathf.Min(lowest, feet.y);
+                    if ((feet.x + .9f) * side <= 0) break;
+                }
+                knight.DebugMove(null);
+                var finish = wall.transform.InverseTransformPoint(body.position);
+                Check(lowest > 6.65f && Mathf.Abs(finish.x + .9f) < .25f && outer.InteractionPrompt.Contains("Drop stone"),
+                    $"walk from stockpile {side} along the courtyard edge reaches the usable lever (feet {finish:F2}, minimum height {lowest:F2}, velocity {body.linearVelocity:F2}, prompt '{outer.InteractionPrompt}')");
+            }
+        }
+        finally
+        {
+            knight.DebugMove(null);
+            Time.captureDeltaTime = previousCaptureDelta;
+            Place(start);
+            body.rotation = spawnFacing;
+            knight.transform.rotation = spawnFacing;
+        }
         bool SupportsPlanks(float x, float inward) =>
             Physics.Raycast(wall.World(x, 7.4f, inward), Vector3.down, out var floor, .7f, ~0, QueryTriggerInteraction.Ignore) &&
             Mathf.Abs(floor.point.y - wall.World(x, 6.845f, inward).y) < .025f;
@@ -346,6 +389,22 @@ public partial class SmokeTestDriver
         yield return Wait(1.4f);
         Check(outer.StonesRemaining == 4 && outer.StoneReady && wall.ReserveStones == 3,
             "the cradle automatically loads the next stone from the visible stock");
+        bool allReleases = true;
+        for (int remaining = 4; remaining > 0; --remaining)
+        {
+            allReleases &= outer.StonesRemaining == remaining && wall.ReadyStone.gameObject.activeSelf &&
+                outer.Interact() && !outer.Interact();
+            float reloadDeadline = Time.realtimeSinceStartup + 5f;
+            while (Time.realtimeSinceStartup < reloadDeadline &&
+                (remaining == 1 ? wall.ReadyStone.gameObject.activeSelf : !outer.StoneReady || !wall.ReadyStone.gameObject.activeSelf))
+            {
+                if (GameHUD.BoonsOpen) GameHUD.DebugPickBoon(0);
+                yield return null;
+            }
+        }
+        Check(allReleases && outer.StonesRemaining == 0 && wall.ReserveStones == 0 &&
+            !wall.ReadyStone.gameObject.activeSelf && !outer.Interact() && outer.InteractionPrompt.Contains("empty"),
+            "one lever releases all five stones, rejects repeat presses during reload and shows the empty cradle");
         Place(start);
         var clockField = typeof(OuterSiege).GetField("<HoldSeconds>k__BackingField",
             System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);

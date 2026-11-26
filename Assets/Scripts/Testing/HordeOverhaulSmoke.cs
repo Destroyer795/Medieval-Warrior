@@ -171,12 +171,16 @@ public partial class SmokeTestDriver
             ClearEnemies();yield return null;Boons.Reset();
             first=Enemy(ZombieType.Brute,position+player.transform.forward*2.3f);
             Boons.Apply(BoonId.ExplosiveQuiver,null);Boons.Apply(BoonId.FireArrows,null);
+            second=Enemy(ZombieType.Brute,position+player.transform.forward*5.4f);
             var arrow=Arrow.Fire(position+Vector3.up*2,player.transform.forward,30,.4f,0,player.transform,0,true);fixtures.Add(arrow.gameObject);
             var hit=typeof(Arrow).GetMethod("HitEnemy",flags);
+            int arrowHits = gm.ArrowsHit, arrowHeads = gm.Headshots;
             hit.Invoke(arrow,new object[]{first,first.HeadPosition});
             int volleys=FindObjectsByType<ClusterVolley>(FindObjectsSortMode.None).Length;
-            hit.Invoke(arrow,new object[]{first,first.HeadPosition});
+            hit.Invoke(arrow,new object[]{second,second.HeadPosition});
             Check(volleys==1&&FindObjectsByType<ClusterVolley>(FindObjectsSortMode.None).Length==1,"piercing headshots trigger only one cluster volley per arrow");
+            Check(gm.ArrowsHit == arrowHits + 1 && gm.Headshots == arrowHeads + 2,
+                "multiple head contacts keep individual headshot credit and a single successful shot");
             beforeHealth=first.Health;yield return Wait(.85f);
             Check(first.Health<beforeHealth&&first.IsBurning,"delayed headshot bombs deal cluster damage and inherit fire");
             ClearEnemies();yield return null;Boons.Reset();
